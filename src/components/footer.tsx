@@ -5,6 +5,7 @@ import {
   InstagramLogo,
   YoutubeLogo,
   WhatsappLogo,
+  MapPin,
 } from "@phosphor-icons/react/dist/ssr";
 
 const footerLinks = {
@@ -79,6 +80,15 @@ export function Footer() {
                 className="w-9 h-9 rounded-full border border-hairline flex items-center justify-center text-slate-500 hover:text-primary hover:border-primary transition-all"
               >
                 <WhatsappLogo size={18} />
+              </a>
+              <a
+                href="https://www.google.com/maps/place/Annex+Consultancy/@22.620505,88.3496737,17z/data=!3m1!4b1!4m6!3m5!1s0x39f89d0068f61edf:0xf74330027ddf3430!8m2!3d22.6205001!4d88.3522486!16s%2Fg%2F11x6t46f2h?entry=ttu&g_ep=EgoyMDI2MDYxMC4wIKXMDSoASAFQAw%3D%3D"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-9 h-9 rounded-full border border-hairline flex items-center justify-center text-slate-500 hover:text-primary hover:border-primary transition-all"
+                aria-label="Google Maps"
+              >
+                <MapPin size={18} />
               </a>
             </div>
           </div>
