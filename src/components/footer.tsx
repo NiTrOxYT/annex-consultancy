@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { GraduationCap } from "@phosphor-icons/react/dist/ssr";
+import Link from "next/link";
 import {
   GraduationCap,
   FacebookLogo,
@@ -19,7 +19,6 @@ const footerLinks = {
     { label: "Study Abroad Programs", href: "/study-abroad" },
     { label: "Study in India Programs", href: "/study-in-india" },
     { label: "Test Preparation", href: "/test-preparation" },
-    { label: "Admin Access", href: "/admin" },
   ],
   legal: [
     { label: "Privacy Policy", href: "/privacy-policy" },
@@ -48,7 +47,7 @@ export function Footer() {
             </p>
             <div className="flex items-center gap-3 mt-2">
               <a
-                href="https://facebook.com"
+                href="https://facebook.com/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-9 h-9 rounded-full border border-hairline flex items-center justify-center text-slate-500 hover:text-primary hover:border-primary transition-all"
