@@ -279,7 +279,7 @@ export default function Contact() {
             {/* Sidebar Column: Contact Info */}
             <div className="lg:col-span-4 flex flex-col gap-6">
               <Card className="h-auto">
-                <CardTitle className="text-sm uppercase tracking-wider text-slate-400 mb-6">Head Office Location</CardTitle>
+                <CardTitle className="text-sm uppercase tracking-wider text-slate-400 mb-6">Office Locations</CardTitle>
                 <div className="flex flex-col gap-6">
                   <div className="flex items-start gap-4">
                     <div className="w-8 h-8 rounded-full bg-primary/5 flex items-center justify-center text-primary shrink-0 mt-0.5">
@@ -294,7 +294,22 @@ export default function Contact() {
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-4">
+                  <div className="flex items-start gap-4 border-t border-hairline pt-4">
+                    <div className="w-8 h-8 rounded-full bg-primary/5 flex items-center justify-center text-primary shrink-0 mt-0.5">
+                      <MapPin size={16} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-primary">India Office</h4>
+                      <p className="text-xs text-slate-500 leading-relaxed mt-1">
+                        99/1/2, Girish Ghosh Rd<br />
+                        Belur Math, Ghusuri<br />
+                        Howrah, West Bengal 711202<br />
+                        India
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-4 border-t border-hairline pt-4">
                     <div className="w-8 h-8 rounded-full bg-primary/5 flex items-center justify-center text-primary shrink-0 mt-0.5">
                       <Phone size={16} />
                     </div>

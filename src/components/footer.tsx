@@ -126,16 +126,29 @@ export function Footer() {
           </div>
 
           {/* Contact Details */}
-          <div>
-            <h4 className="text-xs font-bold text-primary uppercase tracking-wider mb-4">
-              Contact
-            </h4>
-            <p className="text-xs font-semibold text-slate-600 leading-relaxed">
-              Kathmandu Head Office<br />
-              New Baneshwor, Kathmandu, Nepal<br />
-              Phone: +977-1-4780516<br />
-              Email: info@annexconsultant.com
-            </p>
+          <div className="flex flex-col gap-4">
+            <div>
+              <h4 className="text-xs font-bold text-primary uppercase tracking-wider mb-2">
+                Nepal Office
+              </h4>
+              <p className="text-xs font-semibold text-slate-600 leading-relaxed">
+                Kathmandu Head Office<br />
+                New Baneshwor, Kathmandu, Nepal<br />
+                Phone: +977-1-4780516<br />
+                Email: info@annexconsultant.com
+              </p>
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-primary uppercase tracking-wider mb-2">
+                India Office
+              </h4>
+              <p className="text-xs font-semibold text-slate-600 leading-relaxed">
+                99/1/2, Girish Ghosh Rd<br />
+                Belur Math, Ghusuri<br />
+                Howrah, West Bengal 711202<br />
+                India
+              </p>
+            </div>
           </div>
         </div>
 

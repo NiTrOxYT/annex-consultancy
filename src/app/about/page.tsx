@@ -32,6 +32,12 @@ const offices = [
     email: "kathmandu@annexconsultant.com",
   },
   {
+    branch: "India Office",
+    address: "99/1/2, Girish Ghosh Rd, Belur Math, Ghusuri, Howrah, West Bengal 711202, India",
+    phone: "+91-33-XXXXXXXX",
+    email: "india@annexconsultant.com",
+  },
+  {
     branch: "Liaison Office (Sydney)",
     address: "George Street, Sydney, NSW, Australia",
     phone: "+61-2-9281-2292",
