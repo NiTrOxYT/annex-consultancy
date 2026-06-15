@@ -76,7 +76,7 @@ export function Navigation() {
                         {link.label}
                         <CaretDown size={14} className="text-slate-400 group-hover:rotate-180 transition-transform duration-200" />
                       </button>
-                      
+
                       <AnimatePresence>
                         {activeDropdown === link.label && (
                           <motion.div
@@ -122,10 +122,7 @@ export function Navigation() {
               })}
             </nav>
 
-            <div className="hidden lg:flex items-center gap-4">
-              <Link href="/admin" className="text-xs font-semibold text-slate-500 hover:text-primary transition-colors">
-                Admin
-              </Link>
+            <div className="hidden lg:flex items-center">
               <Link href="/contact">
                 <Button size="sm">Book Consultation</Button>
               </Link>
@@ -200,9 +197,6 @@ export function Navigation() {
                 <Button variant="primary" className="w-full text-center">
                   Book Consultation
                 </Button>
-              </Link>
-              <Link href="/admin" className="text-center text-xs font-medium text-slate-400 hover:text-primary">
-                Admin Area
               </Link>
             </motion.div>
           </motion.div>
