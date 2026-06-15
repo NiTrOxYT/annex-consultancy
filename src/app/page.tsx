@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 
 // Seed images
-const HERO_IMAGE = "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1200&auto=format&fit=crop";
+const HERO_IMAGE =
+  "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=1200&auto=format&fit=crop";
 const DEST_UK = "https://images.unsplash.com/photo-1513635269975-59663e0ca1ad?q=80&w=600&auto=format&fit=crop";
 const DEST_AU = "https://images.unsplash.com/photo-1524820197278-540916411e20?q=80&w=600&auto=format&fit=crop";
 const DEST_EU = "https://images.unsplash.com/photo-1473951574080-01fe45ec8643?q=80&w=600&auto=format&fit=crop";
@@ -65,7 +66,7 @@ export default function Home() {
         <section className="relative pt-32 pb-24 md:pt-40 md:pb-32 overflow-hidden bg-white">
           <div className="max-w-7xl mx-auto px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-              
+
               {/* Left Column: Heading, Subhead, CTA */}
               <div className="lg:col-span-7 flex flex-col items-start text-left">
                 <motion.div
