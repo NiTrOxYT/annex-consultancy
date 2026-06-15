@@ -22,7 +22,12 @@ const navLinks = [
       { label: "Italy", href: "/study-abroad/italy" },
     ],
   },
+
   { label: "Study in India", href: "/study-in-india" },
+
+  // ADD THIS
+  { label: "Training & Placement", href: "/training-placement" },
+
   {
     label: "Test Prep",
     href: "/test-preparation",
@@ -33,6 +38,7 @@ const navLinks = [
       { label: "Computer Courses", href: "/test-preparation/computer-courses" },
     ],
   },
+
   { label: "Success Stories", href: "/success-stories" },
   { label: "Blog", href: "/blog" },
 ];
