@@ -4,12 +4,13 @@ import { Sparkle, Checks, ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
-import { Card, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
 
 interface CountryDetails {
   name: string;
   tagline: string;
   desc: string;
+  image: string;
   requirements: string[];
   intakes: string[];
   fees: string;
@@ -22,6 +23,7 @@ const countryData: Record<string, CountryDetails> = {
     name: "United Kingdom",
     tagline: "Accelerated degree structures and world-renowned research.",
     desc: "The UK is one of the most popular study destinations, offering 1-year Masters programs and 3-year Bachelors programs. Annex helps you connect with top Russell Group universities and local campuses.",
+    image: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?q=80&w=2340&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     requirements: [
       "IELTS 6.0 - 6.5 (or equivalent PTE score)",
       "Academic score: Minimum 60% or 2.8 CGPA",
@@ -41,6 +43,7 @@ const countryData: Record<string, CountryDetails> = {
     name: "Australia",
     tagline: "Top tier academic programs paired with rich post-study pathways.",
     desc: "Earn degrees at Group of Eight universities or leading regional campuses. Australia provides excellent opportunities for post-study work rights (PSWR) in cities like Melbourne, Sydney, and Brisbane.",
+    image: "https://images.unsplash.com/photo-1524820197278-540916411e20?q=80&w=600&auto=format&fit=crop",
     requirements: [
       "IELTS 6.0 - 7.0 (or equivalent PTE score)",
       "Academic score: Minimum 65% or 3.0 CGPA",
@@ -60,6 +63,7 @@ const countryData: Record<string, CountryDetails> = {
     name: "Europe",
     tagline: "Affordable premium English programs across historic campuses.",
     desc: "Study in leading economic hubs like Germany, France, or Spain. European state institutions offer highly subsidized education, while English-taught streams make degrees fully accessible to Nepalese learners.",
+    image: "https://images.unsplash.com/photo-1473951574080-01fe45ec8643?q=80&w=600&auto=format&fit=crop",
     requirements: [
       "IELTS 6.0 - 6.5 (some public institutions waive it with MOI)",
       "Academic score: Minimum 55% or 2.5 CGPA",
@@ -79,6 +83,7 @@ const countryData: Record<string, CountryDetails> = {
     name: "Dubai",
     tagline: "Study at top global branch campuses in an international hub.",
     desc: "Dubai offers global university branch campuses with identical degree credentials. Features flexible student visa sponsorship and immediate pathway transitions to mother campuses in the UK or Australia.",
+    image: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?q=80&w=600&auto=format&fit=crop",
     requirements: [
       "IELTS 5.5 - 6.0 (Waiver options available on high high-school scores)",
       "Academic score: Minimum 50% or 2.2 CGPA",
@@ -98,6 +103,7 @@ const countryData: Record<string, CountryDetails> = {
     name: "Italy",
     tagline: "Highly subsidized state universities and generous study grants.",
     desc: "Italy stands out for offering low-cost English-taught degrees at historic public universities. Annex provides complete support with pre-enrollment steps, DSU scholarship declarations, and visa filing.",
+    image: "https://images.unsplash.com/photo-1499002238440-d264edd596ec?q=80&w=600&auto=format&fit=crop",
     requirements: [
       "IELTS 6.0 minimum (or verified English Medium of Instruction certificate)",
       "Academic score: Minimum 55% in high school/Bachelors",
@@ -149,38 +155,58 @@ export default async function CountryPage({ params }: PageProps) {
             <ArrowLeft size={12} /> Back to Destinations
           </Link>
 
-          {/* Heading Block */}
-          <div className="max-w-3xl mb-16">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-subtle-gray border border-hairline/80 text-[10px] uppercase tracking-[0.2em] font-semibold text-primary mb-6">
-              <Sparkle size={12} className="text-gold" weight="fill" />
-              Admissions Guide
+          {/* Desktop Left / Right Split Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start mb-16">
+            
+            {/* Left Column: Heading and Requirements */}
+            <div className="lg:col-span-7 flex flex-col gap-8">
+              
+              {/* Heading Block */}
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-subtle-gray border border-hairline/80 text-[10px] uppercase tracking-[0.2em] font-semibold text-primary mb-6">
+                  <Sparkle size={12} className="text-gold" weight="fill" />
+                  Admissions Guide
+                </div>
+                <h1 className="font-display font-bold text-4xl md:text-5xl text-primary tracking-tighter leading-none mb-6">
+                  Study in {data.name}.
+                </h1>
+                <p className="text-base md:text-lg text-slate-500 leading-relaxed">
+                  {data.tagline} {data.desc}
+                </p>
+              </div>
+
+              {/* Requirements Card */}
+              <Card className="flex flex-col justify-start">
+                <CardTitle className="text-lg mb-6 border-b border-hairline pb-4">Entry Requirements</CardTitle>
+                <ul className="flex flex-col gap-4">
+                  {data.requirements.map((req) => (
+                    <li key={req} className="flex items-start gap-3">
+                      <span className="w-5 h-5 rounded-full bg-primary/5 flex items-center justify-center text-primary shrink-0 mt-0.5">
+                        <Checks size={12} />
+                      </span>
+                      <span className="text-sm text-slate-600 font-medium leading-relaxed">{req}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+
             </div>
-            <h1 className="font-display font-bold text-4xl md:text-5xl text-primary tracking-tighter leading-none mb-6">
-              Study in {data.name}.
-            </h1>
-            <p className="text-base md:text-lg text-slate-500 leading-relaxed">
-              {data.tagline} {data.desc}
-            </p>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16">
-            {/* Requirements Card */}
-            <Card className="lg:col-span-2 flex flex-col justify-start">
-              <CardTitle className="text-lg mb-6 border-b border-hairline pb-4">Entry Requirements</CardTitle>
-              <ul className="flex flex-col gap-4">
-                {data.requirements.map((req) => (
-                  <li key={req} className="flex items-start gap-3">
-                    <span className="w-5 h-5 rounded-full bg-primary/5 flex items-center justify-center text-primary shrink-0 mt-0.5">
-                      <Checks size={12} />
-                    </span>
-                    <span className="text-sm text-slate-600 font-medium leading-relaxed">{req}</span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
+            {/* Right Column: Hero Image & Quick Metrics */}
+            <div className="lg:col-span-5 flex flex-col gap-6">
+              
+              {/* Premium Destination Hero Image */}
+              <div className="relative w-full aspect-[16/10] bg-subtle-gray border border-hairline/80 p-2 rounded-[2rem]">
+                <div className="relative w-full h-full overflow-hidden rounded-[calc(2rem-0.5rem)] border border-hairline/40">
+                  <img
+                    src={data.image}
+                    alt={`Study in ${data.name}`}
+                    className="object-cover w-full h-full brightness-[0.98]"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent pointer-events-none" />
+                </div>
+              </div>
 
-            {/* Quick Metrics */}
-            <div className="flex flex-col gap-6">
               <Card className="h-auto">
                 <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
                   Intake Cycles
@@ -189,6 +215,7 @@ export default async function CountryPage({ params }: PageProps) {
                   {data.intakes.join(" / ")}
                 </div>
               </Card>
+
               <Card className="h-auto">
                 <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
                   Average Tuition Fee
@@ -197,6 +224,7 @@ export default async function CountryPage({ params }: PageProps) {
                   {data.fees}
                 </div>
               </Card>
+
               <Card className="h-auto">
                 <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
                   Est. Living Cost
@@ -205,7 +233,9 @@ export default async function CountryPage({ params }: PageProps) {
                   {data.livingCost}
                 </div>
               </Card>
+
             </div>
+
           </div>
 
           {/* Universities list */}
