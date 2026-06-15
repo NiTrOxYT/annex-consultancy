@@ -23,7 +23,7 @@ const countryData: Record<string, CountryDetails> = {
     name: "United Kingdom",
     tagline: "Accelerated degree structures and world-renowned research.",
     desc: "The UK is one of the most popular study destinations, offering 1-year Masters programs and 3-year Bachelors programs. Annex helps you connect with top Russell Group universities and local campuses.",
-    image: "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?q=80&w=2340&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    image: "/images/uk.jpg",
     requirements: [
       "IELTS 6.0 - 6.5 (or equivalent PTE score)",
       "Academic score: Minimum 60% or 2.8 CGPA",
@@ -43,7 +43,7 @@ const countryData: Record<string, CountryDetails> = {
     name: "Australia",
     tagline: "Top tier academic programs paired with rich post-study pathways.",
     desc: "Earn degrees at Group of Eight universities or leading regional campuses. Australia provides excellent opportunities for post-study work rights (PSWR) in cities like Melbourne, Sydney, and Brisbane.",
-    image: "https://images.unsplash.com/photo-1524820197278-540916411e20?q=80&w=600&auto=format&fit=crop",
+    image: "/images/australia.jpg",
     requirements: [
       "IELTS 6.0 - 7.0 (or equivalent PTE score)",
       "Academic score: Minimum 65% or 3.0 CGPA",
@@ -63,7 +63,7 @@ const countryData: Record<string, CountryDetails> = {
     name: "Europe",
     tagline: "Affordable premium English programs across historic campuses.",
     desc: "Study in leading economic hubs like Germany, France, or Spain. European state institutions offer highly subsidized education, while English-taught streams make degrees fully accessible to Nepalese learners.",
-    image: "https://images.unsplash.com/photo-1473951574080-01fe45ec8643?q=80&w=600&auto=format&fit=crop",
+    image: "/images/europe.jpg",
     requirements: [
       "IELTS 6.0 - 6.5 (some public institutions waive it with MOI)",
       "Academic score: Minimum 55% or 2.5 CGPA",
@@ -83,7 +83,7 @@ const countryData: Record<string, CountryDetails> = {
     name: "Dubai",
     tagline: "Study at top global branch campuses in an international hub.",
     desc: "Dubai offers global university branch campuses with identical degree credentials. Features flexible student visa sponsorship and immediate pathway transitions to mother campuses in the UK or Australia.",
-    image: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?q=80&w=600&auto=format&fit=crop",
+    image: "/images/dubai.jpg",
     requirements: [
       "IELTS 5.5 - 6.0 (Waiver options available on high high-school scores)",
       "Academic score: Minimum 50% or 2.2 CGPA",
@@ -103,7 +103,7 @@ const countryData: Record<string, CountryDetails> = {
     name: "Italy",
     tagline: "Highly subsidized state universities and generous study grants.",
     desc: "Italy stands out for offering low-cost English-taught degrees at historic public universities. Annex provides complete support with pre-enrollment steps, DSU scholarship declarations, and visa filing.",
-    image: "https://images.unsplash.com/photo-1499002238440-d264edd596ec?q=80&w=600&auto=format&fit=crop",
+    image: "/images/italy.jpg",
     requirements: [
       "IELTS 6.0 minimum (or verified English Medium of Instruction certificate)",
       "Academic score: Minimum 55% in high school/Bachelors",
