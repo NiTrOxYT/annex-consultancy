@@ -1,5 +1,12 @@
 import Link from "next/link";
 import { GraduationCap } from "@phosphor-icons/react/dist/ssr";
+import {
+  GraduationCap,
+  FacebookLogo,
+  InstagramLogo,
+  YoutubeLogo,
+  WhatsappLogo,
+} from "@phosphor-icons/react/dist/ssr";
 
 const footerLinks = {
   consultancy: [
@@ -39,6 +46,43 @@ export function Footer() {
             <p className="text-xs text-slate-500 leading-relaxed max-w-[30ch]">
               Annex Education Consultancy provides international and domestic placement services, empowering students to secure admission at top global institutions.
             </p>
+            <div className="flex items-center gap-3 mt-2">
+              <a
+                href="https://facebook.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-9 h-9 rounded-full border border-hairline flex items-center justify-center text-slate-500 hover:text-primary hover:border-primary transition-all"
+              >
+                <FacebookLogo size={18} />
+              </a>
+
+              <a
+                href="https://instagram.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-9 h-9 rounded-full border border-hairline flex items-center justify-center text-slate-500 hover:text-primary hover:border-primary transition-all"
+              >
+                <InstagramLogo size={18} />
+              </a>
+
+              <a
+                href="https://youtube.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-9 h-9 rounded-full border border-hairline flex items-center justify-center text-slate-500 hover:text-primary hover:border-primary transition-all"
+              >
+                <YoutubeLogo size={18} />
+              </a>
+
+              <a
+                href="https://wa.me/977123456789"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-9 h-9 rounded-full border border-hairline flex items-center justify-center text-slate-500 hover:text-primary hover:border-primary transition-all"
+              >
+                <WhatsappLogo size={18} />
+              </a>
+            </div>
           </div>
 
           {/* Consultancy links */}
