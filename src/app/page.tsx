@@ -12,7 +12,7 @@ import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 const HERO_IMAGE =
   "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=1200&auto=format&fit=crop";
 const DEST_UK =
-  "https://unsplash.com/photos/aerial-photography-of-london-skyline-during-daytime-Oja2ty_9ZLM";
+  "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?q=80&w=2340&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
 const DEST_AU = "https://images.unsplash.com/photo-1524820197278-540916411e20?q=80&w=600&auto=format&fit=crop";
 const DEST_EU = "https://images.unsplash.com/photo-1473951574080-01fe45ec8643?q=80&w=600&auto=format&fit=crop";
 const DEST_DXB = "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?q=80&w=600&auto=format&fit=crop";
