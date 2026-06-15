@@ -1,0 +1,241 @@
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import { Sparkle, Checks, ArrowLeft } from "@phosphor-icons/react/dist/ssr";
+import { Navigation } from "@/components/navigation";
+import { Footer } from "@/components/footer";
+import { Button } from "@/components/ui/button";
+import { Card, CardTitle, CardDescription } from "@/components/ui/card";
+
+interface CountryDetails {
+  name: string;
+  tagline: string;
+  desc: string;
+  requirements: string[];
+  intakes: string[];
+  fees: string;
+  livingCost: string;
+  universities: string[];
+}
+
+const countryData: Record<string, CountryDetails> = {
+  uk: {
+    name: "United Kingdom",
+    tagline: "Accelerated degree structures and world-renowned research.",
+    desc: "The UK is one of the most popular study destinations, offering 1-year Masters programs and 3-year Bachelors programs. Annex helps you connect with top Russell Group universities and local campuses.",
+    requirements: [
+      "IELTS 6.0 - 6.5 (or equivalent PTE score)",
+      "Academic score: Minimum 60% or 2.8 CGPA",
+      "No gap restriction for qualified profiles",
+    ],
+    intakes: ["September / October", "January / February"],
+    fees: "£12,000 - £26,000 per year",
+    livingCost: "£10,000 - £12,000 per year",
+    universities: [
+      "University of Westminster, London",
+      "Coventry University, Coventry",
+      "University of Hertfordshire, Hatfield",
+      "Cardiff University, Cardiff",
+    ],
+  },
+  australia: {
+    name: "Australia",
+    tagline: "Top tier academic programs paired with rich post-study pathways.",
+    desc: "Earn degrees at Group of Eight universities or leading regional campuses. Australia provides excellent opportunities for post-study work rights (PSWR) in cities like Melbourne, Sydney, and Brisbane.",
+    requirements: [
+      "IELTS 6.0 - 7.0 (or equivalent PTE score)",
+      "Academic score: Minimum 65% or 3.0 CGPA",
+      "Thorough financial documentation (3 months history)",
+    ],
+    intakes: ["February / March", "July / August", "November (limited)"],
+    fees: "A$22,000 - A$42,000 per year",
+    livingCost: "A$21,041 - A$25,000 per year",
+    universities: [
+      "Macquarie University, Sydney",
+      "Deakin University, Melbourne",
+      "Griffith University, Brisbane",
+      "University of Wollongong, Wollongong",
+    ],
+  },
+  europe: {
+    name: "Europe",
+    tagline: "Affordable premium English programs across historic campuses.",
+    desc: "Study in leading economic hubs like Germany, France, or Spain. European state institutions offer highly subsidized education, while English-taught streams make degrees fully accessible to Nepalese learners.",
+    requirements: [
+      "IELTS 6.0 - 6.5 (some public institutions waive it with MOI)",
+      "Academic score: Minimum 55% or 2.5 CGPA",
+      "Proof of blocked account or financial sponsorship",
+    ],
+    intakes: ["September / October", "March / April"],
+    fees: "€1,500 - €12,000 per year",
+    livingCost: "€8,000 - €11,000 per year",
+    universities: [
+      "IU University of Applied Sciences, Germany",
+      "Toulouse Business School, France",
+      "Geneva Business School, Spain",
+      "Schiller International University, Germany",
+    ],
+  },
+  dubai: {
+    name: "Dubai",
+    tagline: "Study at top global branch campuses in an international hub.",
+    desc: "Dubai offers global university branch campuses with identical degree credentials. Features flexible student visa sponsorship and immediate pathway transitions to mother campuses in the UK or Australia.",
+    requirements: [
+      "IELTS 5.5 - 6.0 (Waiver options available on high high-school scores)",
+      "Academic score: Minimum 50% or 2.2 CGPA",
+      "Simplified financial verification process",
+    ],
+    intakes: ["September", "January", "May"],
+    fees: "AED 35,000 - AED 75,000 per year",
+    livingCost: "AED 24,000 - AED 36,000 per year",
+    universities: [
+      "Heriot-Watt University Dubai",
+      "Middlesex University Dubai",
+      "University of Birmingham Dubai",
+      "Manipal Academy of Higher Education Dubai",
+    ],
+  },
+  italy: {
+    name: "Italy",
+    tagline: "Highly subsidized state universities and generous study grants.",
+    desc: "Italy stands out for offering low-cost English-taught degrees at historic public universities. Annex provides complete support with pre-enrollment steps, DSU scholarship declarations, and visa filing.",
+    requirements: [
+      "IELTS 6.0 minimum (or verified English Medium of Instruction certificate)",
+      "Academic score: Minimum 55% in high school/Bachelors",
+      "Italian declaration of value (DoV) or CIMEA certificate",
+    ],
+    intakes: ["September / October only"],
+    fees: "€800 - €3,000 per year (State rates)",
+    livingCost: "€5,000 - €7,000 per year",
+    universities: [
+      "University of Milan, Milan",
+      "Sapienza University of Rome, Rome",
+      "University of Bologna, Bologna",
+      "Polytechnic University of Turin, Turin",
+    ],
+  },
+};
+
+// Next.js static params generation for routing validation
+export async function generateStaticParams() {
+  return [
+    { country: "uk" },
+    { country: "australia" },
+    { country: "europe" },
+    { country: "dubai" },
+    { country: "italy" },
+  ];
+}
+
+interface PageProps {
+  params: Promise<{ country: string }>;
+}
+
+export default async function CountryPage({ params }: PageProps) {
+  const { country } = await params;
+  const data = countryData[country.toLowerCase()];
+
+  if (!data) {
+    notFound();
+  }
+
+  return (
+    <>
+      <Navigation />
+
+      <main className="flex-grow pt-32 pb-24 bg-white text-left">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          {/* Back button */}
+          <Link href="/study-abroad" className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-primary transition-colors mb-12">
+            <ArrowLeft size={12} /> Back to Destinations
+          </Link>
+
+          {/* Heading Block */}
+          <div className="max-w-3xl mb-16">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-subtle-gray border border-hairline/80 text-[10px] uppercase tracking-[0.2em] font-semibold text-primary mb-6">
+              <Sparkle size={12} className="text-gold" weight="fill" />
+              Admissions Guide
+            </div>
+            <h1 className="font-display font-bold text-4xl md:text-5xl text-primary tracking-tighter leading-none mb-6">
+              Study in {data.name}.
+            </h1>
+            <p className="text-base md:text-lg text-slate-500 leading-relaxed">
+              {data.tagline} {data.desc}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16">
+            {/* Requirements Card */}
+            <Card className="lg:col-span-2 flex flex-col justify-start">
+              <CardTitle className="text-lg mb-6 border-b border-hairline pb-4">Entry Requirements</CardTitle>
+              <ul className="flex flex-col gap-4">
+                {data.requirements.map((req) => (
+                  <li key={req} className="flex items-start gap-3">
+                    <span className="w-5 h-5 rounded-full bg-primary/5 flex items-center justify-center text-primary shrink-0 mt-0.5">
+                      <Checks size={12} />
+                    </span>
+                    <span className="text-sm text-slate-600 font-medium leading-relaxed">{req}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+
+            {/* Quick Metrics */}
+            <div className="flex flex-col gap-6">
+              <Card className="h-auto">
+                <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  Intake Cycles
+                </CardTitle>
+                <div className="font-display font-bold text-xl text-primary leading-tight">
+                  {data.intakes.join(" / ")}
+                </div>
+              </Card>
+              <Card className="h-auto">
+                <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  Average Tuition Fee
+                </CardTitle>
+                <div className="font-mono-data text-xl font-bold text-primary leading-tight">
+                  {data.fees}
+                </div>
+              </Card>
+              <Card className="h-auto">
+                <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                  Est. Living Cost
+                </CardTitle>
+                <div className="font-mono-data text-xl font-bold text-primary leading-tight">
+                  {data.livingCost}
+                </div>
+              </Card>
+            </div>
+          </div>
+
+          {/* Universities list */}
+          <section className="mb-16">
+            <h2 className="font-display font-bold text-2xl text-primary tracking-tight mb-8">
+              Key Partners & Affiliated Camps
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {data.universities.map((uni) => (
+                <div key={uni} className="border border-hairline bg-subtle-gray/10 p-5 rounded-xl flex items-center justify-between">
+                  <span className="text-sm font-semibold text-primary">{uni}</span>
+                  <span className="text-[10px] font-mono-data uppercase tracking-wider text-slate-400">Verified Partnership</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* CTA Box */}
+          <div className="bg-primary text-white p-12 rounded-[2rem] text-center flex flex-col items-center">
+            <h3 className="font-display font-bold text-2xl md:text-3xl text-white mb-4">Start your {data.name} enrollment today</h3>
+            <p className="text-sm text-slate-300 max-w-[45ch] mb-8">We offer full-cycle application routing, credential validation, and visa briefing.</p>
+            <Link href="/contact">
+              <Button variant="gold" size="md">Book Consultation</Button>
+            </Link>
+          </div>
+
+        </div>
+      </main>
+
+      <Footer />
+    </>
+  );
+}

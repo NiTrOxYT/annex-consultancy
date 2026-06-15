@@ -1,0 +1,111 @@
+import Link from "next/link";
+import { GraduationCap } from "@phosphor-icons/react/dist/ssr";
+
+const footerLinks = {
+  consultancy: [
+    { label: "About Us", href: "/about" },
+    { label: "Success Stories", href: "/success-stories" },
+    { label: "Latest Blog", href: "/blog" },
+    { label: "Contact & Offices", href: "/contact" },
+  ],
+  services: [
+    { label: "Study Abroad Programs", href: "/study-abroad" },
+    { label: "Study in India Programs", href: "/study-in-india" },
+    { label: "Test Preparation", href: "/test-preparation" },
+    { label: "Admin Access", href: "/admin" },
+  ],
+  legal: [
+    { label: "Privacy Policy", href: "/privacy-policy" },
+    { label: "Terms of Service", href: "/terms-of-service" },
+    { label: "Cookie Settings", href: "/cookie-settings" },
+  ],
+};
+
+export function Footer() {
+  const currentYear = new Date().getFullYear();
+
+  return (
+    <footer className="border-t border-hairline bg-subtle-gray/30 pt-16 pb-12 mt-auto">
+      <div className="max-w-7xl mx-auto px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+          {/* Logo & Info */}
+          <div className="flex flex-col gap-4">
+            <Link href="/" className="flex items-center gap-2">
+              <GraduationCap size={28} className="text-primary" weight="fill" />
+              <span className="font-display font-bold text-xl tracking-tight text-primary">
+                ANNEX
+              </span>
+            </Link>
+            <p className="text-xs text-slate-500 leading-relaxed max-w-[30ch]">
+              Annex Education Consultancy provides international and domestic placement services, empowering students to secure admission at top global institutions.
+            </p>
+          </div>
+
+          {/* Consultancy links */}
+          <div>
+            <h4 className="text-xs font-bold text-primary uppercase tracking-wider mb-4">
+              Consultancy
+            </h4>
+            <ul className="flex flex-col gap-2.5">
+              {footerLinks.consultancy.map((link) => (
+                <li key={link.label}>
+                  <Link href={link.href} className="text-xs font-semibold text-slate-500 hover:text-primary transition-colors">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Services links */}
+          <div>
+            <h4 className="text-xs font-bold text-primary uppercase tracking-wider mb-4">
+              Services
+            </h4>
+            <ul className="flex flex-col gap-2.5">
+              {footerLinks.services.map((link) => (
+                <li key={link.label}>
+                  <Link href={link.href} className="text-xs font-semibold text-slate-500 hover:text-primary transition-colors">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Contact Details */}
+          <div>
+            <h4 className="text-xs font-bold text-primary uppercase tracking-wider mb-4">
+              Contact
+            </h4>
+            <p className="text-xs font-semibold text-slate-600 leading-relaxed">
+              Kathmandu Head Office<br />
+              New Baneshwor, Kathmandu, Nepal<br />
+              Phone: +977-1-4780516<br />
+              Email: info@annexconsultant.com
+            </p>
+          </div>
+        </div>
+
+        {/* Legal & Copyright */}
+        <div className="border-t border-hairline/80 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-xs text-slate-400 font-semibold">
+            &copy; {currentYear} Annex Education Consultancy. All rights reserved.
+          </p>
+
+          <div className="flex gap-6">
+            {footerLinks.legal.map((link) => (
+              <Link
+                key={link.label}
+                href={link.href}
+                className="text-xs font-semibold text-slate-400 hover:text-primary transition-colors"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
