@@ -36,7 +36,11 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         {children}
-        <GoogleAnalytics gaId="G-NQX1PDVZDF" />
+        <GoogleAnalytics
+
+          gaId={process.env.NEXT_PUBLIC_GA_ID!}
+
+        />
       </body>
     </html>
   );
