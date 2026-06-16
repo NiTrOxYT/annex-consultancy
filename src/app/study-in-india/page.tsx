@@ -44,18 +44,58 @@ export default function StudyInIndia() {
       <main className="flex-grow pt-32 pb-24 bg-white text-left">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           
-          {/* Header */}
-          <div className="max-w-3xl mb-16">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-subtle-gray border border-hairline/80 text-[10px] uppercase tracking-[0.2em] font-semibold text-primary mb-6">
-              <Sparkle size={12} className="text-gold" weight="fill" />
-              Domestic Placements
+          {/* Split Screen Header */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center mb-16">
+            {/* Left column */}
+            <div className="lg:col-span-7">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-subtle-gray border border-hairline/80 text-[10px] uppercase tracking-[0.2em] font-semibold text-primary mb-6">
+                <Sparkle size={12} className="text-gold" weight="fill" />
+                Domestic Placements
+              </div>
+              <h1 className="font-display font-bold text-4xl md:text-5xl text-primary tracking-tighter leading-none mb-6">
+                Study in India.
+              </h1>
+              <p className="text-base md:text-lg text-slate-500 leading-relaxed mb-8 max-w-[55ch]">
+                Access highly credited technical and medical state universities in India. We represent premium partner campuses that hold NAAC A+ and A++ accrediting certifications.
+              </p>
+              
+              {/* Checklist */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  "NAAC A+ & A++ Accredited Universities",
+                  "Fully English Medium Programs",
+                  "UGC, AICTE, and MCI Directories Recognized",
+                  "Direct Provisional Offer Letters"
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-2.5">
+                    <span className="w-5 h-5 rounded-full bg-primary/5 flex items-center justify-center text-primary shrink-0 mt-0.5">
+                      <Checks size={12} />
+                    </span>
+                    <span className="text-xs font-semibold text-slate-600 leading-relaxed">{item}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <h1 className="font-display font-bold text-4xl md:text-5xl text-primary tracking-tighter leading-none mb-6">
-              Study in India.
-            </h1>
-            <p className="text-base md:text-lg text-slate-500 leading-relaxed max-w-[55ch]">
-              Access highly credited technical and medical state universities in India. We represent premium partner campuses that hold NAAC A+ accrediting certifications.
-            </p>
+            
+            {/* Right column: Highlights Grid */}
+            <div className="lg:col-span-5 grid grid-cols-2 gap-4">
+              <Card className="min-h-[110px] p-4 flex flex-col justify-between" outerClassName="border-slate-200">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Accreditation</span>
+                <span className="text-lg font-bold text-primary mt-2">NAAC A++ Status</span>
+              </Card>
+              <Card className="min-h-[110px] p-4 flex flex-col justify-between" outerClassName="border-slate-200">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Academic Scope</span>
+                <span className="text-lg font-bold text-primary mt-2">150+ Programs</span>
+              </Card>
+              <Card className="min-h-[110px] p-4 flex flex-col justify-between" outerClassName="border-slate-200">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Success Rate</span>
+                <span className="text-lg font-bold text-primary mt-2">100% Placements</span>
+              </Card>
+              <Card className="min-h-[110px] p-4 flex flex-col justify-between" outerClassName="border-slate-200">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Consultation</span>
+                <span className="text-lg font-bold text-primary mt-2">Free NoC Help</span>
+              </Card>
+            </div>
           </div>
 
           {/* Dynamic Colleges Directory */}
