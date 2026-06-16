@@ -48,16 +48,26 @@ CREATE POLICY "Allow public delete bookings" ON public.bookings
 CREATE TABLE IF NOT EXISTS public.universities (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
+    slug TEXT NOT NULL UNIQUE,
+    logo_url TEXT,
     country TEXT NOT NULL,
     city TEXT NOT NULL,
-    website TEXT,
-    tuition_range TEXT, -- e.g., "$10,000 - $20,000"
-    intake_months TEXT, -- e.g., "September, January, May"
-    application_deadline TEXT, -- e.g., "June 30"
-    status TEXT DEFAULT 'Active', -- "Active", "Hidden"
+    category TEXT NOT NULL,              -- e.g., 'MBA', 'Engineering', 'MBBS', 'BCA', 'BBA', 'Nursing'
+    course_type TEXT DEFAULT 'Undergraduate', -- e.g., 'Undergraduate', 'Postgraduate'
+    ranking INTEGER,
+    ranking_source TEXT,
+    rating NUMERIC(2,1) DEFAULT 4.5,
+    total_fees TEXT,
+    application_deadline TEXT,
+    intake TEXT,
+    cutoff TEXT,
+    website_url TEXT,
+    description TEXT,
     featured BOOLEAN DEFAULT false,
-    logo_url TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    published BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    views_count INTEGER DEFAULT 0,
+    clicks_count INTEGER DEFAULT 0
 );
 
 -- Enable RLS

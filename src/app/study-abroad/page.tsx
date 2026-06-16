@@ -5,6 +5,7 @@ import { Sparkle, ArrowRight, BookOpen, Clock, Globe } from "@phosphor-icons/rea
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
+import { TopCollegesSection } from "@/components/top-colleges";
 
 const countries = [
   {
@@ -92,6 +93,11 @@ export default function StudyAbroadIndex() {
               </Card>
             ))}
           </section>
+
+          {/* Dynamic Colleges Directory */}
+          <div className="mt-16 border-t border-hairline pt-16">
+            <TopCollegesSection country="abroad" />
+          </div>
 
         </div>
       </main>

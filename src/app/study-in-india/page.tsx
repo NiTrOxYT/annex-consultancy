@@ -6,6 +6,7 @@ import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
+import { TopCollegesSection } from "@/components/top-colleges";
 
 const indiaUniversities = [
   {
@@ -57,40 +58,10 @@ export default function StudyInIndia() {
             </p>
           </div>
 
-          {/* India Universities Directory */}
-          <section className="mb-20">
-            <h2 className="font-display font-bold text-2xl text-primary tracking-tight mb-8">
-              Affiliated & Partner Universities
-            </h2>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {indiaUniversities.map((uni) => (
-                <Card key={uni.name} className="flex flex-col justify-between min-h-[350px]">
-                  <div className="mb-6">
-                    <span className="text-xs font-mono-data text-slate-400 uppercase tracking-wider block mb-1">
-                      {uni.location}
-                    </span>
-                    <CardTitle className="text-xl mb-4">{uni.name}</CardTitle>
-                    <ul className="flex flex-col gap-2.5">
-                      {uni.highlights.map((h) => (
-                        <li key={h} className="flex items-start gap-2">
-                          <span className="w-4.5 h-4.5 rounded-full bg-primary/5 flex items-center justify-center text-primary shrink-0 mt-0.5">
-                            <Checks size={10} />
-                          </span>
-                          <span className="text-xs text-slate-600 leading-normal">{h}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="border-t border-hairline/60 pt-4 mt-auto flex flex-col gap-1.5 text-xs font-mono-data text-slate-500">
-                    <span>COURSES: {uni.courses}</span>
-                    <span>INTAKE: June / July</span>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </section>
+          {/* Dynamic Colleges Directory */}
+          <div className="mb-20">
+            <TopCollegesSection country="india" />
+          </div>
 
           {/* Process Timeline */}
           <section className="mb-20 border-t border-hairline pt-16">

@@ -5,7 +5,7 @@ import {
   Sparkle, ShieldCheck, SignOut, Trash, Plus, FileText, 
   Calendar, Users, Eye, CheckCircle, XCircle, ChartBar, 
   Download, MagnifyingGlass, Funnel, ArrowSquareOut, Globe, 
-  Warning, Check, X, SpinnerGap, GraduationCap, Star
+  Warning, Check, X, SpinnerGap, GraduationCap, Star, Copy
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
@@ -28,16 +28,26 @@ interface Booking {
 interface University {
   id: string;
   name: string;
+  slug: string;
+  logo_url: string;
   country: string;
   city: string;
-  website: string;
-  tuition_range: string;
-  intake_months: string;
+  category: string;
+  course_type: string;
+  ranking: number | null;
+  ranking_source: string;
+  rating: number;
+  total_fees: string;
   application_deadline: string;
-  status: string;
+  intake: string;
+  cutoff: string;
+  website_url: string;
+  description: string;
   featured: boolean;
-  logo_url: string;
+  published: boolean;
   created_at: string;
+  views_count: number;
+  clicks_count: number;
 }
 
 interface Post {
@@ -103,19 +113,30 @@ export default function AdminDashboard() {
   const [editingUni, setEditingUni] = React.useState<University | null>(null);
   const [uniSearch, setUniSearch] = React.useState("");
   const [uniCountryFilter, setUniCountryFilter] = React.useState("All");
+  const [uniCategoryFilter, setUniCategoryFilter] = React.useState("All");
+  const [uniPublishedFilter, setUniPublishedFilter] = React.useState("All");
+  const [uniSortBy, setUniSortBy] = React.useState<"ranking_asc" | "ranking_desc" | "newest">("ranking_asc");
   const [uniPage, setUniPage] = React.useState(1);
   const uniPerPage = 10;
   const [uniForm, setUniForm] = React.useState({
     name: "",
+    slug: "",
+    logo_url: "",
     country: "",
     city: "",
-    website: "",
-    tuition_range: "",
-    intake_months: "",
+    category: "Engineering",
+    course_type: "Undergraduate",
+    ranking: "",
+    ranking_source: "",
+    rating: "4.5",
+    total_fees: "",
     application_deadline: "",
-    status: "Active",
+    intake: "",
+    cutoff: "",
+    website_url: "",
+    description: "",
     featured: false,
-    logo_url: ""
+    published: true
   });
 
   // Blog CMS Tab states
@@ -358,21 +379,35 @@ export default function AdminDashboard() {
   const handleSaveUni = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const generatedSlug = uniForm.slug || uniForm.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+      const rankingVal = uniForm.ranking ? parseInt(uniForm.ranking) : null;
+      const ratingVal = uniForm.rating ? parseFloat(uniForm.rating) : 4.5;
+
+      const payload = {
+        name: uniForm.name,
+        slug: generatedSlug,
+        logo_url: uniForm.logo_url || null,
+        country: uniForm.country,
+        city: uniForm.city,
+        category: uniForm.category,
+        course_type: uniForm.course_type,
+        ranking: rankingVal,
+        ranking_source: uniForm.ranking_source || null,
+        rating: ratingVal,
+        total_fees: uniForm.total_fees || null,
+        application_deadline: uniForm.application_deadline || null,
+        intake: uniForm.intake || null,
+        cutoff: uniForm.cutoff || null,
+        website_url: uniForm.website_url || null,
+        description: uniForm.description || null,
+        featured: uniForm.featured,
+        published: uniForm.published
+      };
+
       if (editingUni) {
         const { error } = await supabase
           .from("universities")
-          .update({
-            name: uniForm.name,
-            country: uniForm.country,
-            city: uniForm.city,
-            website: uniForm.website,
-            tuition_range: uniForm.tuition_range,
-            intake_months: uniForm.intake_months,
-            application_deadline: uniForm.application_deadline,
-            status: uniForm.status,
-            featured: uniForm.featured,
-            logo_url: uniForm.logo_url
-          })
+          .update(payload)
           .eq("id", editingUni.id);
         
         if (error) throw error;
@@ -380,18 +415,7 @@ export default function AdminDashboard() {
       } else {
         const { error } = await supabase
           .from("universities")
-          .insert([{
-            name: uniForm.name,
-            country: uniForm.country,
-            city: uniForm.city,
-            website: uniForm.website,
-            tuition_range: uniForm.tuition_range,
-            intake_months: uniForm.intake_months,
-            application_deadline: uniForm.application_deadline,
-            status: uniForm.status,
-            featured: uniForm.featured,
-            logo_url: uniForm.logo_url
-          }]);
+          .insert([payload]);
         
         if (error) throw error;
         showToast("University added successfully");
@@ -415,6 +439,58 @@ export default function AdminDashboard() {
       fetchAllData();
     } catch (err: any) {
       alert("Error updating featured status: " + err.message);
+    }
+  };
+
+  const togglePublishedUni = async (id: string, currentPublished: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("universities")
+        .update({ published: !currentPublished })
+        .eq("id", id);
+      if (error) throw error;
+      showToast(`University status marked as ${!currentPublished ? "Published" : "Draft"}`);
+      fetchAllData();
+    } catch (err: any) {
+      alert("Error updating published status: " + err.message);
+    }
+  };
+
+  const handleDuplicateUni = async (uni: University) => {
+    try {
+      const duplicatedName = `${uni.name} - Copy`;
+      const duplicatedSlug = `${uni.slug}-copy-${Math.floor(Math.random() * 1000)}`;
+      
+      const payload = {
+        name: duplicatedName,
+        slug: duplicatedSlug,
+        logo_url: uni.logo_url || null,
+        country: uni.country,
+        city: uni.city,
+        category: uni.category,
+        course_type: uni.course_type,
+        ranking: uni.ranking,
+        ranking_source: uni.ranking_source || null,
+        rating: uni.rating,
+        total_fees: uni.total_fees || null,
+        application_deadline: uni.application_deadline || null,
+        intake: uni.intake || null,
+        cutoff: uni.cutoff || null,
+        website_url: uni.website_url || null,
+        description: uni.description || null,
+        featured: uni.featured,
+        published: false // Duplicate starts as draft/unpublished
+      };
+
+      const { error } = await supabase
+        .from("universities")
+        .insert([payload]);
+      
+      if (error) throw error;
+      showToast(`Duplicated "${uni.name}" as draft`);
+      fetchAllData();
+    } catch (err: any) {
+      alert("Error duplicating university: " + err.message);
     }
   };
 
@@ -638,25 +714,53 @@ export default function AdminDashboard() {
     return matchesSearch && matchesDestination && matchesStatus;
   });
 
-  // Universities filter & pagination
-  const filteredUnis = universities.filter(u => {
-    const matchesSearch = 
-      u.name.toLowerCase().includes(uniSearch.toLowerCase()) ||
-      u.city.toLowerCase().includes(uniSearch.toLowerCase()) ||
-      u.country.toLowerCase().includes(uniSearch.toLowerCase());
-    
-    const matchesCountry = uniCountryFilter === "All" || u.country === uniCountryFilter;
-    
-    return matchesSearch && matchesCountry;
-  });
+  // Universities filter, sort & pagination
+  const filteredUnis = React.useMemo(() => {
+    return universities
+      .filter(u => {
+        const matchesSearch = 
+          u.name.toLowerCase().includes(uniSearch.toLowerCase()) ||
+          u.city.toLowerCase().includes(uniSearch.toLowerCase()) ||
+          u.country.toLowerCase().includes(uniSearch.toLowerCase());
+        
+        const matchesCountry = uniCountryFilter === "All" || u.country === uniCountryFilter;
+        const matchesCategory = uniCategoryFilter === "All" || u.category === uniCategoryFilter;
+        
+        const matchesPublished = 
+          uniPublishedFilter === "All" 
+            ? true 
+            : uniPublishedFilter === "Published" 
+            ? u.published === true 
+            : u.published === false;
+            
+        return matchesSearch && matchesCountry && matchesCategory && matchesPublished;
+      })
+      .sort((a, b) => {
+        if (uniSortBy === "newest") {
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        }
+        
+        const rankA = a.ranking === null || a.ranking === undefined ? Infinity : a.ranking;
+        const rankB = b.ranking === null || b.ranking === undefined ? Infinity : b.ranking;
+        
+        if (uniSortBy === "ranking_asc") {
+          return rankA - rankB;
+        } else {
+          if (rankA === Infinity) return 1;
+          if (rankB === Infinity) return -1;
+          return rankB - rankA;
+        }
+      });
+  }, [universities, uniSearch, uniCountryFilter, uniCategoryFilter, uniPublishedFilter, uniSortBy]);
   
   React.useEffect(() => {
     setUniPage(1);
-  }, [uniSearch, uniCountryFilter]);
+  }, [uniSearch, uniCountryFilter, uniCategoryFilter, uniPublishedFilter, uniSortBy]);
 
   const totalUniPages = Math.ceil(filteredUnis.length / uniPerPage) || 1;
   const paginatedUnis = filteredUnis.slice((uniPage - 1) * uniPerPage, uniPage * uniPerPage);
   const uniqueCountries = Array.from(new Set(universities.map(u => u.country)));
+  const uniqueCategories = Array.from(new Set(universities.map(u => u.category)));
 
   // Blog posts filter
   const filteredPosts = posts.filter(p => {
@@ -1124,15 +1228,23 @@ export default function AdminDashboard() {
                     setEditingUni(null);
                     setUniForm({
                       name: "",
+                      slug: "",
+                      logo_url: "",
                       country: "",
                       city: "",
-                      website: "",
-                      tuition_range: "",
-                      intake_months: "",
+                      category: "Engineering",
+                      course_type: "Undergraduate",
+                      ranking: "",
+                      ranking_source: "",
+                      rating: "4.5",
+                      total_fees: "",
                       application_deadline: "",
-                      status: "Active",
+                      intake: "",
+                      cutoff: "",
+                      website_url: "",
+                      description: "",
                       featured: false,
-                      logo_url: ""
+                      published: true
                     });
                     setIsUniModalOpen(true);
                   }} 
@@ -1159,8 +1271,26 @@ export default function AdminDashboard() {
               </Card>
             ) : (
               <>
+                {/* Metrics Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    { label: "Total Universities", value: universities.length, icon: <GraduationCap size={18} className="text-primary" weight="bold" />, bg: "bg-slate-50 border-slate-100" },
+                    { label: "Published Universities", value: universities.filter(u => u.published).length, icon: <CheckCircle size={18} className="text-green-600" weight="bold" />, bg: "bg-green-50/20 border-green-100/60" },
+                    { label: "Draft Universities", value: universities.filter(u => !u.published).length, icon: <FileText size={18} className="text-slate-400" weight="bold" />, bg: "bg-slate-50 border-slate-100" },
+                    { label: "Featured Universities", value: universities.filter(u => u.featured).length, icon: <Star size={18} className="text-amber-500" weight="fill" />, bg: "bg-amber-50/20 border-amber-100/60" }
+                  ].map((stat, idx) => (
+                    <div key={idx} className={`border rounded-2xl p-4 flex flex-col justify-between min-h-[90px] ${stat.bg}`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500">{stat.label}</span>
+                        {stat.icon}
+                      </div>
+                      <span className="text-2xl font-bold font-mono-data text-primary mt-2">{stat.value}</span>
+                    </div>
+                  ))}
+                </div>
+
                 {/* Filters Row */}
-                <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-slate-50 border border-hairline p-4 rounded-2xl">
+                <div className="flex flex-col xl:flex-row gap-4 justify-between items-stretch xl:items-center bg-slate-50 border border-hairline p-4 rounded-2xl">
                   <div className="flex flex-grow max-w-md items-center gap-2.5 px-3 py-2 border border-hairline rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20">
                     <MagnifyingGlass size={16} className="text-slate-400" />
                     <input 
@@ -1172,16 +1302,49 @@ export default function AdminDashboard() {
                     />
                   </div>
                   
-                  <select 
-                    value={uniCountryFilter} 
-                    onChange={(e) => setUniCountryFilter(e.target.value)}
-                    className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
-                  >
-                    <option value="All">All Countries</option>
-                    {uniqueCountries.map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select 
+                      value={uniCountryFilter} 
+                      onChange={(e) => setUniCountryFilter(e.target.value)}
+                      className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
+                    >
+                      <option value="All">All Countries</option>
+                      {uniqueCountries.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+
+                    <select 
+                      value={uniCategoryFilter} 
+                      onChange={(e) => setUniCategoryFilter(e.target.value)}
+                      className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
+                    >
+                      <option value="All">All Categories</option>
+                      {["Engineering", "MBA", "MBBS", "BCA", "BBA", "Nursing"].map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+
+                    <select 
+                      value={uniPublishedFilter} 
+                      onChange={(e) => setUniPublishedFilter(e.target.value)}
+                      className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
+                    >
+                      <option value="All">All Statuses</option>
+                      <option value="Published">Published</option>
+                      <option value="Draft">Draft</option>
+                    </select>
+
+                    <select 
+                      value={uniSortBy} 
+                      onChange={(e) => setUniSortBy(e.target.value as any)}
+                      className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
+                    >
+                      <option value="ranking_asc">Sort: Best Rank (Top first)</option>
+                      <option value="ranking_desc">Sort: Lowest Rank</option>
+                      <option value="newest">Sort: Newest Added</option>
+                    </select>
+                  </div>
                 </div>
 
                 {filteredUnis.length === 0 ? (
@@ -1191,16 +1354,16 @@ export default function AdminDashboard() {
                 ) : (
                   <div className="flex flex-col gap-4">
                     <div className="border border-hairline rounded-2xl overflow-x-auto bg-white">
-                      <table className="w-full text-left border-collapse text-xs min-w-[900px]">
+                      <table className="w-full text-left border-collapse text-xs min-w-[950px]">
                         <thead>
                           <tr className="bg-slate-50 border-b border-hairline text-slate-500 font-bold uppercase tracking-wider">
                             <th className="p-4">Logo</th>
-                            <th className="p-4">University</th>
-                            <th className="p-4">Location</th>
-                            <th className="p-4">Tuition / Intakes</th>
-                            <th className="p-4">Deadline</th>
+                            <th className="p-4">University Name</th>
+                            <th className="p-4">Country</th>
+                            <th className="p-4">Category</th>
+                            <th className="p-4">Ranking</th>
+                            <th className="p-4">Fees</th>
                             <th className="p-4">Status</th>
-                            <th className="p-4 text-center">Featured</th>
                             <th className="p-4 text-right">Actions</th>
                           </tr>
                         </thead>
@@ -1216,30 +1379,40 @@ export default function AdminDashboard() {
                               </td>
                               <td className="p-4 font-semibold text-primary">
                                 {uni.name}<br />
-                                {uni.website && (
-                                  <a href={uni.website} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-primary flex items-center gap-0.5 text-[10px] font-normal mt-0.5 font-mono-data">
-                                    {uni.website.replace(/^https?:\/\/(www\.)?/, "")} <ArrowSquareOut size={10} />
+                                {uni.website_url && (
+                                  <a href={uni.website_url} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-primary flex items-center gap-0.5 text-[10px] font-normal mt-0.5 font-mono-data">
+                                    {uni.website_url.replace(/^https?:\/\/(www\.)?/, "")} <ArrowSquareOut size={10} />
                                   </a>
                                 )}
                               </td>
                               <td className="p-4">
                                 <span className="font-semibold">{uni.city}</span>, {uni.country}
                               </td>
-                              <td className="p-4 font-semibold text-slate-600">
-                                {uni.tuition_range || "N/A"}<br />
-                                <span className="text-[10px] text-slate-400 font-normal">{uni.intake_months || "N/A"}</span>
-                              </td>
-                              <td className="p-4 font-semibold text-slate-500">{uni.application_deadline || "N/A"}</td>
                               <td className="p-4">
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  uni.status === "Active" ? "bg-green-50 text-green-600 border border-green-100" : "bg-slate-100 text-slate-400 border border-slate-200"
-                                }`}>
-                                  {uni.status || "Active"}
-                                </span>
+                                <span className="bg-primary/5 text-primary border border-primary/10 px-2 py-0.5 rounded text-[10px] font-bold">{uni.category}</span>
+                                <span className="text-[10px] text-slate-400 block mt-1">{uni.course_type}</span>
                               </td>
-                              <td className="p-4 text-center">
-                                <button onClick={() => toggleFeaturedUni(uni.id, uni.featured)} className={`p-1 cursor-pointer transition-colors ${uni.featured ? "text-amber-500" : "text-slate-300"}`}>
-                                  <Star size={18} weight={uni.featured ? "fill" : "regular"} />
+                              <td className="p-4">
+                                {uni.ranking ? (
+                                  <span className="font-semibold font-mono-data text-primary">#{uni.ranking}<br/>
+                                    <span className="text-[9px] font-normal text-slate-400 font-sans">{uni.ranking_source || "Ranked"}</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 font-normal">N/A</span>
+                                )}
+                              </td>
+                              <td className="p-4 font-semibold text-slate-600">
+                                {uni.total_fees || "N/A"}<br />
+                                <span className="text-[10px] text-slate-400 font-normal">{uni.intake || "N/A"}</span>
+                              </td>
+                              <td className="p-4">
+                                <button
+                                  onClick={() => togglePublishedUni(uni.id, uni.published)}
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
+                                    uni.published ? "bg-green-50 text-green-600 border-green-100 hover:bg-green-100/30" : "bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200/30"
+                                  }`}
+                                >
+                                  {uni.published ? "Published" : "Draft"}
                                 </button>
                               </td>
                               <td className="p-4 text-right flex justify-end gap-2 items-center h-full mt-2">
@@ -1248,23 +1421,43 @@ export default function AdminDashboard() {
                                     setEditingUni(uni);
                                     setUniForm({
                                       name: uni.name,
+                                      slug: uni.slug || "",
+                                      logo_url: uni.logo_url || "",
                                       country: uni.country,
                                       city: uni.city || "",
-                                      website: uni.website || "",
-                                      tuition_range: uni.tuition_range || "",
-                                      intake_months: uni.intake_months || "",
+                                      category: uni.category || "Engineering",
+                                      course_type: uni.course_type || "Undergraduate",
+                                      ranking: uni.ranking ? uni.ranking.toString() : "",
+                                      ranking_source: uni.ranking_source || "",
+                                      rating: uni.rating ? uni.rating.toString() : "4.5",
+                                      total_fees: uni.total_fees || "",
                                       application_deadline: uni.application_deadline || "",
-                                      status: uni.status || "Active",
+                                      intake: uni.intake || "",
+                                      cutoff: uni.cutoff || "",
+                                      website_url: uni.website_url || "",
+                                      description: uni.description || "",
                                       featured: uni.featured || false,
-                                      logo_url: uni.logo_url || ""
+                                      published: uni.published || false
                                     });
                                     setIsUniModalOpen(true);
                                   }}
                                   className="p-1 text-slate-500 hover:text-primary hover:bg-slate-50 rounded transition-colors cursor-pointer"
+                                  title="Edit university"
                                 >
                                   <Eye size={16} />
                                 </button>
-                                <button onClick={() => handleDeleteUni(uni.id)} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer">
+                                <button
+                                  onClick={() => handleDuplicateUni(uni)}
+                                  className="p-1 text-slate-500 hover:text-primary hover:bg-slate-50 rounded transition-colors cursor-pointer"
+                                  title="Duplicate university"
+                                >
+                                  <Copy size={16} />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteUni(uni.id)} 
+                                  className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                  title="Delete"
+                                >
                                   <Trash size={16} />
                                 </button>
                               </td>
@@ -1288,6 +1481,83 @@ export default function AdminDashboard() {
                     )}
                   </div>
                 )}
+
+                {/* Admin Analytics Section */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+                  <Card>
+                    <CardTitle className="text-sm uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-1.5">
+                      <Eye size={16} /> Most Viewed Universities
+                    </CardTitle>
+                    <div className="flex flex-col gap-3">
+                      {([...universities].sort((a,b) => b.views_count - a.views_count).slice(0, 5)).map((u, i) => (
+                        <div key={u.id} className="flex justify-between items-center text-xs border-b border-hairline/60 pb-2 last:border-0 last:pb-0">
+                          <span className="font-semibold text-primary">{i+1}. {u.name}</span>
+                          <span className="font-mono-data text-slate-500 font-bold">{u.views_count} views</span>
+                        </div>
+                      ))}
+                      {universities.length === 0 && <span className="text-xs text-slate-400">No records found.</span>}
+                    </div>
+                  </Card>
+
+                  <Card>
+                    <CardTitle className="text-sm uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-1.5">
+                      <Sparkle size={16} /> Most Clicked Apply Buttons
+                    </CardTitle>
+                    <div className="flex flex-col gap-3">
+                      {([...universities].sort((a,b) => b.clicks_count - a.clicks_count).slice(0, 5)).map((u, i) => (
+                        <div key={u.id} className="flex justify-between items-center text-xs border-b border-hairline/60 pb-2 last:border-0 last:pb-0">
+                          <span className="font-semibold text-primary">{i+1}. {u.name}</span>
+                          <span className="font-mono-data text-slate-500 font-bold">{u.clicks_count} clicks</span>
+                        </div>
+                      ))}
+                      {universities.length === 0 && <span className="text-xs text-slate-400">No records found.</span>}
+                    </div>
+                  </Card>
+
+                  <Card>
+                    <CardTitle className="text-sm uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-1.5">
+                      <Globe size={16} /> Country Distribution
+                    </CardTitle>
+                    <div className="flex flex-col gap-3">
+                      {Object.entries(
+                        universities.reduce((acc, u) => {
+                          acc[u.country] = (acc[u.country] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>)
+                      )
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([country, count]) => (
+                          <div key={country} className="flex justify-between items-center text-xs border-b border-hairline/60 pb-2 last:border-0 last:pb-0">
+                            <span className="font-semibold text-primary">{country}</span>
+                            <span className="font-mono-data text-slate-500 font-bold">{count} {count === 1 ? "university" : "universities"}</span>
+                          </div>
+                        ))}
+                      {universities.length === 0 && <span className="text-xs text-slate-400">No records found.</span>}
+                    </div>
+                  </Card>
+
+                  <Card>
+                    <CardTitle className="text-sm uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-1.5">
+                      <GraduationCap size={16} /> Category Breakdown
+                    </CardTitle>
+                    <div className="flex flex-col gap-3">
+                      {Object.entries(
+                        universities.reduce((acc, u) => {
+                          acc[u.category] = (acc[u.category] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>)
+                      )
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([category, count]) => (
+                          <div key={category} className="flex justify-between items-center text-xs border-b border-hairline/60 pb-2 last:border-0 last:pb-0">
+                            <span className="font-semibold text-primary">{category}</span>
+                            <span className="font-mono-data text-slate-500 font-bold">{count} {count === 1 ? "college" : "colleges"}</span>
+                          </div>
+                        ))}
+                      {universities.length === 0 && <span className="text-xs text-slate-400">No records found.</span>}
+                    </div>
+                  </Card>
+                </div>
               </>
             )}
           </section>
@@ -1672,8 +1942,8 @@ export default function AdminDashboard() {
 
       {/* 2. ADD/EDIT UNIVERSITY MODAL */}
       {isUniModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <Card className="max-w-md w-full p-6 relative bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+          <Card className="max-w-2xl w-full p-6 relative bg-white shadow-2xl">
             <button onClick={() => setIsUniModalOpen(false)} className="absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer">
               <X size={20} />
             </button>
@@ -1681,61 +1951,226 @@ export default function AdminDashboard() {
               <Globe size={22} className="text-primary" />
               <div>
                 <CardTitle className="text-lg">{editingUni ? "Edit University" : "Add New University"}</CardTitle>
-                <CardDescription className="text-xs">Configure university information databases.</CardDescription>
+                <CardDescription className="text-xs">Configure university profiles, categories, entry requirements, and rankings.</CardDescription>
               </div>
             </div>
             <form onSubmit={handleSaveUni} className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-1">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Name *</label>
-                  <input type="text" value={uniForm.name} onChange={(e) => setUniForm({ ...uniForm, name: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" required />
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">University Name *</label>
+                  <input 
+                    type="text" 
+                    value={uniForm.name} 
+                    onChange={(e) => {
+                      const nameVal = e.target.value;
+                      const slugVal = nameVal.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+                      setUniForm({ ...uniForm, name: nameVal, slug: slugVal });
+                    }} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    required 
+                  />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Logo URL</label>
-                  <input type="text" value={uniForm.logo_url} onChange={(e) => setUniForm({ ...uniForm, logo_url: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" placeholder="https://" />
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">URL Slug (Auto)</label>
+                  <input 
+                    type="text" 
+                    value={uniForm.slug} 
+                    onChange={(e) => setUniForm({ ...uniForm, slug: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-slate-50 font-mono-data" 
+                    required 
+                  />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Logo URL</label>
+                  <input 
+                    type="text" 
+                    value={uniForm.logo_url} 
+                    onChange={(e) => setUniForm({ ...uniForm, logo_url: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    placeholder="https://" 
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Website URL</label>
+                  <input 
+                    type="url" 
+                    value={uniForm.website_url} 
+                    onChange={(e) => setUniForm({ ...uniForm, website_url: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    placeholder="https://" 
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Country *</label>
-                  <input type="text" value={uniForm.country} onChange={(e) => setUniForm({ ...uniForm, country: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" required />
+                  <input 
+                    type="text" 
+                    value={uniForm.country} 
+                    onChange={(e) => setUniForm({ ...uniForm, country: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    required 
+                  />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">City *</label>
-                  <input type="text" value={uniForm.city} onChange={(e) => setUniForm({ ...uniForm, city: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" required />
+                  <input 
+                    type="text" 
+                    value={uniForm.city} 
+                    onChange={(e) => setUniForm({ ...uniForm, city: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    required 
+                  />
                 </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Website URL</label>
-                <input type="url" value={uniForm.website} onChange={(e) => setUniForm({ ...uniForm, website: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" placeholder="https://" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Tuition Range</label>
-                  <input type="text" value={uniForm.tuition_range} onChange={(e) => setUniForm({ ...uniForm, tuition_range: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" placeholder="e.g. £10,000-£15,000" />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Deadline</label>
-                  <input type="text" value={uniForm.application_deadline} onChange={(e) => setUniForm({ ...uniForm, application_deadline: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" placeholder="e.g. June 30" />
-                </div>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Intake Months</label>
-                <input type="text" value={uniForm.intake_months} onChange={(e) => setUniForm({ ...uniForm, intake_months: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" placeholder="e.g. September, January" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Status</label>
-                  <select value={uniForm.status} onChange={(e) => setUniForm({ ...uniForm, status: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-white cursor-pointer">
-                    <option value="Active">Active</option>
-                    <option value="Hidden">Hidden</option>
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Category *</label>
+                  <select 
+                    value={uniForm.category} 
+                    onChange={(e) => setUniForm({ ...uniForm, category: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-800 focus:outline-none cursor-pointer"
+                  >
+                    <option value="Engineering">Engineering</option>
+                    <option value="MBA">MBA</option>
+                    <option value="MBBS">MBBS</option>
+                    <option value="BCA">BCA</option>
+                    <option value="BBA">BBA</option>
+                    <option value="Nursing">Nursing</option>
                   </select>
                 </div>
-                <div className="flex items-center gap-2 mt-4">
-                  <input type="checkbox" id="featured" checked={uniForm.featured} onChange={(e) => setUniForm({ ...uniForm, featured: e.target.checked })} className="w-4 h-4 text-primary cursor-pointer border-hairline rounded" />
-                  <label htmlFor="featured" className="text-[10px] font-bold text-primary uppercase tracking-wider cursor-pointer">Featured Partner</label>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Course Level *</label>
+                  <select 
+                    value={uniForm.course_type} 
+                    onChange={(e) => setUniForm({ ...uniForm, course_type: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-800 focus:outline-none cursor-pointer"
+                  >
+                    <option value="Undergraduate">Undergraduate</option>
+                    <option value="Postgraduate">Postgraduate</option>
+                  </select>
                 </div>
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">World Ranking</label>
+                  <input 
+                    type="number" 
+                    value={uniForm.ranking} 
+                    onChange={(e) => setUniForm({ ...uniForm, ranking: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    placeholder="e.g. 154" 
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Ranking Source</label>
+                  <input 
+                    type="text" 
+                    value={uniForm.ranking_source} 
+                    onChange={(e) => setUniForm({ ...uniForm, ranking_source: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    placeholder="e.g. QS Rankings" 
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Rating (1-5)</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    min="1" 
+                    max="5" 
+                    value={uniForm.rating} 
+                    onChange={(e) => setUniForm({ ...uniForm, rating: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Total Fees Range</label>
+                  <input 
+                    type="text" 
+                    value={uniForm.total_fees} 
+                    onChange={(e) => setUniForm({ ...uniForm, total_fees: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    placeholder="e.g. £15,000 - £22,000 per year" 
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Application Deadline</label>
+                  <input 
+                    type="text" 
+                    value={uniForm.application_deadline} 
+                    onChange={(e) => setUniForm({ ...uniForm, application_deadline: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    placeholder="e.g. June 30" 
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Intake Cycles</label>
+                  <input 
+                    type="text" 
+                    value={uniForm.intake} 
+                    onChange={(e) => setUniForm({ ...uniForm, intake: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    placeholder="e.g. September / January" 
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Entry Cutoff / Score</label>
+                  <input 
+                    type="text" 
+                    value={uniForm.cutoff} 
+                    onChange={(e) => setUniForm({ ...uniForm, cutoff: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    placeholder="e.g. IELTS 6.5 / 75% in 10+2" 
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Description</label>
+                <textarea 
+                  value={uniForm.description} 
+                  onChange={(e) => setUniForm({ ...uniForm, description: e.target.value })} 
+                  className="px-3 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white min-h-[80px] resize-none" 
+                  placeholder="Provide a detailed description of the campus, unique programs, and student facilities."
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-6 mt-2">
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    id="featured" 
+                    checked={uniForm.featured} 
+                    onChange={(e) => setUniForm({ ...uniForm, featured: e.target.checked })} 
+                    className="w-4 h-4 text-primary cursor-pointer border-hairline rounded" 
+                  />
+                  <label htmlFor="featured" className="text-[10px] font-bold text-primary uppercase tracking-wider cursor-pointer">Featured Partner</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    id="published" 
+                    checked={uniForm.published} 
+                    onChange={(e) => setUniForm({ ...uniForm, published: e.target.checked })} 
+                    className="w-4 h-4 text-primary cursor-pointer border-hairline rounded" 
+                  />
+                  <label htmlFor="published" className="text-[10px] font-bold text-primary uppercase tracking-wider cursor-pointer">Published / Active</label>
+                </div>
+              </div>
+
               <div className="flex justify-end gap-3 border-t border-hairline pt-4 mt-2">
                 <Button type="submit" variant="primary" size="sm">Save Record</Button>
                 <Button type="button" onClick={() => setIsUniModalOpen(false)} variant="ghost" size="sm">Cancel</Button>

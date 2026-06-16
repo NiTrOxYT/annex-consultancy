@@ -5,6 +5,7 @@ import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
+import { TopCollegesSection } from "@/components/top-colleges";
 
 interface CountryDetails {
   name: string;
@@ -239,19 +240,9 @@ export default async function CountryPage({ params }: PageProps) {
           </div>
 
           {/* Universities list */}
-          <section className="mb-16">
-            <h2 className="font-display font-bold text-2xl text-primary tracking-tight mb-8">
-              Key Partners & Affiliated Camps
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {data.universities.map((uni) => (
-                <div key={uni} className="border border-hairline bg-subtle-gray/10 p-5 rounded-xl flex items-center justify-between">
-                  <span className="text-sm font-semibold text-primary">{uni}</span>
-                  <span className="text-[10px] font-mono-data uppercase tracking-wider text-slate-400">Verified Partnership</span>
-                </div>
-              ))}
-            </div>
-          </section>
+          <div className="mb-16">
+            <TopCollegesSection country={country} />
+          </div>
 
           {/* CTA Box */}
           <div className="bg-primary text-white p-12 rounded-[2rem] text-center flex flex-col items-center">
