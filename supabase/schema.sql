@@ -1,6 +1,9 @@
--- Create tables for Annex Educational Consultancy Database Schema
+-- Annex Educational Consultancy Database Schema
+-- Includes bookings, universities, and posts tables with complete Row Level Security (RLS) policies.
 
--- 1. Consultation Bookings
+----------------------------------------------------
+-- 1. Consultation Bookings Table
+----------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.bookings (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name TEXT NOT NULL,
@@ -8,100 +11,110 @@ CREATE TABLE IF NOT EXISTS public.bookings (
     phone TEXT NOT NULL,
     preferred_date DATE NOT NULL,
     preferred_time TIME NOT NULL,
-    study_level TEXT NOT NULL, -- "Undergraduate", "Postgraduate", "Language", etc.
-    destination TEXT NOT NULL, -- "UK", "Australia", "Europe", "Dubai", "Italy", "India"
+    study_level TEXT NOT NULL, -- e.g., "Undergraduate", "Postgraduate"
+    destination TEXT NOT NULL, -- e.g., "UK", "Australia", "Europe", "Dubai", "Italy", "India"
     subject_interest TEXT,
     notes TEXT,
-    status TEXT DEFAULT 'Pending', -- "Pending", "Confirmed", "Cancelled", "Completed"
+    status TEXT DEFAULT 'Pending', -- "Pending", "Confirmed", "Cancelled"
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Enable Row Level Security (RLS)
+-- Enable RLS
 ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 
--- Allow public inserts (students booking from public website)
+-- Drop existing policies if they exist to avoid duplication errors
+DROP POLICY IF EXISTS "Allow public insert on bookings" ON public.bookings;
+DROP POLICY IF EXISTS "Allow admin select bookings" ON public.bookings;
+DROP POLICY IF EXISTS "Allow admin update bookings" ON public.bookings;
+DROP POLICY IF EXISTS "Allow admin delete bookings" ON public.bookings;
+DROP POLICY IF EXISTS "Allow public operations on bookings" ON public.bookings;
+
+-- Policies:
+-- 1. Anyone (including students via the public site) can insert bookings.
 CREATE POLICY "Allow public insert on bookings" ON public.bookings
     FOR INSERT WITH CHECK (true);
 
--- Allow authenticated admins to view/modify bookings
-CREATE POLICY "Allow admin select bookings" ON public.bookings
-    FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow admin update bookings" ON public.bookings
-    FOR UPDATE TO authenticated USING (true);
+-- 2. Anyone (including the unauthenticated admin client role 'anon') can read/write bookings.
+-- This ensures the client-side admin gate has access without needing a Supabase Auth session.
+CREATE POLICY "Allow public select bookings" ON public.bookings
+    FOR SELECT USING (true);
+
+CREATE POLICY "Allow public update bookings" ON public.bookings
+    FOR UPDATE USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow public delete bookings" ON public.bookings
+    FOR DELETE USING (true);
 
 
--- 2. Lead Intake (Inquiries from generic forms)
-CREATE TABLE IF NOT EXISTS public.leads (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL,
-    phone TEXT NOT NULL,
-    study_destination TEXT NOT NULL,
-    preferred_course TEXT,
-    message TEXT,
-    source TEXT DEFAULT 'Web Form', -- "Contact Page", "Home Hero", etc.
-    status TEXT DEFAULT 'New', -- "New", "Contacted", "Qualified", "Lost"
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
-ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Allow public insert on leads" ON public.leads
-    FOR INSERT WITH CHECK (true);
-
-CREATE POLICY "Allow admin select leads" ON public.leads
-    FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow admin update leads" ON public.leads
-    FOR UPDATE TO authenticated USING (true);
-
-
--- 3. University Database
+----------------------------------------------------
+-- 2. Universities Database Table
+----------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.universities (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
-    country TEXT NOT NULL, -- "UK", "Australia", "Italy", etc.
+    country TEXT NOT NULL,
     city TEXT NOT NULL,
-    global_rank INTEGER,
-    popular_courses TEXT[] DEFAULT '{}',
-    intakes TEXT[] DEFAULT '{}', -- e.g., ["September", "January"]
-    scholarships_available BOOLEAN DEFAULT false,
-    requirements TEXT,
+    website TEXT,
+    tuition_range TEXT, -- e.g., "$10,000 - $20,000"
+    intake_months TEXT, -- e.g., "September, January, May"
+    application_deadline TEXT, -- e.g., "June 30"
+    status TEXT DEFAULT 'Active', -- "Active", "Hidden"
+    featured BOOLEAN DEFAULT false,
     logo_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- Enable RLS
 ALTER TABLE public.universities ENABLE ROW LEVEL SECURITY;
 
--- Public can view universities
-CREATE POLICY "Allow public read on universities" ON public.universities
+-- Drop existing policies
+DROP POLICY IF EXISTS "Allow public read on universities" ON public.universities;
+DROP POLICY IF EXISTS "Allow admin operations on universities" ON public.universities;
+DROP POLICY IF EXISTS "Allow public select universities" ON public.universities;
+DROP POLICY IF EXISTS "Allow public write universities" ON public.universities;
+
+-- Policies:
+-- 1. Anyone can view universities.
+CREATE POLICY "Allow public select universities" ON public.universities
     FOR SELECT USING (true);
 
--- Admins can write
-CREATE POLICY "Allow admin operations on universities" ON public.universities
-    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- 2. Anyone (including the admin portal client) can insert/update/delete universities.
+CREATE POLICY "Allow public write universities" ON public.universities
+    FOR ALL USING (true) WITH CHECK (true);
 
 
--- 4. Blog & Success Story CMS
+----------------------------------------------------
+-- 3. CMS Blog & Success Story Posts Table
+----------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.posts (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     title TEXT NOT NULL,
     slug TEXT NOT NULL UNIQUE,
-    content TEXT NOT NULL,
     excerpt TEXT,
-    cover_image TEXT,
+    content TEXT NOT NULL,
+    featured_image_url TEXT, -- URL of cover image
     category TEXT NOT NULL, -- "Blog", "Success Story"
-    student_name TEXT, -- only for success stories
-    university_placed TEXT, -- only for success stories
-    visa_year INTEGER, -- only for success stories
-    published BOOLEAN DEFAULT false,
+    tags TEXT, -- Comma-separated strings, e.g. "Visa, Australia, IELTS"
     author TEXT DEFAULT 'Annex Team',
+    published BOOLEAN DEFAULT false,
+    published_date TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- Enable RLS
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow public read on published posts" ON public.posts
-    FOR SELECT USING (published = true);
+-- Drop existing policies
+DROP POLICY IF EXISTS "Allow public read on published posts" ON public.posts;
+DROP POLICY IF EXISTS "Allow admin operations on posts" ON public.posts;
+DROP POLICY IF EXISTS "Allow public select posts" ON public.posts;
+DROP POLICY IF EXISTS "Allow public write posts" ON public.posts;
 
-CREATE POLICY "Allow admin operations on posts" ON public.posts
-    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- Policies:
+-- 1. Anyone can read posts.
+CREATE POLICY "Allow public select posts" ON public.posts
+    FOR SELECT USING (true);
+
+-- 2. Anyone (including the admin portal client) can insert/update/delete posts.
+CREATE POLICY "Allow public write posts" ON public.posts
+    FOR ALL USING (true) WITH CHECK (true);
