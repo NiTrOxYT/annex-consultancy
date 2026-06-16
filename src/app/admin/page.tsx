@@ -5,7 +5,7 @@ import {
   Sparkle, ShieldCheck, SignOut, Trash, Plus, FileText, 
   Calendar, Users, Eye, CheckCircle, XCircle, ChartBar, 
   Download, MagnifyingGlass, Funnel, ArrowSquareOut, Globe, 
-  Warning, Check, X, SpinnerGap, GraduationCap, Star, FileCode
+  Warning, Check, X, SpinnerGap, GraduationCap, Star
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
@@ -34,7 +34,7 @@ interface University {
   tuition_range: string;
   intake_months: string;
   application_deadline: string;
-  status: string; // "Active" | "Hidden"
+  status: string;
   featured: boolean;
   logo_url: string;
   created_at: string;
@@ -47,14 +47,25 @@ interface Post {
   excerpt: string;
   content: string;
   featured_image_url: string;
-  category: string; // "Blog" | "Success Story"
+  category: string; // Blog category
   tags: string;
   author: string;
   published: boolean;
   published_date: string | null;
-  student_name?: string | null;
-  university_placed?: string | null;
-  visa_year?: number | null;
+  created_at: string;
+}
+
+interface SuccessStory {
+  id: string;
+  name: string;
+  destination: string;
+  university: string;
+  course: string;
+  quote: string;
+  year: number;
+  student_photo_url: string;
+  success_metrics: string;
+  published: boolean;
   created_at: string;
 }
 
@@ -65,11 +76,16 @@ export default function AdminDashboard() {
   const [checkingAuth, setCheckingAuth] = React.useState(true);
   
   // Dashboard Tabs
-  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "cms">("bookings");
+  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories">("bookings");
+
+  // Loaders & table existence flags
+  const [loading, setLoading] = React.useState(false);
+  const [uniTableExists, setUniTableExists] = React.useState<boolean | null>(null);
+  const [postsTableExists, setPostsTableExists] = React.useState<boolean | null>(null);
+  const [storiesTableExists, setStoriesTableExists] = React.useState<boolean | null>(null);
 
   // Booking states
   const [bookings, setBookings] = React.useState<Booking[]>([]);
-  const [loading, setLoading] = React.useState(false);
   const [selectedBooking, setSelectedBooking] = React.useState<Booking | null>(null);
   const [isNotesModalOpen, setIsNotesModalOpen] = React.useState(false);
   
@@ -83,18 +99,12 @@ export default function AdminDashboard() {
 
   // University Tab states
   const [universities, setUniversities] = React.useState<University[]>([]);
-  const [uniLoading, setUniLoading] = React.useState(false);
-  const [uniTableExists, setUniTableExists] = React.useState<boolean | null>(null);
-  const [uniError, setUniError] = React.useState<string | null>(null);
   const [isUniModalOpen, setIsUniModalOpen] = React.useState(false);
   const [editingUni, setEditingUni] = React.useState<University | null>(null);
   const [uniSearch, setUniSearch] = React.useState("");
   const [uniCountryFilter, setUniCountryFilter] = React.useState("All");
-  
-  // University Pagination
   const [uniPage, setUniPage] = React.useState(1);
   const uniPerPage = 10;
-
   const [uniForm, setUniForm] = React.useState({
     name: "",
     country: "",
@@ -108,29 +118,41 @@ export default function AdminDashboard() {
     logo_url: ""
   });
 
-  // CMS Tab states
+  // Blog CMS Tab states
   const [posts, setPosts] = React.useState<Post[]>([]);
-  const [cmsLoading, setCmsLoading] = React.useState(false);
-  const [postsTableExists, setPostsTableExists] = React.useState<boolean | null>(null);
   const [isPostModalOpen, setIsPostModalOpen] = React.useState(false);
   const [editingPost, setEditingPost] = React.useState<Post | null>(null);
-  const [cmsTab, setCmsTab] = React.useState<"All" | "Blog" | "Success Story">("All");
-  const [cmsSearch, setCmsSearch] = React.useState("");
+  const [blogSearch, setBlogSearch] = React.useState("");
+  const [blogCategoryFilter, setBlogCategoryFilter] = React.useState("All");
   const [postModalTab, setPostModalTab] = React.useState<"edit" | "preview">("edit");
-
   const [postForm, setPostForm] = React.useState({
     title: "",
     slug: "",
     excerpt: "",
     content: "",
     featured_image_url: "",
-    category: "Blog",
+    category: "University Guide",
     tags: "",
     author: "Annex Team",
-    published: false,
-    student_name: "",
-    university_placed: "",
-    visa_year: new Date().getFullYear().toString()
+    published: false
+  });
+
+  // Success Stories CMS Tab states
+  const [stories, setStories] = React.useState<SuccessStory[]>([]);
+  const [isStoryModalOpen, setIsStoryModalOpen] = React.useState(false);
+  const [editingStory, setEditingStory] = React.useState<SuccessStory | null>(null);
+  const [storySearch, setStorySearch] = React.useState("");
+  const [storyCountryFilter, setStoryCountryFilter] = React.useState("All");
+  const [storyForm, setStoryForm] = React.useState({
+    name: "",
+    destination: "",
+    university: "",
+    course: "",
+    quote: "",
+    year: new Date().getFullYear().toString(),
+    student_photo_url: "",
+    success_metrics: "",
+    published: false
   });
 
   // Check auth persistence on mount
@@ -152,7 +174,7 @@ export default function AdminDashboard() {
     if (!isAuthenticated) return;
 
     let inactivityTimer: NodeJS.Timeout;
-    const TIMEOUT_DURATION = 10 * 60 * 1000; // 10 minutes in ms
+    const TIMEOUT_DURATION = 10 * 60 * 1000; // 10 minutes
 
     const resetInactivityTimer = () => {
       clearTimeout(inactivityTimer);
@@ -162,14 +184,11 @@ export default function AdminDashboard() {
       }, TIMEOUT_DURATION);
     };
 
-    // Events to monitor user activity
     const activityEvents = ["mousedown", "mousemove", "keypress", "scroll", "touchstart"];
-    
     activityEvents.forEach(event => {
       window.addEventListener(event, resetInactivityTimer);
     });
 
-    // Start timer on mount/auth state change
     resetInactivityTimer();
 
     return () => {
@@ -180,7 +199,7 @@ export default function AdminDashboard() {
     };
   }, [isAuthenticated]);
 
-  // Auth Handler
+  // Auth Handlers
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const secretKey = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
@@ -201,7 +220,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Sign out Handler
   const handleSignOut = () => {
     setIsAuthenticated(false);
     setPassword("");
@@ -212,35 +230,28 @@ export default function AdminDashboard() {
     }
   };
 
-  // Fetch Bookings
-  const fetchBookings = React.useCallback(async () => {
+  // Fetch Database tables
+  const fetchAllData = React.useCallback(async () => {
     setLoading(true);
+    
+    // 1. Fetch Bookings
     try {
       const { data, error } = await supabase
         .from("bookings")
         .select("*")
         .order("created_at", { ascending: false });
-
       if (error) throw error;
       setBookings(data || []);
     } catch (err: any) {
       console.error("Error loading bookings:", err.message);
-      showToast("Error loading bookings: " + err.message);
-    } finally {
-      setLoading(false);
     }
-  }, []);
 
-  // Fetch Universities
-  const fetchUniversities = async () => {
-    setUniLoading(true);
-    setUniError(null);
+    // 2. Fetch Universities
     try {
       const { data, error } = await supabase
         .from("universities")
         .select("*")
         .order("created_at", { ascending: false });
-
       if (error) {
         if (error.code === "42P01" || error.message.includes("does not exist")) {
           setUniTableExists(false);
@@ -253,21 +264,14 @@ export default function AdminDashboard() {
       }
     } catch (err: any) {
       console.error("Error loading universities:", err.message);
-      setUniError(err.message);
-    } finally {
-      setUniLoading(false);
     }
-  };
 
-  // Fetch Posts (CMS)
-  const fetchPosts = async () => {
-    setCmsLoading(true);
+    // 3. Fetch Blog Posts
     try {
       const { data, error } = await supabase
         .from("posts")
         .select("*")
         .order("created_at", { ascending: false });
-
       if (error) {
         if (error.code === "42P01" || error.message.includes("does not exist")) {
           setPostsTableExists(false);
@@ -279,24 +283,37 @@ export default function AdminDashboard() {
         setPostsTableExists(true);
       }
     } catch (err: any) {
-      console.error("Error loading CMS posts:", err.message);
-    } finally {
-      setCmsLoading(false);
+      console.error("Error loading blog posts:", err.message);
     }
-  };
 
-  // Trigger loading when authenticated or tab switches
+    // 4. Fetch Success Stories
+    try {
+      const { data, error } = await supabase
+        .from("success_stories")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) {
+        if (error.code === "42P01" || error.message.includes("does not exist")) {
+          setStoriesTableExists(false);
+        } else {
+          throw error;
+        }
+      } else {
+        setStories(data || []);
+        setStoriesTableExists(true);
+      }
+    } catch (err: any) {
+      console.error("Error loading success stories:", err.message);
+    }
+
+    setLoading(false);
+  }, []);
+
   React.useEffect(() => {
     if (isAuthenticated) {
-      if (activeTab === "bookings") {
-        fetchBookings();
-      } else if (activeTab === "universities") {
-        fetchUniversities();
-      } else if (activeTab === "cms") {
-        fetchPosts();
-      }
+      fetchAllData();
     }
-  }, [isAuthenticated, activeTab, fetchBookings]);
+  }, [isAuthenticated, fetchAllData]);
 
   // Toast Helper
   const showToast = (msg: string) => {
@@ -306,8 +323,10 @@ export default function AdminDashboard() {
     }, 4000);
   };
 
-  // Update Booking Status
-  const updateStatus = async (id: string, newStatus: string) => {
+  // ----------------------------------------------------
+  // BOOKINGS LOGIC
+  // ----------------------------------------------------
+  const updateBookingStatus = async (id: string, newStatus: string) => {
     try {
       const { error } = await supabase
         .from("bookings")
@@ -315,43 +334,29 @@ export default function AdminDashboard() {
         .eq("id", id);
       if (error) throw error;
       showToast(`Booking marked as ${newStatus}`);
-      fetchBookings();
+      fetchAllData();
     } catch (err: any) {
       alert("Error updating status: " + err.message);
     }
   };
 
-  // Delete Booking
   const deleteBooking = async (id: string) => {
     if (!confirm("Are you sure you want to delete this record?")) return;
     try {
       const { error } = await supabase.from("bookings").delete().eq("id", id);
       if (error) throw error;
       showToast("Consultation booking deleted");
-      fetchBookings();
+      fetchAllData();
     } catch (err: any) {
       alert("Error deleting record: " + err.message);
     }
   };
 
-  // Auto-generate slug from title
-  const handleTitleChange = (title: string, setForm: any) => {
-    const generatedSlug = title.toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
-    
-    setForm((prev: any) => ({
-      ...prev,
-      title,
-      slug: generatedSlug
-    }));
-  };
-
-  // Save University CRUD
+  // ----------------------------------------------------
+  // UNIVERSITIES CRUD
+  // ----------------------------------------------------
   const handleSaveUni = async (e: React.FormEvent) => {
     e.preventDefault();
-    setUniLoading(true);
-    setUniError(null);
     try {
       if (editingUni) {
         const { error } = await supabase
@@ -392,29 +397,13 @@ export default function AdminDashboard() {
         showToast("University added successfully");
       }
       setIsUniModalOpen(false);
-      setUniForm({
-        name: "",
-        country: "",
-        city: "",
-        website: "",
-        tuition_range: "",
-        intake_months: "",
-        application_deadline: "",
-        status: "Active",
-        featured: false,
-        logo_url: ""
-      });
       setEditingUni(null);
-      fetchUniversities();
+      fetchAllData();
     } catch (err: any) {
-      console.error("Error saving university:", err.message);
-      setUniError(err.message);
-    } finally {
-      setUniLoading(false);
+      alert("Error saving university: " + err.message);
     }
   };
 
-  // Toggle Featured status for University
   const toggleFeaturedUni = async (id: string, currentFeatured: boolean) => {
     try {
       const { error } = await supabase
@@ -423,32 +412,29 @@ export default function AdminDashboard() {
         .eq("id", id);
       if (error) throw error;
       showToast(`University marked as ${!currentFeatured ? "Featured" : "Regular"}`);
-      fetchUniversities();
+      fetchAllData();
     } catch (err: any) {
       alert("Error updating featured status: " + err.message);
     }
   };
 
-  // Delete University CRUD
   const handleDeleteUni = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this university record?")) return;
-    setUniLoading(true);
+    if (!confirm("Are you sure you want to delete this university?")) return;
     try {
       const { error } = await supabase.from("universities").delete().eq("id", id);
       if (error) throw error;
       showToast("University deleted successfully");
-      fetchUniversities();
+      fetchAllData();
     } catch (err: any) {
       alert("Error deleting university: " + err.message);
-    } finally {
-      setUniLoading(false);
     }
   };
 
-  // Save CMS Post
+  // ----------------------------------------------------
+  // BLOG CMS CRUD
+  // ----------------------------------------------------
   const handleSavePost = async (e: React.FormEvent) => {
     e.preventDefault();
-    setCmsLoading(true);
     try {
       const publishedDate = postForm.published ? new Date().toISOString() : null;
 
@@ -465,10 +451,7 @@ export default function AdminDashboard() {
             tags: postForm.tags,
             author: postForm.author,
             published: postForm.published,
-            published_date: publishedDate,
-            student_name: postForm.category === "Success Story" ? postForm.student_name : null,
-            university_placed: postForm.category === "Success Story" ? postForm.university_placed : null,
-            visa_year: postForm.category === "Success Story" ? parseInt(postForm.visa_year) || null : null
+            published_date: publishedDate
           })
           .eq("id", editingPost.id);
         
@@ -487,40 +470,20 @@ export default function AdminDashboard() {
             tags: postForm.tags,
             author: postForm.author,
             published: postForm.published,
-            published_date: publishedDate,
-            student_name: postForm.category === "Success Story" ? postForm.student_name : null,
-            university_placed: postForm.category === "Success Story" ? postForm.university_placed : null,
-            visa_year: postForm.category === "Success Story" ? parseInt(postForm.visa_year) || null : null
+            published_date: publishedDate
           }]);
         
         if (error) throw error;
         showToast("Article created successfully");
       }
       setIsPostModalOpen(false);
-      setPostForm({
-        title: "",
-        slug: "",
-        excerpt: "",
-        content: "",
-        featured_image_url: "",
-        category: "Blog",
-        tags: "",
-        author: "Annex Team",
-        published: false,
-        student_name: "",
-        university_placed: "",
-        visa_year: new Date().getFullYear().toString()
-      });
       setEditingPost(null);
-      fetchPosts();
+      fetchAllData();
     } catch (err: any) {
       alert("Error saving article: " + err.message);
-    } finally {
-      setCmsLoading(false);
     }
   };
 
-  // Toggle Publish Status
   const togglePublishPost = async (id: string, currentPublished: boolean) => {
     try {
       const publishedDate = !currentPublished ? new Date().toISOString() : null;
@@ -530,51 +493,139 @@ export default function AdminDashboard() {
         .eq("id", id);
       if (error) throw error;
       showToast(`Article marked as ${!currentPublished ? "Published" : "Draft"}`);
-      fetchPosts();
+      fetchAllData();
     } catch (err: any) {
       alert("Error updating published status: " + err.message);
     }
   };
 
-  // Delete CMS Post
   const handleDeletePost = async (id: string) => {
     if (!confirm("Are you sure you want to delete this article?")) return;
-    setCmsLoading(true);
     try {
       const { error } = await supabase.from("posts").delete().eq("id", id);
       if (error) throw error;
       showToast("Article deleted successfully");
-      fetchPosts();
+      fetchAllData();
     } catch (err: any) {
       alert("Error deleting article: " + err.message);
-    } finally {
-      setCmsLoading(false);
     }
   };
 
-  // Dynamic Statistics Calculations (Dashboard Overview)
+  // ----------------------------------------------------
+  // SUCCESS STORIES CRUD
+  // ----------------------------------------------------
+  const handleSaveStory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingStory) {
+        const { error } = await supabase
+          .from("success_stories")
+          .update({
+            name: storyForm.name,
+            destination: storyForm.destination,
+            university: storyForm.university,
+            course: storyForm.course,
+            quote: storyForm.quote,
+            year: parseInt(storyForm.year) || new Date().getFullYear(),
+            student_photo_url: storyForm.student_photo_url,
+            success_metrics: storyForm.success_metrics,
+            published: storyForm.published
+          })
+          .eq("id", editingStory.id);
+        
+        if (error) throw error;
+        showToast("Success story updated successfully");
+      } else {
+        const { error } = await supabase
+          .from("success_stories")
+          .insert([{
+            name: storyForm.name,
+            destination: storyForm.destination,
+            university: storyForm.university,
+            course: storyForm.course,
+            quote: storyForm.quote,
+            year: parseInt(storyForm.year) || new Date().getFullYear(),
+            student_photo_url: storyForm.student_photo_url,
+            success_metrics: storyForm.success_metrics,
+            published: storyForm.published
+          }]);
+        
+        if (error) throw error;
+        showToast("Success story created successfully");
+      }
+      setIsStoryModalOpen(false);
+      setEditingStory(null);
+      fetchAllData();
+    } catch (err: any) {
+      alert("Error saving story: " + err.message);
+    }
+  };
+
+  const togglePublishStory = async (id: string, currentPublished: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("success_stories")
+        .update({ published: !currentPublished })
+        .eq("id", id);
+      if (error) throw error;
+      showToast(`Success story marked as ${!currentPublished ? "Published" : "Draft"}`);
+      fetchAllData();
+    } catch (err: any) {
+      alert("Error updating published status: " + err.message);
+    }
+  };
+
+  const handleDeleteStory = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this success story?")) return;
+    try {
+      const { error } = await supabase.from("success_stories").delete().eq("id", id);
+      if (error) throw error;
+      showToast("Success story deleted successfully");
+      fetchAllData();
+    } catch (err: any) {
+      alert("Error deleting story: " + err.message);
+    }
+  };
+
+  // ----------------------------------------------------
+  // DYNAMIC STATISTICS & ANALYTICS CALCULATIONS
+  // ----------------------------------------------------
   const totalRequests = bookings.length;
-  const pendingRequests = bookings.filter(b => b.status === "Pending").length;
-  const confirmedRequests = bookings.filter(b => b.status === "Confirmed").length;
-  const cancelledRequests = bookings.filter(b => b.status === "Cancelled").length;
-  
-  const todayDateObj = new Date();
-  const todayRequests = bookings.filter(b => {
+  const today = new Date();
+  const bookingsToday = bookings.filter(b => {
     if (!b.created_at) return false;
     const bDate = new Date(b.created_at);
-    return bDate.getDate() === todayDateObj.getDate() &&
-           bDate.getMonth() === todayDateObj.getMonth() &&
-           bDate.getFullYear() === todayDateObj.getFullYear();
+    return bDate.getDate() === today.getDate() &&
+           bDate.getMonth() === today.getMonth() &&
+           bDate.getFullYear() === today.getFullYear();
   }).length;
 
-  const monthRequests = bookings.filter(b => {
-    if (!b.created_at) return false;
-    const bDate = new Date(b.created_at);
-    return bDate.getMonth() === todayDateObj.getMonth() &&
-           bDate.getFullYear() === todayDateObj.getFullYear();
-  }).length;
+  const publishedPostsCount = posts.filter(p => p.published).length;
+  const publishedStoriesCount = stories.filter(s => s.published).length;
 
-  // Filter and Search logic for Bookings
+  const getMostSelected = (arr: string[]) => {
+    if (arr.length === 0) return "N/A";
+    const map: Record<string, number> = {};
+    let maxElement = arr[0], maxCount = 1;
+    for (let i = 0; i < arr.length; i++) {
+      const el = arr[i];
+      if (map[el] == null) map[el] = 1;
+      else map[el]++;
+      if (map[el] > maxCount) {
+        maxElement = el;
+        maxCount = map[el];
+      }
+    }
+    return `${maxElement} (${maxCount})`;
+  };
+
+  const mostSelectedDestination = getMostSelected(bookings.map(b => b.destination));
+  const mostSelectedStudyLevel = getMostSelected(bookings.map(b => b.study_level));
+
+  // ----------------------------------------------------
+  // FILTERING LOGIC
+  // ----------------------------------------------------
+  // Bookings filter
   const filteredBookings = bookings.filter(b => {
     const matchesSearch = 
       b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -587,7 +638,7 @@ export default function AdminDashboard() {
     return matchesSearch && matchesDestination && matchesStatus;
   });
 
-  // Filter and Search logic for Universities
+  // Universities filter & pagination
   const filteredUnis = universities.filter(u => {
     const matchesSearch = 
       u.name.toLowerCase().includes(uniSearch.toLowerCase()) ||
@@ -598,32 +649,75 @@ export default function AdminDashboard() {
     
     return matchesSearch && matchesCountry;
   });
-
-  // Reset page to 1 when filters change
+  
   React.useEffect(() => {
     setUniPage(1);
   }, [uniSearch, uniCountryFilter]);
 
-  // Paginated Universities
   const totalUniPages = Math.ceil(filteredUnis.length / uniPerPage) || 1;
   const paginatedUnis = filteredUnis.slice((uniPage - 1) * uniPerPage, uniPage * uniPerPage);
+  const uniqueCountries = Array.from(new Set(universities.map(u => u.country)));
 
-  // Filter and Search logic for CMS Posts
+  // Blog posts filter
   const filteredPosts = posts.filter(p => {
     const matchesSearch = 
-      p.title.toLowerCase().includes(cmsSearch.toLowerCase()) ||
-      p.excerpt.toLowerCase().includes(cmsSearch.toLowerCase()) ||
-      p.tags.toLowerCase().includes(cmsSearch.toLowerCase());
+      p.title.toLowerCase().includes(blogSearch.toLowerCase()) ||
+      p.excerpt.toLowerCase().includes(blogSearch.toLowerCase()) ||
+      p.tags.toLowerCase().includes(blogSearch.toLowerCase());
 
-    const matchesCategory = cmsTab === "All" || p.category === cmsTab;
+    const matchesCategory = blogCategoryFilter === "All" || p.category === blogCategoryFilter;
 
     return matchesSearch && matchesCategory;
   });
+  const uniqueBlogCategories = Array.from(new Set(posts.map(p => p.category)));
 
-  // Export to CSV Function
+  // Success Stories filter
+  const filteredStories = stories.filter(s => {
+    const matchesSearch = 
+      s.name.toLowerCase().includes(storySearch.toLowerCase()) ||
+      s.university.toLowerCase().includes(storySearch.toLowerCase()) ||
+      s.course.toLowerCase().includes(storySearch.toLowerCase());
+
+    const matchesCountry = storyCountryFilter === "All" || s.destination === storyCountryFilter;
+
+    return matchesSearch && matchesCountry;
+  });
+  const uniqueStoryCountries = Array.from(new Set(stories.map(s => s.destination)));
+
+  // Combined Recent Activity Feed (Unified bookings, blog posts, success stories)
+  const combinedActivity = React.useMemo(() => {
+    const actBookings = bookings.map(b => ({
+      id: b.id,
+      type: "Booking",
+      title: b.name,
+      meta: `Booked for ${b.destination}`,
+      date: b.created_at
+    }));
+
+    const actPosts = posts.map(p => ({
+      id: p.id,
+      type: "Blog",
+      title: p.title,
+      meta: `Article created by ${p.author}`,
+      date: p.created_at
+    }));
+
+    const actStories = stories.map(s => ({
+      id: s.id,
+      type: "Success",
+      title: s.name,
+      meta: `Placed at ${s.university} (${s.destination})`,
+      date: s.created_at
+    }));
+
+    return [...actBookings, ...actPosts, ...actStories]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 10);
+  }, [bookings, posts, stories]);
+
+  // Export CSV Helper
   const exportToCSV = () => {
     if (filteredBookings.length === 0) return;
-    
     const headers = ["ID", "Name", "Email", "Phone", "Preferred Date", "Preferred Time", "Study Level", "Destination", "Notes", "Status", "Created At"];
     const rows = filteredBookings.map(b => [
       b.id,
@@ -652,49 +746,21 @@ export default function AdminDashboard() {
     showToast("CSV file exported successfully");
   };
 
-  // Analytics Helpers
-  const getMostSelected = (arr: string[]) => {
-    if (arr.length === 0) return "N/A";
-    const map: Record<string, number> = {};
-    let maxElement = arr[0], maxCount = 1;
-    for (let i = 0; i < arr.length; i++) {
-      const el = arr[i];
-      if (map[el] == null) map[el] = 1;
-      else map[el]++;
-      if (map[el] > maxCount) {
-        maxElement = el;
-        maxCount = map[el];
-      }
-    }
-    return `${maxElement} (${maxCount})`;
-  };
-
-  const destinations = bookings.map(b => b.destination);
-  const studyLevels = bookings.map(b => b.study_level);
-
-  const mostSelectedDestination = getMostSelected(destinations);
-  const mostSelectedStudyLevel = getMostSelected(studyLevels);
-
-  // Extract unique countries from universities for filtering
-  const uniqueCountries = Array.from(new Set(universities.map(u => u.country)));
-
-  // Loading indicator for authorization gates
   if (checkingAuth) {
     return (
       <main className="min-h-[100dvh] flex items-center justify-center bg-subtle-gray/30">
         <div className="flex flex-col items-center gap-2">
           <SpinnerGap className="animate-spin text-primary" size={32} />
-          <span className="text-xs font-semibold text-slate-500 font-mono-data">Loading security keys...</span>
+          <span className="text-xs font-semibold text-slate-500 font-mono-data">Loading security settings...</span>
         </div>
       </main>
     );
   }
 
-  // Unauthenticated view (Login Gate)
   if (!isAuthenticated) {
     return (
       <main className="min-h-[100dvh] flex items-center justify-center bg-subtle-gray/30 px-6 py-12">
-        <Card className="max-w-md w-full p-8">
+        <Card className="max-w-md w-full p-8 bg-white">
           <div className="flex flex-col items-center text-center mb-8">
             <div className="w-12 h-12 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-4">
               <ShieldCheck size={24} weight="bold" />
@@ -716,7 +782,7 @@ export default function AdminDashboard() {
                 id="pass"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="px-4 py-3 border border-hairline rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800"
+                className="px-4 py-3 border border-hairline rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
                 placeholder="••••••••"
                 required
               />
@@ -732,17 +798,14 @@ export default function AdminDashboard() {
 
   return (
     <main className="min-h-[100dvh] bg-white text-left flex flex-col relative">
-      {/* Toast Notification Container */}
+      {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-8 right-8 z-50 bg-primary text-white border border-hairline/20 px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 animate-fade-in-up">
           <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-gold">
             <Check size={14} weight="bold" />
           </div>
           <div className="text-xs font-semibold">{toastMessage}</div>
-          <button 
-            onClick={() => setToastMessage(null)} 
-            className="text-white/60 hover:text-white ml-2 transition-colors cursor-pointer"
-          >
+          <button onClick={() => setToastMessage(null)} className="text-white/60 hover:text-white ml-2 cursor-pointer">
             <X size={14} />
           </button>
         </div>
@@ -757,68 +820,55 @@ export default function AdminDashboard() {
           </div>
           
           <nav className="flex gap-1 sm:gap-2">
-            <button
-              onClick={() => setActiveTab("bookings")}
-              className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer ${
-                activeTab === "bookings" ? "bg-primary text-white" : "text-slate-500 hover:text-primary hover:bg-slate-50"
-              }`}
-            >
-              Consultations ({bookings.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("universities")}
-              className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer ${
-                activeTab === "universities" ? "bg-primary text-white" : "text-slate-500 hover:text-primary hover:bg-slate-50"
-              }`}
-            >
-              Universities ({universities.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("cms")}
-              className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer ${
-                activeTab === "cms" ? "bg-primary text-white" : "text-slate-500 hover:text-primary hover:bg-slate-50"
-              }`}
-            >
-              CMS Articles ({posts.length})
-            </button>
+            {[
+              { id: "bookings", label: `Consultations (${bookings.length})` },
+              { id: "universities", label: `Universities (${universities.length})` },
+              { id: "blog", label: `Blog posts (${posts.length})` },
+              { id: "stories", label: `Success stories (${stories.length})` }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer ${
+                  activeTab === tab.id ? "bg-primary text-white" : "text-slate-500 hover:text-primary hover:bg-slate-50"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </nav>
         </div>
 
-        <button
-          onClick={handleSignOut}
-          className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-primary transition-colors cursor-pointer"
-        >
+        <button onClick={handleSignOut} className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-primary transition-colors cursor-pointer">
           <SignOut size={16} /> Sign Out
         </button>
       </header>
 
-      {/* Main Panel Content */}
+      {/* Main Content Area */}
       <div className="flex-grow p-6 lg:p-8 max-w-7xl mx-auto w-full">
         {activeTab === "bookings" && (
           <section className="flex flex-col gap-8">
-            
-            {/* Dashboard Headers */}
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="font-display font-bold text-2xl text-primary leading-tight">Admin dashboard.</h2>
-                <p className="text-xs text-slate-400 mt-1">Real-time consultation overview and booking pipelines.</p>
+                <p className="text-xs text-slate-400 mt-1">Overview of booking requests and published CMS content.</p>
               </div>
-              <Button variant="secondary" size="sm" onClick={fetchBookings} className="flex items-center gap-1.5">
+              <Button variant="secondary" size="sm" onClick={fetchAllData} className="flex items-center gap-1.5">
                 <SpinnerGap className={loading ? "animate-spin" : ""} size={14} /> Refresh Data
               </Button>
             </div>
 
-            {/* Grid 1: Statistic Cards */}
+            {/* Dashboard Overview grid */}
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
               {[
-                { label: "Total Requests", value: totalRequests, icon: <Users size={20} className="text-primary" weight="bold" />, bg: "bg-slate-50 border-slate-100" },
-                { label: "Pending Requests", value: pendingRequests, icon: <Calendar size={20} className="text-yellow-600" weight="bold" />, bg: "bg-yellow-50/20 border-yellow-100/60" },
-                { label: "Confirmed Requests", value: confirmedRequests, icon: <CheckCircle size={20} className="text-green-600" weight="bold" />, bg: "bg-green-50/20 border-green-100/60" },
-                { label: "Cancelled Requests", value: cancelledRequests, icon: <XCircle size={20} className="text-red-600" weight="bold" />, bg: "bg-red-50/20 border-red-100/60" },
-                { label: "Today's Requests", value: todayRequests, icon: <Sparkle size={20} className="text-gold" weight="bold" />, bg: "bg-amber-50/20 border-amber-100/60" },
-                { label: "This Month's", value: monthRequests, icon: <FileText size={20} className="text-indigo-600" weight="bold" />, bg: "bg-indigo-50/20 border-indigo-100/60" }
+                { label: "Total Bookings", value: totalRequests, icon: <Users size={18} className="text-primary" weight="bold" />, bg: "bg-slate-50 border-slate-100" },
+                { label: "New Bookings Today", value: bookingsToday, icon: <Calendar size={18} className="text-yellow-600" weight="bold" />, bg: "bg-yellow-50/20 border-yellow-100/60" },
+                { label: "Total Blog Posts", value: posts.length, icon: <FileText size={18} className="text-blue-600" weight="bold" />, bg: "bg-blue-50/20 border-blue-100/60" },
+                { label: "Published Blogs", value: publishedPostsCount, icon: <CheckCircle size={18} className="text-green-600" weight="bold" />, bg: "bg-green-50/20 border-green-100/60" },
+                { label: "Total Stories", value: stories.length, icon: <GraduationCap size={18} className="text-purple-600" weight="bold" />, bg: "bg-purple-50/20 border-purple-100/60" },
+                { label: "Published Stories", value: publishedStoriesCount, icon: <Sparkle size={18} className="text-gold" weight="bold" />, bg: "bg-amber-50/20 border-amber-100/60" }
               ].map((stat, idx) => (
-                <div key={idx} className={`border rounded-2xl p-4 flex flex-col justify-between min-h-[100px] ${stat.bg}`}>
+                <div key={idx} className={`border rounded-2xl p-4 flex flex-col justify-between min-h-[90px] ${stat.bg}`}>
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500">{stat.label}</span>
                     {stat.icon}
@@ -828,60 +878,59 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            {/* Grid 2: Sub-panels (Widgets / Analytics) */}
+            {/* Sub-panels (Quick Actions / Analytics Insights) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               
-              {/* Analytics Section links */}
-              <div className="lg:col-span-4">
+              {/* Quick Actions Column */}
+              <div className="lg:col-span-5 flex flex-col gap-4">
                 <Card className="h-full">
-                  <CardTitle className="text-sm uppercase tracking-wider text-slate-400 mb-4">External Analytics Links</CardTitle>
-                  <div className="flex flex-col gap-3">
+                  <CardTitle className="text-sm uppercase tracking-wider text-slate-400 mb-4">Quick Access Links</CardTitle>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <a 
-                      href="https://analytics.google.com" 
+                      href="https://analytics.google.com/" 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="flex items-center justify-between p-3 border border-hairline hover:border-primary rounded-xl bg-slate-50 hover:bg-slate-100/50 transition-all text-xs font-bold text-slate-600 hover:text-primary group"
+                      className="flex flex-col items-center justify-center p-4 border border-hairline hover:border-primary rounded-xl bg-slate-50 hover:bg-slate-100/30 transition-all text-center gap-2 group"
                     >
-                      <span className="flex items-center gap-2">
-                        <ChartBar size={16} className="text-primary" /> Google Analytics
-                      </span>
-                      <ArrowSquareOut size={14} className="text-slate-400 group-hover:text-primary" />
+                      <ChartBar size={20} className="text-primary group-hover:scale-105 transition-transform" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Google Analytics</span>
                     </a>
+                    
                     <a 
-                      href="https://clarity.microsoft.com" 
+                      href="https://clarity.microsoft.com/" 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="flex items-center justify-between p-3 border border-hairline hover:border-primary rounded-xl bg-slate-50 hover:bg-slate-100/50 transition-all text-xs font-bold text-slate-600 hover:text-primary group"
+                      className="flex flex-col items-center justify-center p-4 border border-hairline hover:border-primary rounded-xl bg-slate-50 hover:bg-slate-100/30 transition-all text-center gap-2 group"
                     >
-                      <span className="flex items-center gap-2">
-                        <Eye size={16} className="text-primary" /> Microsoft Clarity
-                      </span>
-                      <ArrowSquareOut size={14} className="text-slate-400 group-hover:text-primary" />
+                      <Eye size={20} className="text-primary group-hover:scale-105 transition-transform" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Microsoft Clarity</span>
+                    </a>
+
+                    <a 
+                      href="https://supabase.com/dashboard" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex flex-col items-center justify-center p-4 border border-hairline hover:border-primary rounded-xl bg-slate-50 hover:bg-slate-100/30 transition-all text-center gap-2 group"
+                    >
+                      <Globe size={20} className="text-primary group-hover:scale-105 transition-transform" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Supabase DB</span>
                     </a>
                   </div>
                 </Card>
               </div>
 
-              {/* Analytics Dashboard Insights */}
-              <div className="lg:col-span-8">
+              {/* Analytics Insights */}
+              <div className="lg:col-span-7">
                 <Card className="h-full">
-                  <CardTitle className="text-sm uppercase tracking-wider text-slate-400 mb-6">Dashboard Insights</CardTitle>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <div className="border-r border-hairline last:border-0 pr-4">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Top Destination</label>
-                      <span className="text-xs sm:text-sm font-semibold text-primary block truncate">{mostSelectedDestination}</span>
+                  <CardTitle className="text-sm uppercase tracking-wider text-slate-400 mb-4">Booking Insights</CardTitle>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-slate-50 border border-hairline rounded-xl p-4 flex flex-col justify-between">
+                      <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Most Selected Destination</span>
+                      <span className="text-sm font-semibold text-primary mt-1">{mostSelectedDestination}</span>
                     </div>
-                    <div className="border-r border-hairline last:border-0 pr-4">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Top Education Level</label>
-                      <span className="text-xs sm:text-sm font-semibold text-primary block truncate">{mostSelectedStudyLevel}</span>
-                    </div>
-                    <div className="border-r border-hairline last:border-0 pr-4">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Total Universities</label>
-                      <span className="text-lg font-bold font-mono-data text-primary block">{universities.length}</span>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Total Articles</label>
-                      <span className="text-lg font-bold font-mono-data text-primary block">{posts.length}</span>
+                    <div className="bg-slate-50 border border-hairline rounded-xl p-4 flex flex-col justify-between">
+                      <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Most Selected Study Level</span>
+                      <span className="text-sm font-semibold text-primary mt-1">{mostSelectedStudyLevel}</span>
                     </div>
                   </div>
                 </Card>
@@ -889,19 +938,17 @@ export default function AdminDashboard() {
 
             </div>
 
-            {/* Grid 3: Main Tables & Recent Activity Feed */}
+            {/* Main Area: Bookings list & timeline Activity feed */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               
-              {/* Left Column: Bookings list */}
+              {/* Consultation Requests list */}
               <div className="lg:col-span-8 flex flex-col gap-4">
-                
-                {/* Search & Filters */}
                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-slate-50 border border-hairline p-4 rounded-2xl">
                   <div className="flex flex-grow max-w-md items-center gap-2.5 px-3 py-2 border border-hairline rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20">
                     <MagnifyingGlass size={16} className="text-slate-400" />
                     <input 
                       type="text" 
-                      placeholder="Search name, email, phone..." 
+                      placeholder="Search bookings..." 
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="text-xs w-full focus:outline-none text-slate-800 bg-transparent"
@@ -913,48 +960,38 @@ export default function AdminDashboard() {
                     )}
                   </div>
                   
-                  <div className="flex flex-wrap items-center gap-3">
-                    {/* Destination filter */}
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold cursor-pointer">
-                      <Funnel size={14} className="text-slate-400" />
-                      <select 
-                        value={destinationFilter} 
-                        onChange={(e) => setDestinationFilter(e.target.value)}
-                        className="bg-transparent focus:outline-none cursor-pointer"
-                      >
-                        <option value="All">All Destinations</option>
-                        <option value="UK">UK</option>
-                        <option value="Australia">Australia</option>
-                        <option value="Europe">Europe</option>
-                        <option value="Dubai">Dubai</option>
-                        <option value="Italy">Italy</option>
-                        <option value="India">India</option>
-                      </select>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select 
+                      value={destinationFilter} 
+                      onChange={(e) => setDestinationFilter(e.target.value)}
+                      className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
+                    >
+                      <option value="All">All Destinations</option>
+                      <option value="UK">UK</option>
+                      <option value="Australia">Australia</option>
+                      <option value="Europe">Europe</option>
+                      <option value="Dubai">Dubai</option>
+                      <option value="Italy">Italy</option>
+                      <option value="India">India</option>
+                    </select>
 
-                    {/* Status filter */}
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold cursor-pointer">
-                      <Funnel size={14} className="text-slate-400" />
-                      <select 
-                        value={statusFilter} 
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="bg-transparent focus:outline-none cursor-pointer"
-                      >
-                        <option value="All">All Statuses</option>
-                        <option value="Pending">Pending</option>
-                        <option value="Confirmed">Confirmed</option>
-                        <option value="Cancelled">Cancelled</option>
-                      </select>
-                    </div>
+                    <select 
+                      value={statusFilter} 
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
+                    >
+                      <option value="All">All Statuses</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Confirmed">Confirmed</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
 
-                    {/* CSV Export Button */}
                     <Button onClick={exportToCSV} variant="secondary" size="sm" className="flex items-center gap-1">
                       <Download size={14} /> Export CSV
                     </Button>
                   </div>
                 </div>
 
-                {/* Table */}
                 {loading ? (
                   <div className="text-center py-12 text-slate-400 text-xs font-semibold">Loading data...</div>
                 ) : filteredBookings.length === 0 ? (
@@ -1004,12 +1041,12 @@ export default function AdminDashboard() {
                                   setIsNotesModalOpen(true);
                                 }}
                                 className="p-1 text-slate-500 hover:text-primary hover:bg-slate-50 rounded transition-colors cursor-pointer"
-                                title="View details & notes"
+                                title="View details"
                               >
                                 <Eye size={16} />
                               </button>
                               <button
-                                onClick={() => updateStatus(booking.id, "Confirmed")}
+                                onClick={() => updateBookingStatus(booking.id, "Confirmed")}
                                 className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors cursor-pointer"
                                 title="Confirm Booking"
                                 disabled={booking.status === "Confirmed"}
@@ -1017,7 +1054,7 @@ export default function AdminDashboard() {
                                 <CheckCircle size={16} weight="fill" />
                               </button>
                               <button
-                                onClick={() => updateStatus(booking.id, "Cancelled")}
+                                onClick={() => updateBookingStatus(booking.id, "Cancelled")}
                                 className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
                                 title="Cancel Booking"
                                 disabled={booking.status === "Cancelled"}
@@ -1038,36 +1075,33 @@ export default function AdminDashboard() {
                     </table>
                   </div>
                 )}
-
               </div>
 
-              {/* Right Column: Recent Activity timeline */}
+              {/* Unified Recent Activity Feed */}
               <div className="lg:col-span-4">
                 <Card className="h-full">
                   <CardTitle className="text-sm uppercase tracking-wider text-slate-400 mb-6">Recent Activity Feed</CardTitle>
                   <div className="flex flex-col gap-4">
-                    {bookings.slice(0, 5).map((b) => (
-                      <div key={b.id} className="flex gap-3 items-start border-b border-hairline/60 pb-3 last:border-0 last:pb-0">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
+                    {combinedActivity.map((act) => (
+                      <div key={act.id} className="flex gap-3 items-start border-b border-hairline/60 pb-3 last:border-0 last:pb-0">
+                        <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
+                          act.type === "Booking" ? "bg-primary" : act.type === "Blog" ? "bg-blue-500" : "bg-purple-500"
+                        }`} />
                         <div className="flex-grow min-w-0">
-                          <p className="text-xs font-semibold text-primary truncate">{b.name}</p>
+                          <p className="text-xs font-semibold text-primary truncate" title={act.title}>{act.title}</p>
                           <p className="text-[10px] text-slate-400">
-                            {b.destination} &bull; {b.preferred_date}
+                            {act.meta} &bull; {new Date(act.date).toLocaleDateString()}
                           </p>
                         </div>
-                        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold shrink-0 ${
-                          b.status === "Confirmed"
-                            ? "bg-green-50 text-green-600 border border-green-100"
-                            : b.status === "Cancelled"
-                            ? "bg-red-50 text-red-600 border border-red-100"
-                            : "bg-yellow-50 text-yellow-600 border border-yellow-100"
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider uppercase shrink-0 ${
+                          act.type === "Booking" ? "bg-slate-100 text-slate-600" : act.type === "Blog" ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"
                         }`}>
-                          {b.status}
+                          {act.type}
                         </span>
                       </div>
                     ))}
-                    {bookings.length === 0 && (
-                      <div className="text-slate-400 text-xs py-4 text-center">No recent activity.</div>
+                    {combinedActivity.length === 0 && (
+                      <div className="text-slate-400 text-xs py-4 text-center">No recent actions logged.</div>
                     )}
                   </div>
                 </Card>
@@ -1082,7 +1116,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="font-display font-bold text-2xl text-primary">University Management</h2>
-                <p className="text-xs text-slate-400 mt-1">Manage global university placement partner records.</p>
+                <p className="text-xs text-slate-400 mt-1">Coordinate placement details and country tags.</p>
               </div>
               {uniTableExists && (
                 <Button 
@@ -1100,7 +1134,6 @@ export default function AdminDashboard() {
                       featured: false,
                       logo_url: ""
                     });
-                    setUniError(null);
                     setIsUniModalOpen(true);
                   }} 
                   variant="primary" 
@@ -1112,121 +1145,48 @@ export default function AdminDashboard() {
               )}
             </div>
 
-            {uniLoading && universities.length === 0 && (
+            {loading && universities.length === 0 ? (
               <div className="text-center py-12 text-slate-400 text-xs font-semibold">Loading universities...</div>
-            )}
-
-            {!uniLoading && uniTableExists === false && (
-              <div className="flex flex-col gap-6">
-                <Card outerClassName="border-amber-200" className="bg-amber-50/10">
-                  <div className="flex items-center gap-2.5 mb-4">
-                    <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center">
-                      <Warning size={18} weight="fill" />
-                    </div>
-                    <CardTitle className="text-sm uppercase tracking-wider text-amber-800">Table Missing Warning</CardTitle>
-                  </div>
-                  <p className="text-xs md:text-sm text-slate-700 leading-relaxed mb-4">
-                    The Supabase connection is successful, but the table <strong>public.universities</strong> does not exist in your database schema or is missing columns. Proactively execute the following SQL script to create/migrate it:
-                  </p>
-                  
-                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-300 overflow-x-auto leading-relaxed select-all">
-                    <pre>{`-- SQL Migration Code
-CREATE TABLE IF NOT EXISTS public.universities (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE,
-    country TEXT NOT NULL,
-    city TEXT NOT NULL,
-    website TEXT,
-    tuition_range TEXT,
-    intake_months TEXT,
-    application_deadline TEXT,
-    status TEXT DEFAULT 'Active',
-    featured BOOLEAN DEFAULT false,
-    logo_url TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- Enable RLS and policies
-ALTER TABLE public.universities ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow public select universities" ON public.universities FOR SELECT USING (true);
-CREATE POLICY "Allow public write universities" ON public.universities FOR ALL USING (true) WITH CHECK (true);`}</pre>
-                  </div>
-                </Card>
-
-                {/* Local Fallback Layout for display consistency */}
-                <div className="border border-dashed border-hairline p-12 rounded-2xl text-center">
-                  <Globe size={32} className="text-slate-300 mx-auto mb-3" />
-                  <h3 className="font-display font-semibold text-sm text-slate-500 mb-1">CRUD Placeholder Dashboard</h3>
-                  <p className="text-xs text-slate-400 max-w-[40ch] mx-auto">
-                    Once you apply the migration SQL in your Supabase SQL Editor, refresh this page to access full University CRUD actions.
-                  </p>
+            ) : uniTableExists === false ? (
+              <Card outerClassName="border-amber-200" className="bg-amber-50/10">
+                <div className="flex items-center gap-2 mb-4">
+                  <Warning size={18} className="text-amber-600" weight="fill" />
+                  <CardTitle className="text-sm uppercase text-amber-800 tracking-wider">Universities Table Missing</CardTitle>
                 </div>
-              </div>
-            )}
-
-            {!uniLoading && uniTableExists === true && (
+                <p className="text-xs text-slate-700 leading-relaxed mb-2">
+                  The database relation <strong>public.universities</strong> is missing or misaligned. Please execute the SQL scripts in your Supabase console to seed the table structures properly.
+                </p>
+              </Card>
+            ) : (
               <>
-                {uniError && (uniError.includes("column") || uniError.includes("tuition_range") || uniError.includes("intake_months")) ? (
-                  <Card outerClassName="border-amber-200" className="bg-amber-50/10 mb-4">
-                    <div className="flex items-center gap-2.5 mb-2">
-                      <Warning size={18} className="text-amber-600" weight="fill" />
-                      <CardTitle className="text-xs uppercase tracking-wider text-amber-800">Schema Upgrade Required</CardTitle>
-                    </div>
-                    <p className="text-xs text-slate-700 leading-relaxed mb-3">
-                      The universities table is missing required columns. Execute this SQL query in your Supabase console to upgrade the table structure:
-                    </p>
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-300 overflow-x-auto leading-relaxed select-all">
-                      <pre>{`ALTER TABLE public.universities 
-ADD COLUMN IF NOT EXISTS city TEXT,
-ADD COLUMN IF NOT EXISTS tuition_range TEXT,
-ADD COLUMN IF NOT EXISTS intake_months TEXT,
-ADD COLUMN IF NOT EXISTS application_deadline TEXT,
-ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'Active',
-ADD COLUMN IF NOT EXISTS featured BOOLEAN DEFAULT false,
-ADD COLUMN IF NOT EXISTS logo_url TEXT;`}</pre>
-                    </div>
-                  </Card>
-                ) : null}
-
                 {/* Filters Row */}
                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-slate-50 border border-hairline p-4 rounded-2xl">
                   <div className="flex flex-grow max-w-md items-center gap-2.5 px-3 py-2 border border-hairline rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20">
                     <MagnifyingGlass size={16} className="text-slate-400" />
                     <input 
                       type="text" 
-                      placeholder="Search university name, city, country..." 
+                      placeholder="Search universities..." 
                       value={uniSearch}
                       onChange={(e) => setUniSearch(e.target.value)}
                       className="text-xs w-full focus:outline-none text-slate-800 bg-transparent"
                     />
-                    {uniSearch && (
-                      <button onClick={() => setUniSearch("")} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                        <X size={14} />
-                      </button>
-                    )}
                   </div>
                   
-                  <div className="flex flex-wrap items-center gap-3">
-                    {/* Country Filter */}
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold cursor-pointer">
-                      <Funnel size={14} className="text-slate-400" />
-                      <select 
-                        value={uniCountryFilter} 
-                        onChange={(e) => setUniCountryFilter(e.target.value)}
-                        className="bg-transparent focus:outline-none cursor-pointer"
-                      >
-                        <option value="All">All Countries</option>
-                        {uniqueCountries.map(c => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+                  <select 
+                    value={uniCountryFilter} 
+                    onChange={(e) => setUniCountryFilter(e.target.value)}
+                    className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
+                  >
+                    <option value="All">All Countries</option>
+                    {uniqueCountries.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
                 </div>
 
                 {filteredUnis.length === 0 ? (
                   <div className="text-center py-12 border border-dashed border-hairline rounded-2xl text-slate-400 text-xs font-semibold">
-                    No university records found. Click "Add University" to seed data.
+                    No university records configured yet.
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4">
@@ -1251,18 +1211,13 @@ ADD COLUMN IF NOT EXISTS logo_url TEXT;`}</pre>
                                 {uni.logo_url ? (
                                   <img src={uni.logo_url} alt="" className="w-8 h-8 rounded-lg object-contain bg-slate-50 border border-hairline" />
                                 ) : (
-                                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] text-slate-400 font-bold font-mono">UNI</div>
+                                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-[9px] text-slate-400 font-bold">UNI</div>
                                 )}
                               </td>
                               <td className="p-4 font-semibold text-primary">
                                 {uni.name}<br />
                                 {uni.website && (
-                                  <a 
-                                    href={uni.website} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    className="text-slate-400 hover:text-primary flex items-center gap-0.5 font-mono-data text-[10px] font-normal mt-0.5"
-                                  >
+                                  <a href={uni.website} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-primary flex items-center gap-0.5 text-[10px] font-normal mt-0.5 font-mono-data">
                                     {uni.website.replace(/^https?:\/\/(www\.)?/, "")} <ArrowSquareOut size={10} />
                                   </a>
                                 )}
@@ -1270,28 +1225,20 @@ ADD COLUMN IF NOT EXISTS logo_url TEXT;`}</pre>
                               <td className="p-4">
                                 <span className="font-semibold">{uni.city}</span>, {uni.country}
                               </td>
-                              <td className="p-4">
-                                <span className="text-slate-600 font-mono-data">{uni.tuition_range || "N/A"}</span><br />
-                                <span className="text-[10px] text-slate-400">{uni.intake_months || "N/A"}</span>
+                              <td className="p-4 font-semibold text-slate-600">
+                                {uni.tuition_range || "N/A"}<br />
+                                <span className="text-[10px] text-slate-400 font-normal">{uni.intake_months || "N/A"}</span>
                               </td>
-                              <td className="p-4 font-semibold text-slate-600">{uni.application_deadline || "N/A"}</td>
+                              <td className="p-4 font-semibold text-slate-500">{uni.application_deadline || "N/A"}</td>
                               <td className="p-4">
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  uni.status === "Active"
-                                    ? "bg-green-50 text-green-600 border border-green-100"
-                                    : "bg-slate-100 text-slate-400 border border-slate-200"
+                                  uni.status === "Active" ? "bg-green-50 text-green-600 border border-green-100" : "bg-slate-100 text-slate-400 border border-slate-200"
                                 }`}>
                                   {uni.status || "Active"}
                                 </span>
                               </td>
                               <td className="p-4 text-center">
-                                <button
-                                  onClick={() => toggleFeaturedUni(uni.id, uni.featured)}
-                                  className={`p-1 rounded-full hover:bg-slate-50 transition-colors cursor-pointer ${
-                                    uni.featured ? "text-amber-500" : "text-slate-300"
-                                  }`}
-                                  title={uni.featured ? "Unfeature university" : "Feature university"}
-                                >
+                                <button onClick={() => toggleFeaturedUni(uni.id, uni.featured)} className={`p-1 cursor-pointer transition-colors ${uni.featured ? "text-amber-500" : "text-slate-300"}`}>
                                   <Star size={18} weight={uni.featured ? "fill" : "regular"} />
                                 </button>
                               </td>
@@ -1314,15 +1261,10 @@ ADD COLUMN IF NOT EXISTS logo_url TEXT;`}</pre>
                                     setIsUniModalOpen(true);
                                   }}
                                   className="p-1 text-slate-500 hover:text-primary hover:bg-slate-50 rounded transition-colors cursor-pointer"
-                                  title="Edit"
                                 >
                                   <Eye size={16} />
                                 </button>
-                                <button
-                                  onClick={() => handleDeleteUni(uni.id)}
-                                  className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                                  title="Delete"
-                                >
+                                <button onClick={() => handleDeleteUni(uni.id)} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer">
                                   <Trash size={16} />
                                 </button>
                               </td>
@@ -1332,7 +1274,6 @@ ADD COLUMN IF NOT EXISTS logo_url TEXT;`}</pre>
                       </table>
                     </div>
 
-                    {/* Pagination controls */}
                     {totalUniPages > 1 && (
                       <div className="flex items-center justify-between border-t border-hairline pt-4 px-2">
                         <span className="text-xs text-slate-500">
@@ -1340,22 +1281,8 @@ ADD COLUMN IF NOT EXISTS logo_url TEXT;`}</pre>
                         </span>
                         
                         <div className="flex gap-2">
-                          <Button 
-                            disabled={uniPage === 1}
-                            onClick={() => setUniPage(p => Math.max(1, p - 1))}
-                            variant="secondary"
-                            size="sm"
-                          >
-                            Previous
-                          </Button>
-                          <Button 
-                            disabled={uniPage === totalUniPages}
-                            onClick={() => setUniPage(p => Math.min(totalUniPages, p + 1))}
-                            variant="secondary"
-                            size="sm"
-                          >
-                            Next
-                          </Button>
+                          <Button disabled={uniPage === 1} onClick={() => setUniPage(p => Math.max(1, p - 1))} variant="secondary" size="sm">Previous</Button>
+                          <Button disabled={uniPage === totalUniPages} onClick={() => setUniPage(p => Math.min(totalUniPages, p + 1))} variant="secondary" size="sm">Next</Button>
                         </div>
                       </div>
                     )}
@@ -1366,12 +1293,12 @@ ADD COLUMN IF NOT EXISTS logo_url TEXT;`}</pre>
           </section>
         )}
 
-        {activeTab === "cms" && (
+        {activeTab === "blog" && (
           <section className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-display font-bold text-2xl text-primary">CMS Articles</h2>
-                <p className="text-xs text-slate-400 mt-1">Manage educational blogs and student visa success story publications.</p>
+                <h2 className="font-display font-bold text-2xl text-primary">Blog Posts</h2>
+                <p className="text-xs text-slate-400 mt-1">Manage public articles and insights.</p>
               </div>
               {postsTableExists && (
                 <Button 
@@ -1383,13 +1310,10 @@ ADD COLUMN IF NOT EXISTS logo_url TEXT;`}</pre>
                       excerpt: "",
                       content: "",
                       featured_image_url: "",
-                      category: "Blog",
+                      category: "University Guide",
                       tags: "",
                       author: "Annex Team",
-                      published: false,
-                      student_name: "",
-                      university_placed: "",
-                      visa_year: new Date().getFullYear().toString()
+                      published: false
                     });
                     setPostModalTab("edit");
                     setIsPostModalOpen(true);
@@ -1398,103 +1322,52 @@ ADD COLUMN IF NOT EXISTS logo_url TEXT;`}</pre>
                   size="sm" 
                   className="flex items-center gap-1"
                 >
-                  <Plus size={14} /> New Post
+                  <Plus size={14} /> New Article
                 </Button>
               )}
             </div>
 
-            {uniLoading && posts.length === 0 && (
-              <div className="text-center py-12 text-slate-400 text-xs font-semibold">Loading CMS posts...</div>
-            )}
-
-            {!cmsLoading && postsTableExists === false && (
-              <div className="flex flex-col gap-6">
-                <Card outerClassName="border-amber-200" className="bg-amber-50/10">
-                  <div className="flex items-center gap-2.5 mb-4">
-                    <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center">
-                      <Warning size={18} weight="fill" />
-                    </div>
-                    <CardTitle className="text-sm uppercase tracking-wider text-amber-800">Table Missing Warning</CardTitle>
-                  </div>
-                  <p className="text-xs md:text-sm text-slate-700 leading-relaxed mb-4">
-                    The Supabase connection is successful, but the table <strong>public.posts</strong> does not exist in your database schema. Proactively execute the following SQL script to create it:
-                  </p>
-                  
-                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-300 overflow-x-auto leading-relaxed select-all">
-                    <pre>{`-- SQL Migration Code
-CREATE TABLE IF NOT EXISTS public.posts (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    title TEXT NOT NULL,
-    slug TEXT NOT NULL UNIQUE,
-    excerpt TEXT,
-    content TEXT NOT NULL,
-    featured_image_url TEXT,
-    category TEXT NOT NULL,
-    tags TEXT,
-    author TEXT DEFAULT 'Annex Team',
-    published BOOLEAN DEFAULT false,
-    published_date TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- Enable RLS and policies
-ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow public select posts" ON public.posts FOR SELECT USING (true);
-CREATE POLICY "Allow public write posts" ON public.posts FOR ALL USING (true) WITH CHECK (true);`}</pre>
-                  </div>
-                </Card>
-
-                {/* Local Fallback Layout */}
-                <div className="border border-dashed border-hairline p-12 rounded-2xl text-center">
-                  <FileText size={32} className="text-slate-300 mx-auto mb-3" />
-                  <h3 className="font-display font-semibold text-sm text-slate-500 mb-1">CMS Placeholder Dashboard</h3>
-                  <p className="text-xs text-slate-400 max-w-[40ch] mx-auto">
-                    Once you apply the schema SQL in your Supabase console, refresh this page to load details.
-                  </p>
+            {loading && posts.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 text-xs font-semibold">Loading Blog CMS...</div>
+            ) : postsTableExists === false ? (
+              <Card outerClassName="border-amber-200" className="bg-amber-50/10">
+                <div className="flex items-center gap-2 mb-4">
+                  <Warning size={18} className="text-amber-600" weight="fill" />
+                  <CardTitle className="text-sm uppercase text-amber-800 tracking-wider">Posts Table Missing</CardTitle>
                 </div>
-              </div>
-            )}
-
-            {!cmsLoading && postsTableExists === true && (
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  The database table <strong>public.posts</strong> is missing. Apply the migration SQL scripts to proceed.
+                </p>
+              </Card>
+            ) : (
               <>
-                {/* Search & Category Filter Tabs */}
                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-slate-50 border border-hairline p-4 rounded-2xl">
-                  {/* Category Filter Tabs */}
-                  <div className="flex border-b border-transparent gap-4 text-xs font-bold uppercase tracking-wider text-slate-400">
-                    {(["All", "Blog", "Success Story"] as const).map(tab => (
-                      <button
-                        key={tab}
-                        onClick={() => setCmsTab(tab)}
-                        className={`py-2 px-1 border-b-2 cursor-pointer transition-all ${
-                          cmsTab === tab ? "border-primary text-primary" : "border-transparent hover:text-primary"
-                        }`}
-                      >
-                        {tab}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Search Bar */}
-                  <div className="flex flex-grow max-w-sm items-center gap-2.5 px-3 py-2 border border-hairline rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20">
+                  <div className="flex flex-grow max-w-md items-center gap-2.5 px-3 py-2 border border-hairline rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20">
                     <MagnifyingGlass size={16} className="text-slate-400" />
                     <input 
                       type="text" 
-                      placeholder="Search title, excerpt, tags..." 
-                      value={cmsSearch}
-                      onChange={(e) => setCmsSearch(e.target.value)}
+                      placeholder="Search articles..." 
+                      value={blogSearch}
+                      onChange={(e) => setBlogSearch(e.target.value)}
                       className="text-xs w-full focus:outline-none text-slate-800 bg-transparent"
                     />
-                    {cmsSearch && (
-                      <button onClick={() => setCmsSearch("")} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                        <X size={14} />
-                      </button>
-                    )}
                   </div>
+                  
+                  <select 
+                    value={blogCategoryFilter} 
+                    onChange={(e) => setBlogCategoryFilter(e.target.value)}
+                    className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
+                  >
+                    <option value="All">All Categories</option>
+                    {uniqueBlogCategories.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
                 </div>
 
                 {filteredPosts.length === 0 ? (
                   <div className="text-center py-12 border border-dashed border-hairline rounded-2xl text-slate-400 text-xs font-semibold">
-                    No articles found matching filters. Create your first post!
+                    No articles found matching filters.
                   </div>
                 ) : (
                   <div className="border border-hairline rounded-2xl overflow-x-auto bg-white">
@@ -1502,7 +1375,7 @@ CREATE POLICY "Allow public write posts" ON public.posts FOR ALL USING (true) WI
                       <thead>
                         <tr className="bg-slate-50 border-b border-hairline text-slate-500 font-bold uppercase tracking-wider">
                           <th className="p-4">Cover</th>
-                          <th className="p-4">Article Details</th>
+                          <th className="p-4">Article</th>
                           <th className="p-4">Category</th>
                           <th className="p-4">Tags</th>
                           <th className="p-4">Author</th>
@@ -1515,9 +1388,9 @@ CREATE POLICY "Allow public write posts" ON public.posts FOR ALL USING (true) WI
                           <tr key={post.id} className="hover:bg-subtle-gray/30">
                             <td className="p-4">
                               {post.featured_image_url ? (
-                                <img src={post.featured_image_url} alt="" className="w-12 h-8 rounded-md object-cover border border-hairline bg-slate-50" />
+                                <img src={post.featured_image_url} alt="" className="w-12 h-8 rounded object-cover border border-hairline bg-slate-50" />
                               ) : (
-                                <div className="w-12 h-8 rounded-md bg-slate-100 flex items-center justify-center text-[8px] text-slate-400 font-bold font-mono">IMG</div>
+                                <div className="w-12 h-8 rounded bg-slate-100 flex items-center justify-center text-[8px] text-slate-400 font-bold">IMG</div>
                               )}
                             </td>
                             <td className="p-4 font-semibold text-primary max-w-[250px] truncate" title={post.title}>
@@ -1525,37 +1398,25 @@ CREATE POLICY "Allow public write posts" ON public.posts FOR ALL USING (true) WI
                               <span className="text-[10px] text-slate-400 font-mono-data font-normal">slug: {post.slug}</span>
                             </td>
                             <td className="p-4">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                post.category === "Success Story" 
-                                  ? "bg-purple-50 text-purple-600 border border-purple-100" 
-                                  : "bg-blue-50 text-blue-600 border border-blue-100"
-                              }`}>
-                                {post.category}
-                              </span>
+                              <span className="bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded text-[10px] font-bold">{post.category}</span>
                             </td>
                             <td className="p-4 max-w-[150px] truncate">
                               {post.tags ? (
                                 <div className="flex flex-wrap gap-1">
                                   {post.tags.split(",").map(tag => (
-                                    <span key={tag} className="bg-slate-100 text-[9px] text-slate-500 px-1 py-0.5 rounded-md font-semibold">
-                                      {tag.trim()}
-                                    </span>
+                                    <span key={tag} className="bg-slate-100 text-[9px] text-slate-500 px-1 py-0.5 rounded-md font-semibold">{tag.trim()}</span>
                                   ))}
                                 </div>
-                              ) : (
-                                <span className="text-slate-400">-</span>
-                              )}
+                              ) : "-"}
                             </td>
                             <td className="p-4">{post.author}</td>
                             <td className="p-4">
                               <button
                                 onClick={() => togglePublishPost(post.id, post.published)}
-                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
-                                  post.published
-                                    ? "bg-green-50 text-green-600 border-green-100 hover:bg-green-100/30"
-                                    : "bg-yellow-50 text-yellow-600 border-yellow-100 hover:bg-yellow-100/30"
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
+                                  post.published ? "bg-green-50 text-green-600 border-green-100 hover:bg-green-100/30" : "bg-yellow-50 text-yellow-600 border-yellow-100 hover:bg-yellow-100/30"
                                 }`}
-                                title={post.published ? "Mark as Draft" : "Publish Article"}
+                                title={post.published ? "Mark Draft" : "Publish"}
                               >
                                 {post.published ? "Published" : "Draft"}
                               </button>
@@ -1573,24 +1434,169 @@ CREATE POLICY "Allow public write posts" ON public.posts FOR ALL USING (true) WI
                                     category: post.category,
                                     tags: post.tags || "",
                                     author: post.author || "Annex Team",
-                                    published: post.published,
-                                    student_name: post.student_name || "",
-                                    university_placed: post.university_placed || "",
-                                    visa_year: (post.visa_year || new Date().getFullYear()).toString()
+                                    published: post.published
                                   });
                                   setPostModalTab("edit");
                                   setIsPostModalOpen(true);
                                 }}
                                 className="p-1 text-slate-500 hover:text-primary hover:bg-slate-50 rounded transition-colors cursor-pointer"
-                                title="Edit"
                               >
                                 <Eye size={16} />
                               </button>
+                              <button onClick={() => handleDeletePost(post.id)} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer">
+                                <Trash size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        )}
+
+        {activeTab === "stories" && (
+          <section className="flex flex-col gap-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-display font-bold text-2xl text-primary">Success Stories</h2>
+                <p className="text-xs text-slate-400 mt-1">Manage public placements and test prep testimonials.</p>
+              </div>
+              {storiesTableExists && (
+                <Button 
+                  onClick={() => {
+                    setEditingStory(null);
+                    setStoryForm({
+                      name: "",
+                      destination: "",
+                      university: "",
+                      course: "",
+                      quote: "",
+                      year: new Date().getFullYear().toString(),
+                      student_photo_url: "",
+                      success_metrics: "",
+                      published: false
+                    });
+                    setIsStoryModalOpen(true);
+                  }}
+                  variant="primary" 
+                  size="sm" 
+                  className="flex items-center gap-1"
+                >
+                  <Plus size={14} /> New Story
+                </Button>
+              )}
+            </div>
+
+            {loading && stories.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 text-xs font-semibold">Loading Stories CMS...</div>
+            ) : storiesTableExists === false ? (
+              <Card outerClassName="border-amber-200" className="bg-amber-50/10">
+                <div className="flex items-center gap-2 mb-4">
+                  <Warning size={18} className="text-amber-600" weight="fill" />
+                  <CardTitle className="text-sm uppercase text-amber-800 tracking-wider">Stories Table Missing</CardTitle>
+                </div>
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  The database table <strong>public.success_stories</strong> is missing. Run the SQL script to seed it.
+                </p>
+              </Card>
+            ) : (
+              <>
+                <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-slate-50 border border-hairline p-4 rounded-2xl">
+                  <div className="flex flex-grow max-w-md items-center gap-2.5 px-3 py-2 border border-hairline rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20">
+                    <MagnifyingGlass size={16} className="text-slate-400" />
+                    <input 
+                      type="text" 
+                      placeholder="Search success stories..." 
+                      value={storySearch}
+                      onChange={(e) => setStorySearch(e.target.value)}
+                      className="text-xs w-full focus:outline-none text-slate-800 bg-transparent"
+                    />
+                  </div>
+                  
+                  <select 
+                    value={storyCountryFilter} 
+                    onChange={(e) => setStoryCountryFilter(e.target.value)}
+                    className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
+                  >
+                    <option value="All">All Placements</option>
+                    {uniqueStoryCountries.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {filteredStories.length === 0 ? (
+                  <div className="text-center py-12 border border-dashed border-hairline rounded-2xl text-slate-400 text-xs font-semibold">
+                    No success stories found matching filters.
+                  </div>
+                ) : (
+                  <div className="border border-hairline rounded-2xl overflow-x-auto bg-white">
+                    <table className="w-full text-left border-collapse text-xs min-w-[850px]">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-hairline text-slate-500 font-bold uppercase tracking-wider">
+                          <th className="p-4">Photo</th>
+                          <th className="p-4">Student Name</th>
+                          <th className="p-4">Placement Details</th>
+                          <th className="p-4">Tuition / Success Metric</th>
+                          <th className="p-4">Intake Year</th>
+                          <th className="p-4">Status</th>
+                          <th className="p-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-hairline">
+                        {filteredStories.map((story) => (
+                          <tr key={story.id} className="hover:bg-subtle-gray/30">
+                            <td className="p-4">
+                              {story.student_photo_url ? (
+                                <img src={story.student_photo_url} alt="" className="w-8 h-8 rounded-full object-cover border border-hairline bg-slate-50" />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[8px] text-slate-400 font-bold">STU</div>
+                              )}
+                            </td>
+                            <td className="p-4 font-semibold text-primary">{story.name}</td>
+                            <td className="p-4">
+                              <span className="font-semibold">{story.university}</span> &middot; <span className="font-mono-data text-gold font-bold">{story.destination}</span><br />
+                              <span className="text-[10px] text-slate-400">{story.course}</span>
+                            </td>
+                            <td className="p-4 font-semibold text-slate-600">{story.success_metrics || "Standard Visa"}</td>
+                            <td className="p-4 font-mono-data font-semibold">{story.year}</td>
+                            <td className="p-4">
                               <button
-                                onClick={() => handleDeletePost(post.id)}
-                                className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                                title="Delete"
+                                onClick={() => togglePublishStory(story.id, story.published)}
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
+                                  story.published ? "bg-green-50 text-green-600 border-green-100 hover:bg-green-100/30" : "bg-yellow-50 text-yellow-600 border-yellow-100 hover:bg-yellow-100/30"
+                                }`}
+                                title={story.published ? "Mark Draft" : "Publish"}
                               >
+                                {story.published ? "Published" : "Draft"}
+                              </button>
+                            </td>
+                            <td className="p-4 text-right flex justify-end gap-2 items-center h-full mt-2">
+                              <button
+                                onClick={() => {
+                                  setEditingStory(story);
+                                  setStoryForm({
+                                    name: story.name,
+                                    destination: story.destination,
+                                    university: story.university,
+                                    course: story.course,
+                                    quote: story.quote,
+                                    year: story.year.toString(),
+                                    student_photo_url: story.student_photo_url || "",
+                                    success_metrics: story.success_metrics || "",
+                                    published: story.published
+                                  });
+                                  setIsStoryModalOpen(true);
+                                }}
+                                className="p-1 text-slate-500 hover:text-primary hover:bg-slate-50 rounded transition-colors cursor-pointer"
+                              >
+                                <Eye size={16} />
+                              </button>
+                              <button onClick={() => handleDeleteStory(story.id)} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer">
                                 <Trash size={16} />
                               </button>
                             </td>
@@ -1606,17 +1612,14 @@ CREATE POLICY "Allow public write posts" ON public.posts FOR ALL USING (true) WI
         )}
       </div>
 
-      {/* MODAL 1: View Booking Notes Dialog */}
+      {/* MODALS */}
+      {/* 1. VIEW BOOKING DETAILS MODAL */}
       {isNotesModalOpen && selectedBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
           <Card className="max-w-2xl w-full p-6 relative bg-white shadow-2xl">
-            <button 
-              onClick={() => setIsNotesModalOpen(false)}
-              className="absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer"
-            >
+            <button onClick={() => setIsNotesModalOpen(false)} className="absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer">
               <X size={20} />
             </button>
-            
             <div className="flex items-center gap-2 mb-6 border-b border-hairline pb-4">
               <FileText size={22} className="text-primary" />
               <div>
@@ -1624,233 +1627,117 @@ CREATE POLICY "Allow public write posts" ON public.posts FOR ALL USING (true) WI
                 <CardDescription className="text-xs">Submission ID: {selectedBooking.id}</CardDescription>
               </div>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-xs md:text-sm">
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Student Name</label>
-                <p className="text-sm font-semibold text-primary">{selectedBooking.name}</p>
+                <p className="font-semibold text-primary">{selectedBooking.name}</p>
               </div>
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Status</label>
                 <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                  selectedBooking.status === "Confirmed"
-                    ? "bg-green-50 text-green-600 border border-green-100"
-                    : selectedBooking.status === "Cancelled"
-                    ? "bg-red-50 text-red-600 border border-red-100"
-                    : "bg-yellow-50 text-yellow-600 border border-yellow-100"
-                }`}>
-                  {selectedBooking.status}
-                </span>
+                  selectedBooking.status === "Confirmed" ? "bg-green-50 text-green-600 border border-green-100" : selectedBooking.status === "Cancelled" ? "bg-red-50 text-red-600 border border-red-100" : "bg-yellow-50 text-yellow-600 border border-yellow-100"
+                }`}>{selectedBooking.status}</span>
               </div>
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Email</label>
-                <p className="text-sm font-mono-data text-slate-600">{selectedBooking.email}</p>
+                <p className="font-mono-data text-slate-600">{selectedBooking.email}</p>
               </div>
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Phone</label>
-                <p className="text-sm font-mono-data text-slate-600">{selectedBooking.phone}</p>
+                <p className="font-mono-data text-slate-600">{selectedBooking.phone}</p>
               </div>
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Preferred Date/Time</label>
-                <p className="text-sm text-slate-600">{selectedBooking.preferred_date} @ {selectedBooking.preferred_time}</p>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Preferred Slot</label>
+                <p className="text-slate-600">{selectedBooking.preferred_date} @ {selectedBooking.preferred_time}</p>
               </div>
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Study Level & Destination</label>
-                <p className="text-sm text-slate-600">{selectedBooking.study_level} to {selectedBooking.destination}</p>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Destination Details</label>
+                <p className="text-slate-600">{selectedBooking.study_level} to {selectedBooking.destination}</p>
               </div>
             </div>
-            
             <div className="mb-6">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Notes & Academic Background</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Notes & Transcripts Background</label>
               <div className="p-4 bg-slate-50 border border-hairline rounded-xl text-xs md:text-sm text-slate-700 leading-relaxed whitespace-pre-wrap max-h-[200px] overflow-y-auto">
                 {selectedBooking.notes || "No additional information provided."}
               </div>
             </div>
-            
             <div className="flex justify-end gap-3 border-t border-hairline pt-4">
-              {selectedBooking.status !== "Confirmed" && (
-                <Button 
-                  onClick={() => {
-                    updateStatus(selectedBooking.id, "Confirmed");
-                    setSelectedBooking(prev => prev ? { ...prev, status: "Confirmed" } : null);
-                  }} 
-                  variant="primary" 
-                  size="sm"
-                >
-                  Confirm Booking
-                </Button>
-              )}
-              {selectedBooking.status !== "Cancelled" && (
-                <Button 
-                  onClick={() => {
-                    updateStatus(selectedBooking.id, "Cancelled");
-                    setSelectedBooking(prev => prev ? { ...prev, status: "Cancelled" } : null);
-                  }} 
-                  variant="secondary" 
-                  size="sm"
-                >
-                  Cancel Booking
-                </Button>
-              )}
+              {selectedBooking.status !== "Confirmed" && <Button onClick={() => { updateBookingStatus(selectedBooking.id, "Confirmed"); setSelectedBooking(null); setIsNotesModalOpen(false); }} variant="primary" size="sm">Confirm</Button>}
+              {selectedBooking.status !== "Cancelled" && <Button onClick={() => { updateBookingStatus(selectedBooking.id, "Cancelled"); setSelectedBooking(null); setIsNotesModalOpen(false); }} variant="secondary" size="sm">Cancel</Button>}
               <Button onClick={() => setIsNotesModalOpen(false)} variant="ghost" size="sm">Close</Button>
             </div>
           </Card>
         </div>
       )}
 
-      {/* MODAL 2: Add/Edit University Dialog */}
+      {/* 2. ADD/EDIT UNIVERSITY MODAL */}
       {isUniModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <Card className="max-w-md w-full p-6 relative bg-white shadow-2xl">
-            <button 
-              onClick={() => setIsUniModalOpen(false)}
-              className="absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer"
-            >
+            <button onClick={() => setIsUniModalOpen(false)} className="absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer">
               <X size={20} />
             </button>
-            
             <div className="flex items-center gap-2 mb-6 border-b border-hairline pb-4">
               <Globe size={22} className="text-primary" />
               <div>
                 <CardTitle className="text-lg">{editingUni ? "Edit University" : "Add New University"}</CardTitle>
-                <CardDescription className="text-xs">Provide official placement partner information below.</CardDescription>
+                <CardDescription className="text-xs">Configure university information databases.</CardDescription>
               </div>
             </div>
-
             <form onSubmit={handleSaveUni} className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-1">
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="uniName" className="text-[10px] font-bold text-primary uppercase tracking-wider">University Name *</label>
-                  <input 
-                    type="text" 
-                    id="uniName"
-                    value={uniForm.name}
-                    onChange={(e) => setUniForm({ ...uniForm, name: e.target.value })}
-                    placeholder="e.g. University of Greenwich"
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
-                    required
-                  />
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Name *</label>
+                  <input type="text" value={uniForm.name} onChange={(e) => setUniForm({ ...uniForm, name: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" required />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="uniLogo" className="text-[10px] font-bold text-primary uppercase tracking-wider">Logo URL</label>
-                  <input 
-                    type="text" 
-                    id="uniLogo"
-                    value={uniForm.logo_url}
-                    onChange={(e) => setUniForm({ ...uniForm, logo_url: e.target.value })}
-                    placeholder="e.g. https://logo.domain/image.png"
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
-                  />
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Logo URL</label>
+                  <input type="text" value={uniForm.logo_url} onChange={(e) => setUniForm({ ...uniForm, logo_url: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" placeholder="https://" />
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="uniCountry" className="text-[10px] font-bold text-primary uppercase tracking-wider">Country *</label>
-                  <input 
-                    type="text" 
-                    id="uniCountry"
-                    value={uniForm.country}
-                    onChange={(e) => setUniForm({ ...uniForm, country: e.target.value })}
-                    placeholder="e.g. United Kingdom"
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
-                    required
-                  />
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Country *</label>
+                  <input type="text" value={uniForm.country} onChange={(e) => setUniForm({ ...uniForm, country: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" required />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="uniCity" className="text-[10px] font-bold text-primary uppercase tracking-wider">City *</label>
-                  <input 
-                    type="text" 
-                    id="uniCity"
-                    value={uniForm.city}
-                    onChange={(e) => setUniForm({ ...uniForm, city: e.target.value })}
-                    placeholder="e.g. London"
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
-                    required
-                  />
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">City *</label>
+                  <input type="text" value={uniForm.city} onChange={(e) => setUniForm({ ...uniForm, city: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" required />
                 </div>
               </div>
-
               <div className="flex flex-col gap-1">
-                <label htmlFor="uniWebsite" className="text-[10px] font-bold text-primary uppercase tracking-wider">Website URL</label>
-                <input 
-                  type="url" 
-                  id="uniWebsite"
-                  value={uniForm.website}
-                  onChange={(e) => setUniForm({ ...uniForm, website: e.target.value })}
-                  placeholder="https://example.edu"
-                  className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
-                />
+                <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Website URL</label>
+                <input type="url" value={uniForm.website} onChange={(e) => setUniForm({ ...uniForm, website: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" placeholder="https://" />
               </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="uniTuition" className="text-[10px] font-bold text-primary uppercase tracking-wider">Tuition Range</label>
-                  <input 
-                    type="text" 
-                    id="uniTuition"
-                    value={uniForm.tuition_range}
-                    onChange={(e) => setUniForm({ ...uniForm, tuition_range: e.target.value })}
-                    placeholder="e.g. £12,000 - £18,000/yr"
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
-                  />
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Tuition Range</label>
+                  <input type="text" value={uniForm.tuition_range} onChange={(e) => setUniForm({ ...uniForm, tuition_range: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" placeholder="e.g. £10,000-£15,000" />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="uniDeadline" className="text-[10px] font-bold text-primary uppercase tracking-wider">Application Deadline</label>
-                  <input 
-                    type="text" 
-                    id="uniDeadline"
-                    value={uniForm.application_deadline}
-                    onChange={(e) => setUniForm({ ...uniForm, application_deadline: e.target.value })}
-                    placeholder="e.g. June 30 / rolling"
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
-                  />
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Deadline</label>
+                  <input type="text" value={uniForm.application_deadline} onChange={(e) => setUniForm({ ...uniForm, application_deadline: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" placeholder="e.g. June 30" />
                 </div>
               </div>
-
               <div className="flex flex-col gap-1">
-                <label htmlFor="uniIntakes" className="text-[10px] font-bold text-primary uppercase tracking-wider">Intake Months</label>
-                <input 
-                  type="text" 
-                  id="uniIntakes"
-                  value={uniForm.intake_months}
-                  onChange={(e) => setUniForm({ ...uniForm, intake_months: e.target.value })}
-                  placeholder="e.g. September, January, May"
-                  className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
-                />
+                <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Intake Months</label>
+                <input type="text" value={uniForm.intake_months} onChange={(e) => setUniForm({ ...uniForm, intake_months: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" placeholder="e.g. September, January" />
               </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="uniStatus" className="text-[10px] font-bold text-primary uppercase tracking-wider">Status</label>
-                  <select
-                    id="uniStatus"
-                    value={uniForm.status}
-                    onChange={(e) => setUniForm({ ...uniForm, status: e.target.value })}
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white cursor-pointer"
-                  >
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Status</label>
+                  <select value={uniForm.status} onChange={(e) => setUniForm({ ...uniForm, status: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-white cursor-pointer">
                     <option value="Active">Active</option>
                     <option value="Hidden">Hidden</option>
                   </select>
                 </div>
                 <div className="flex items-center gap-2 mt-4">
-                  <input 
-                    type="checkbox" 
-                    id="uniFeatured"
-                    checked={uniForm.featured}
-                    onChange={(e) => setUniForm({ ...uniForm, featured: e.target.checked })}
-                    className="w-4 h-4 text-primary border-hairline rounded focus:ring-primary/20 cursor-pointer"
-                  />
-                  <label htmlFor="uniFeatured" className="text-[10px] font-bold text-primary uppercase tracking-wider cursor-pointer">
-                    Featured Partner
-                  </label>
+                  <input type="checkbox" id="featured" checked={uniForm.featured} onChange={(e) => setUniForm({ ...uniForm, featured: e.target.checked })} className="w-4 h-4 text-primary cursor-pointer border-hairline rounded" />
+                  <label htmlFor="featured" className="text-[10px] font-bold text-primary uppercase tracking-wider cursor-pointer">Featured Partner</label>
                 </div>
               </div>
-
               <div className="flex justify-end gap-3 border-t border-hairline pt-4 mt-2">
-                <Button type="submit" variant="primary" size="sm">
-                  {uniLoading ? "Saving..." : "Save Record"}
-                </Button>
+                <Button type="submit" variant="primary" size="sm">Save Record</Button>
                 <Button type="button" onClick={() => setIsUniModalOpen(false)} variant="ghost" size="sm">Cancel</Button>
               </div>
             </form>
@@ -1858,269 +1745,170 @@ CREATE POLICY "Allow public write posts" ON public.posts FOR ALL USING (true) WI
         </div>
       )}
 
-      {/* MODAL 3: Add/Edit CMS Post Dialog */}
+      {/* 3. ADD/EDIT BLOG POST MODAL */}
       {isPostModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <Card className="max-w-2xl w-full p-6 relative bg-white shadow-2xl flex flex-col">
-            <button 
-              onClick={() => setIsPostModalOpen(false)}
-              className="absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer z-10"
-            >
+            <button onClick={() => setIsPostModalOpen(false)} className="absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer z-10">
               <X size={20} />
             </button>
-            
             <div className="flex items-center gap-2 mb-4 border-b border-hairline pb-3">
               <FileText size={22} className="text-primary" />
               <div>
-                <CardTitle className="text-lg">{editingPost ? "Edit CMS Article" : "Create CMS Article"}</CardTitle>
-                <CardDescription className="text-xs">Publish a new blog or success story to the public grids.</CardDescription>
+                <CardTitle className="text-lg">{editingPost ? "Edit Blog Article" : "Create Blog Article"}</CardTitle>
+                <CardDescription className="text-xs">Publish articles directly onto the public Annex Journal page.</CardDescription>
               </div>
             </div>
-
-            {/* Modal Tabs for Editing and Previewing */}
-            <div className="flex gap-4 text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">
-              <button
-                type="button"
-                onClick={() => setPostModalTab("edit")}
-                className={`pb-1 border-b-2 cursor-pointer ${
-                  postModalTab === "edit" ? "border-primary text-primary" : "border-transparent hover:text-primary"
-                }`}
-              >
-                Edit Content
-              </button>
-              <button
-                type="button"
-                onClick={() => setPostModalTab("preview")}
-                className={`pb-1 border-b-2 cursor-pointer ${
-                  postModalTab === "preview" ? "border-primary text-primary" : "border-transparent hover:text-primary"
-                }`}
-              >
-                Live Preview
-              </button>
+            
+            {/* Inner modal tabs */}
+            <div className="flex gap-4 text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 border-b border-hairline/40 pb-2">
+              <button type="button" onClick={() => setPostModalTab("edit")} className={`pb-1 cursor-pointer transition-all ${postModalTab === "edit" ? "text-primary border-b-2 border-primary" : "hover:text-primary"}`}>Edit Content</button>
+              <button type="button" onClick={() => setPostModalTab("preview")} className={`pb-1 cursor-pointer transition-all ${postModalTab === "preview" ? "text-primary border-b-2 border-primary" : "hover:text-primary"}`}>Live Preview</button>
             </div>
 
             {postModalTab === "edit" ? (
               <form onSubmit={handleSavePost} className="flex flex-col gap-4 max-h-[60vh] overflow-y-auto pr-1">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
-                    <label htmlFor="postTitle" className="text-[10px] font-bold text-primary uppercase tracking-wider">Title *</label>
+                    <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Title *</label>
                     <input 
                       type="text" 
-                      id="postTitle"
-                      value={postForm.title}
-                      onChange={(e) => handleTitleChange(e.target.value, setPostForm)}
-                      placeholder="e.g. UK Student Visa Guide 2026"
-                      className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
-                      required
+                      value={postForm.title} 
+                      onChange={(e) => {
+                        const newTitle = e.target.value;
+                        const slugVal = newTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+                        setPostForm({ ...postForm, title: newTitle, slug: slugVal });
+                      }} 
+                      className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                      required 
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label htmlFor="postSlug" className="text-[10px] font-bold text-primary uppercase tracking-wider">URL Slug (Auto)</label>
-                    <input 
-                      type="text" 
-                      id="postSlug"
-                      value={postForm.slug}
-                      onChange={(e) => setPostForm({ ...postForm, slug: e.target.value })}
-                      placeholder="uk-student-visa-guide-2026"
-                      className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-slate-50 font-mono-data"
-                      required
-                    />
+                    <label className="text-[10px] font-bold text-primary uppercase tracking-wider">URL Slug (Auto)</label>
+                    <input type="text" value={postForm.slug} onChange={(e) => setPostForm({ ...postForm, slug: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-slate-50 font-mono-data" required />
                   </div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
-                    <label htmlFor="postCategory" className="text-[10px] font-bold text-primary uppercase tracking-wider">Category</label>
-                    <select
-                      id="postCategory"
-                      value={postForm.category}
-                      onChange={(e) => setPostForm({ ...postForm, category: e.target.value })}
-                      className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white cursor-pointer"
-                    >
-                      <option value="Blog">Blog Post</option>
-                      <option value="Success Story">Success Story</option>
+                    <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Category *</label>
+                    <select value={postForm.category} onChange={(e) => setPostForm({ ...postForm, category: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-white cursor-pointer">
+                      <option value="University Guide">University Guide</option>
+                      <option value="Visa Guide">Visa Guide</option>
+                      <option value="Intake Alert">Intake Alert</option>
+                      <option value="News & Events">News & Events</option>
                     </select>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label htmlFor="postAuthor" className="text-[10px] font-bold text-primary uppercase tracking-wider">Author</label>
-                    <input 
-                      type="text" 
-                      id="postAuthor"
-                      value={postForm.author}
-                      onChange={(e) => setPostForm({ ...postForm, author: e.target.value })}
-                      placeholder="Annex Team"
-                      className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
-                    />
+                    <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Author *</label>
+                    <input type="text" value={postForm.author} onChange={(e) => setPostForm({ ...postForm, author: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-white" required />
                   </div>
                 </div>
-
-                {postForm.category === "Success Story" && (
-                  <div className="grid grid-cols-3 gap-3 p-3 bg-slate-50 border border-hairline rounded-2xl">
-                    <div className="flex flex-col gap-1">
-                      <label htmlFor="studentName" className="text-[10px] font-bold text-primary uppercase tracking-wider">Student Name *</label>
-                      <input 
-                        type="text" 
-                        id="studentName"
-                        value={postForm.student_name}
-                        onChange={(e) => setPostForm({ ...postForm, student_name: e.target.value })}
-                        placeholder="Aarav Sharma"
-                        className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
-                        required={postForm.category === "Success Story"}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label htmlFor="uniPlaced" className="text-[10px] font-bold text-primary uppercase tracking-wider">University *</label>
-                      <input 
-                        type="text" 
-                        id="uniPlaced"
-                        value={postForm.university_placed}
-                        onChange={(e) => setPostForm({ ...postForm, university_placed: e.target.value })}
-                        placeholder="Uni of Leeds"
-                        className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
-                        required={postForm.category === "Success Story"}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label htmlFor="visaYear" className="text-[10px] font-bold text-primary uppercase tracking-wider">Visa Year *</label>
-                      <input 
-                        type="number" 
-                        id="visaYear"
-                        value={postForm.visa_year}
-                        onChange={(e) => setPostForm({ ...postForm, visa_year: e.target.value })}
-                        placeholder="2026"
-                        className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
-                        required={postForm.category === "Success Story"}
-                      />
-                    </div>
-                  </div>
-                )}
-
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="postImage" className="text-[10px] font-bold text-primary uppercase tracking-wider">Featured Image URL</label>
-                  <input 
-                    type="text" 
-                    id="postImage"
-                    value={postForm.featured_image_url}
-                    onChange={(e) => setPostForm({ ...postForm, featured_image_url: e.target.value })}
-                    placeholder="e.g. https://images.unsplash.com/photo-xxx"
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
-                  />
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Cover Image URL</label>
+                  <input type="text" value={postForm.featured_image_url} onChange={(e) => setPostForm({ ...postForm, featured_image_url: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-white" placeholder="https://" />
                 </div>
-
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="postTags" className="text-[10px] font-bold text-primary uppercase tracking-wider">Tags (Comma separated)</label>
-                  <input 
-                    type="text" 
-                    id="postTags"
-                    value={postForm.tags}
-                    onChange={(e) => setPostForm({ ...postForm, tags: e.target.value })}
-                    placeholder="e.g. UK, Student Visa, Admission Guidance"
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
-                  />
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Tags (Comma-separated)</label>
+                  <input type="text" value={postForm.tags} onChange={(e) => setPostForm({ ...postForm, tags: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-white" placeholder="UK, Admissions, Visa" />
                 </div>
-
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="postExcerpt" className="text-[10px] font-bold text-primary uppercase tracking-wider">Summary Excerpt *</label>
-                  <input 
-                    type="text" 
-                    id="postExcerpt"
-                    value={postForm.excerpt}
-                    onChange={(e) => setPostForm({ ...postForm, excerpt: e.target.value })}
-                    placeholder="Short summary excerpt describing the article..."
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
-                    required
-                  />
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Summary Excerpt *</label>
+                  <input type="text" value={postForm.excerpt} onChange={(e) => setPostForm({ ...postForm, excerpt: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-white" required />
                 </div>
-
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="postContent" className="text-[10px] font-bold text-primary uppercase tracking-wider">Content Body *</label>
-                  <textarea 
-                    id="postContent"
-                    value={postForm.content}
-                    onChange={(e) => setPostForm({ ...postForm, content: e.target.value })}
-                    placeholder="Write the full markdown or plaintext content body here..."
-                    className="px-3 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white min-h-[140px] resize-none"
-                    required
-                  />
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Content Body *</label>
+                  <textarea value={postForm.content} onChange={(e) => setPostForm({ ...postForm, content: e.target.value })} className="px-3 py-2 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-white min-h-[140px] resize-none" required />
                 </div>
-
                 <div className="flex items-center gap-2 mt-2">
-                  <input 
-                    type="checkbox" 
-                    id="postPublished"
-                    checked={postForm.published}
-                    onChange={(e) => setPostForm({ ...postForm, published: e.target.checked })}
-                    className="w-4 h-4 text-primary border-hairline rounded focus:ring-primary/20 cursor-pointer"
-                  />
-                  <label htmlFor="postPublished" className="text-xs font-bold text-primary uppercase tracking-wider cursor-pointer select-none">
-                    Publish immediately (publicly visible)
-                  </label>
+                  <input type="checkbox" id="published" checked={postForm.published} onChange={(e) => setPostForm({ ...postForm, published: e.target.checked })} className="w-4 h-4 text-primary cursor-pointer border-hairline rounded" />
+                  <label htmlFor="published" className="text-xs font-bold text-primary uppercase tracking-wider cursor-pointer">Publish immediately</label>
                 </div>
-
                 <div className="flex justify-end gap-3 border-t border-hairline pt-4 mt-2">
-                  <Button type="submit" variant="primary" size="sm">
-                    {cmsLoading ? "Saving..." : "Save Record"}
-                  </Button>
+                  <Button type="submit" variant="primary" size="sm">Save Record</Button>
                   <Button type="button" onClick={() => setIsPostModalOpen(false)} variant="ghost" size="sm">Cancel</Button>
                 </div>
               </form>
             ) : (
-              /* CMS Preview View */
+              /* BLOG PREVIEW */
               <div className="flex flex-col gap-4 max-h-[60vh] overflow-y-auto pr-1">
-                {postForm.featured_image_url && (
-                  <img 
-                    src={postForm.featured_image_url} 
-                    alt="" 
-                    className="w-full h-44 object-cover rounded-2xl border border-hairline bg-slate-50"
-                  />
-                )}
-                
+                {postForm.featured_image_url && <img src={postForm.featured_image_url} alt="" className="w-full h-40 object-cover rounded-2xl border border-hairline" />}
                 <div>
-                  <div className="flex flex-wrap gap-2 items-center mb-2">
-                    <span className="bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">
-                      {postForm.category}
-                    </span>
-                    
-                    {postForm.tags && postForm.tags.split(",").map(t => (
-                      <span key={t} className="bg-slate-100 text-slate-500 text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                        #{t.trim()}
-                      </span>
-                    ))}
-                  </div>
-
-                  <h1 className="font-display font-bold text-2xl text-primary leading-tight">
-                    {postForm.title || "Untitled Article"}
-                  </h1>
-                  
-                  <p className="text-[10px] text-slate-400 mt-1 font-mono-data font-semibold">
-                    BY {postForm.author.toUpperCase()} &bull; STATUS: {postForm.published ? "PUBLISHED" : "DRAFT"}
-                  </p>
+                  <span className="bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">{postForm.category}</span>
+                  <h1 className="font-display font-bold text-2xl text-primary mt-2">{postForm.title || "Untitled Article"}</h1>
+                  <p className="text-[10px] text-slate-400 mt-1 font-mono-data">BY {postForm.author.toUpperCase()}</p>
                 </div>
-
-                {postForm.category === "Success Story" && (
-                  <div className="p-3 bg-purple-50/30 border border-purple-100 rounded-xl text-xs text-purple-950 leading-relaxed font-semibold">
-                    Student: {postForm.student_name || "N/A"} &bull; Placed: {postForm.university_placed || "N/A"} &bull; Visa: {postForm.visa_year || "N/A"}
-                  </div>
-                )}
-
-                {postForm.excerpt && (
-                  <p className="text-xs font-semibold text-slate-500 italic border-l-2 border-primary pl-3 py-1">
-                    {postForm.excerpt}
-                  </p>
-                )}
-
-                <div className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap pt-2 border-t border-hairline/60">
-                  {postForm.content || "Write some body content in the edit panel to review the layout preview."}
-                </div>
-
-                <div className="flex justify-end gap-3 border-t border-hairline pt-4 mt-2">
-                  <Button type="button" onClick={() => setPostModalTab("edit")} variant="secondary" size="sm">
-                    Back to Edit
-                  </Button>
-                  <Button type="button" onClick={() => setIsPostModalOpen(false)} variant="ghost" size="sm">Close Preview</Button>
+                {postForm.excerpt && <p className="text-xs font-semibold text-slate-500 italic border-l-2 border-primary pl-3 py-0.5">{postForm.excerpt}</p>}
+                <div className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap pt-2 border-t border-hairline/60">{postForm.content || "Write content to see preview."}</div>
+                <div className="flex justify-end gap-2 border-t border-hairline pt-4 mt-2">
+                  <Button onClick={() => setPostModalTab("edit")} variant="secondary" size="sm">Back to Edit</Button>
+                  <Button onClick={() => setIsPostModalOpen(false)} variant="ghost" size="sm">Close</Button>
                 </div>
               </div>
             )}
+          </Card>
+        </div>
+      )}
+
+      {/* 4. ADD/EDIT SUCCESS STORY MODAL */}
+      {isStoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <Card className="max-w-md w-full p-6 relative bg-white shadow-2xl">
+            <button onClick={() => setIsStoryModalOpen(false)} className="absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer">
+              <X size={20} />
+            </button>
+            <div className="flex items-center gap-2 mb-6 border-b border-hairline pb-4">
+              <GraduationCap size={22} className="text-primary" />
+              <div>
+                <CardTitle className="text-lg">{editingStory ? "Edit Success Story" : "Add Success Story"}</CardTitle>
+                <CardDescription className="text-xs">Publish student placement records and approvals.</CardDescription>
+              </div>
+            </div>
+            <form onSubmit={handleSaveStory} className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Student Name *</label>
+                  <input type="text" value={storyForm.name} onChange={(e) => setStoryForm({ ...storyForm, name: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" required />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Destination Country *</label>
+                  <input type="text" value={storyForm.destination} onChange={(e) => setStoryForm({ ...storyForm, destination: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" placeholder="e.g. UK, Australia" required />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-primary uppercase tracking-wider">University Placed *</label>
+                <input type="text" value={storyForm.university} onChange={(e) => setStoryForm({ ...storyForm, university: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" required />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Course *</label>
+                  <input type="text" value={storyForm.course} onChange={(e) => setStoryForm({ ...storyForm, course: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" required />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Intake Year *</label>
+                  <input type="number" value={storyForm.year} onChange={(e) => setStoryForm({ ...storyForm, year: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" required />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Success Metrics / Scores</label>
+                <input type="text" value={storyForm.success_metrics} onChange={(e) => setStoryForm({ ...storyForm, success_metrics: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" placeholder="e.g. PTE 79 Overall, IELTS 7.5" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Student Photo URL</label>
+                <input type="text" value={storyForm.student_photo_url} onChange={(e) => setStoryForm({ ...storyForm, student_photo_url: e.target.value })} className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" placeholder="https://" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Testimonial Quote *</label>
+                <textarea value={storyForm.quote} onChange={(e) => setStoryForm({ ...storyForm, quote: e.target.value })} className="px-3 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white min-h-[100px] resize-none" required />
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <input type="checkbox" id="storyPublished" checked={storyForm.published} onChange={(e) => setStoryForm({ ...storyForm, published: e.target.checked })} className="w-4 h-4 text-primary cursor-pointer border-hairline rounded" />
+                <label htmlFor="storyPublished" className="text-xs font-bold text-primary uppercase tracking-wider cursor-pointer">Publish immediately</label>
+              </div>
+              <div className="flex justify-end gap-3 border-t border-hairline pt-4 mt-2">
+                <Button type="submit" variant="primary" size="sm">Save Record</Button>
+                <Button type="button" onClick={() => setIsStoryModalOpen(false)} variant="ghost" size="sm">Cancel</Button>
+              </div>
+            </form>
           </Card>
         </div>
       )}

@@ -1,11 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Sparkle, Calendar, User, ArrowLeft } from "@phosphor-icons/react";
+import { Sparkle, Calendar, User, ArrowLeft, SpinnerGap } from "@phosphor-icons/react";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase";
 
 interface BlogPost {
   title: string;
@@ -24,7 +24,7 @@ const blogPosts: BlogPost[] = [
     date: "2026-06-10",
     author: "Subas Chandra Thapa",
     excerpt: "Russel Group universities in the UK represent premier research institutions. Learn about application cycles and IELTS score expectations.",
-    content: "Russell Group universities (such as Oxford, Cambridge, LSE, and Imperial College) represent the peak of research and teaching excellence in the UK. Securing admissions requires a highly competitive GPA (typically 3.2+ CGPA or 70%+), structural letters of recommendation, and a focused Statement of Purpose (SoP) detailing your research goals. Intakes open primarily in September, with critical document submissions closing as early as March. Annex provides complete portfolio structuring for Russell Group entries.",
+    content: "Russell Group universities (such as Oxford, Cambridge, LSE, and Imperial College) represent the peak of research and teaching excellence in the UK. Securing admissions requires a highly competitive GPA (typically 3.2+ CGPA or 70%+), structural letters of recommendation, and a focused Statement of Purpose (SoP) detailing your research goals. Intakes open primarily in September, with critical document submissions closing as early as March. Annex structures portfolio layouts for Russell Group entries.",
     slug: "russell-group-guide",
   },
   {
@@ -49,6 +49,50 @@ const blogPosts: BlogPost[] = [
 
 export default function Blog() {
   const [selectedPost, setSelectedPost] = React.useState<BlogPost | null>(null);
+  const [posts, setPosts] = React.useState<BlogPost[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    async function loadHybridPosts() {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("posts")
+          .select("*")
+          .eq("published", true)
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        const supabasePosts: BlogPost[] = (data || []).map((p: any) => ({
+          title: p.title,
+          category: p.category || "Blog",
+          date: p.published_date ? p.published_date.split("T")[0] : new Date(p.created_at).toISOString().split("T")[0],
+          author: p.author || "Annex Team",
+          excerpt: p.excerpt || "",
+          content: p.content || "",
+          slug: p.slug || p.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
+        }));
+
+        // Merge and prevent duplicates based on slug/title
+        const merged = [...supabasePosts];
+        blogPosts.forEach(hardcoded => {
+          if (!merged.some(m => m.slug === hardcoded.slug || m.title.toLowerCase() === hardcoded.title.toLowerCase())) {
+            merged.push(hardcoded);
+          }
+        });
+
+        setPosts(merged);
+      } catch (err) {
+        console.error("Error loading blog posts from Supabase:", err);
+        setPosts(blogPosts); // Fallback to hardcoded content
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadHybridPosts();
+  }, []);
 
   return (
     <>
@@ -70,38 +114,49 @@ export default function Blog() {
             </p>
           </div>
 
-          {!selectedPost ? (
-            /* Post Listings Grid */
-            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {blogPosts.map((post) => (
-                <Card key={post.slug} className="flex flex-col justify-between min-h-[300px]">
-                  <div className="mb-6">
-                    <span className="text-xs font-mono-data text-gold font-bold uppercase tracking-wider block mb-2">
-                      {post.category}
-                    </span>
-                    <CardTitle className="text-xl mb-3 hover:text-gold transition-colors cursor-pointer" onClick={() => setSelectedPost(post)}>
-                      {post.title}
-                    </CardTitle>
-                    <CardDescription className="mb-4">
-                      {post.excerpt}
-                    </CardDescription>
-                  </div>
-
-                  <div className="border-t border-hairline pt-4 mt-auto">
-                    <div className="flex justify-between items-center text-[10px] font-mono-data text-slate-400 font-semibold mb-4">
-                      <span className="flex items-center gap-1"><Calendar size={12} /> {post.date}</span>
-                      <span className="flex items-center gap-1"><User size={12} /> BY: {post.author.toUpperCase()}</span>
+          {loading ? (
+            <div className="text-center py-20 text-slate-400 text-xs font-semibold">
+              <SpinnerGap className="animate-spin mx-auto mb-2 text-primary" size={24} />
+              Loading articles...
+            </div>
+          ) : !selectedPost ? (
+            posts.length === 0 ? (
+              <div className="text-center py-20 text-slate-400 text-xs font-semibold">
+                No articles published yet. Check back soon!
+              </div>
+            ) : (
+              /* Post Listings Grid */
+              <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {posts.map((post) => (
+                  <Card key={post.slug} className="flex flex-col justify-between min-h-[300px]">
+                    <div className="mb-6">
+                      <span className="text-xs font-mono-data text-gold font-bold uppercase tracking-wider block mb-2">
+                        {post.category}
+                      </span>
+                      <CardTitle className="text-xl mb-3 hover:text-gold transition-colors cursor-pointer" onClick={() => setSelectedPost(post)}>
+                        {post.title}
+                      </CardTitle>
+                      <CardDescription className="mb-4">
+                        {post.excerpt}
+                      </CardDescription>
                     </div>
-                    <button
-                      onClick={() => setSelectedPost(post)}
-                      className="text-xs font-bold uppercase tracking-wider text-primary hover:text-gold transition-colors cursor-pointer"
-                    >
-                      Read Article &rarr;
-                    </button>
-                  </div>
-                </Card>
-              ))}
-            </section>
+
+                    <div className="border-t border-hairline pt-4 mt-auto">
+                      <div className="flex justify-between items-center text-[10px] font-mono-data text-slate-400 font-semibold mb-4">
+                        <span className="flex items-center gap-1"><Calendar size={12} /> {post.date}</span>
+                        <span className="flex items-center gap-1"><User size={12} /> BY: {post.author.toUpperCase()}</span>
+                      </div>
+                      <button
+                        onClick={() => setSelectedPost(post)}
+                        className="text-xs font-bold uppercase tracking-wider text-primary hover:text-gold transition-colors cursor-pointer"
+                      >
+                        Read Article &rarr;
+                      </button>
+                    </div>
+                  </Card>
+                ))}
+              </section>
+            )
           ) : (
             /* Selected Post Reader View */
             <article className="max-w-3xl mx-auto border border-hairline bg-subtle-gray/10 p-8 md:p-12 rounded-[2rem]">
@@ -125,7 +180,7 @@ export default function Blog() {
               </div>
 
               <div className="text-sm text-slate-600 leading-relaxed space-y-4 max-w-[65ch]">
-                <p>{selectedPost.content}</p>
+                <p className="whitespace-pre-wrap">{selectedPost.content}</p>
                 <p>
                   For personalized queries and profiling, speak with our certified advisors. We audit student academic transcripts and outline exact pathways for global admissions.
                 </p>
