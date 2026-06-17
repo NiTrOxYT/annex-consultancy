@@ -130,7 +130,12 @@ export function Navigation() {
 
             <div className="hidden lg:flex items-center gap-3">
               <Link href="/student-login">
-                <Button variant="ghost" size="sm">Student Login</Button>
+                <Button
+                  size="sm"
+                  className="bg-gradient-to-r from-gold to-yellow-500 text-primary font-semibold hover:scale-105 transition-all duration-300 shadow-md"
+                >
+                  🎓 Student Portal
+                </Button>
               </Link>
               <Link href="/contact">
                 <Button size="sm">Book Consultation</Button>
