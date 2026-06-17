@@ -34,7 +34,7 @@ export default function StudentLogin() {
         const { data: student } = await supabase
           .from("students")
           .select("status")
-          .eq("id", session.user.id)
+          .eq("auth_user_id", session.user.id)
           .single();
 
         if (student && student.status === "Active") {
@@ -58,33 +58,58 @@ export default function StudentLogin() {
 
     try {
       // 1. Sign in with password
+      console.log("[Diagnostic] Attempting Supabase Auth sign-in for email:", email);
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (authError) {
+        console.error("[Diagnostic] Supabase Auth sign-in failed. Error code:", authError.code, "Message:", authError.message);
         throw new Error(authError.message);
       }
 
       if (!authData.user) {
+        console.error("[Diagnostic] Supabase Auth sign-in succeeded but no user object was returned.");
         throw new Error("Login failed. No user found.");
       }
 
-      // 2. Fetch student profile to verify status
+      const userId = authData.user.id;
+      const userEmail = authData.user.email;
+      console.log("[Diagnostic] Supabase Auth sign-in succeeded. User ID:", userId, "Email:", userEmail);
+
+      // 2. Fetch student profile to verify status from 'students' table
+      console.log("[Diagnostic] Querying 'students' table for profile with auth_user_id:", userId);
       const { data: student, error: dbError } = await supabase
         .from("students")
-        .select("status, name")
-        .eq("id", authData.user.id)
+        .select("id, status, name")
+        .eq("auth_user_id", userId)
         .single();
 
       if (dbError) {
-        // User authenticated but no student record - maybe admin or non-student user
+        console.error("[Diagnostic] Query to 'students' table failed. Error details:", {
+          code: dbError.code,
+          message: dbError.message,
+          details: dbError.details,
+          hint: dbError.hint
+        });
+
+        // Sign out to prevent invalid authenticated session state
         await supabase.auth.signOut();
-        throw new Error("This account is not configured as a student profile. Please contact Admin.");
+
+        if (dbError.code === "PGRST116") {
+          console.error(`[Diagnostic] Rejection Reason: User ${userId} exists in Auth but has no corresponding row in public.students table.`);
+          throw new Error(`This account is not configured as a student profile. (Profile missing in database for ID: ${userId}). Please contact Admin.`);
+        } else {
+          console.error(`[Diagnostic] Rejection Reason: Database query failed. Code: ${dbError.code}, Message: ${dbError.message}`);
+          throw new Error(`Unable to fetch your student profile (Database Error: ${dbError.message || dbError.code}). Please contact Admin.`);
+        }
       }
 
+      console.log("[Diagnostic] Student profile lookup succeeded. Profile:", student);
+
       if (student.status !== "Active") {
+        console.error(`[Diagnostic] Rejection Reason: Student profile status is not Active. Status is: "${student.status}"`);
         // Disabled student account
         await supabase.auth.signOut();
         throw new Error("Your student portal account has been disabled. Please contact your counselor.");
@@ -95,6 +120,7 @@ export default function StudentLogin() {
         sessionStorage.removeItem("annex_impersonate_student_id");
       }
 
+      console.log("[Diagnostic] Validation passed successfully. Routing student to dashboard.");
       // Success, route to dashboard
       router.push("/student/dashboard");
     } catch (err: any) {

@@ -158,7 +158,17 @@ export default function StudentDashboard() {
         if (!activeStudentId) {
           const { data: { session } } = await supabase.auth.getSession();
           if (session) {
-            activeStudentId = session.user.id;
+            // Resolve auth user ID → students.id via auth_user_id column
+            const { data: studentRecord } = await supabase
+              .from("students")
+              .select("id")
+              .eq("auth_user_id", session.user.id)
+              .single();
+            if (studentRecord) {
+              activeStudentId = studentRecord.id;
+            } else {
+              console.error("[Diagnostic] No student record found for auth_user_id:", session.user.id);
+            }
           }
         }
 

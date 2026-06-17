@@ -156,7 +156,7 @@ CREATE POLICY "Allow public write success_stories" ON public.success_stories
 
 -- A. Students Table
 CREATE TABLE IF NOT EXISTS public.students (
-    id UUID PRIMARY KEY, -- References auth.users.id
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
     phone TEXT,
@@ -170,7 +170,8 @@ CREATE TABLE IF NOT EXISTS public.students (
     emergency_contact TEXT,
     passport_details TEXT,
     current_stage TEXT DEFAULT 'Consultation',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    auth_user_id UUID UNIQUE -- Links to auth.users.id; used for login lookups
 );
 
 -- Enable RLS

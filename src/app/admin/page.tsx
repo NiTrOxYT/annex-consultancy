@@ -1162,22 +1162,71 @@ export default function AdminDashboard() {
           throw new Error("Password is required for new students.");
         }
 
-        // 1. Sign up via sessionless client so admin is NOT logged out!
+        // A. Pre-check: Does a student profile with this email already exist in 'students' table?
+        console.log("[Diagnostic] Pre-checking email in public.students table:", studentForm.email);
+        const { data: existingProfile, error: profileCheckError } = await supabase
+          .from("students")
+          .select("id")
+          .eq("email", studentForm.email)
+          .maybeSingle();
+
+        if (profileCheckError) {
+          console.warn("[Diagnostic] Pre-check profile query warning:", profileCheckError.message);
+        }
+
+        if (existingProfile) {
+          throw new Error("A student profile with this email address already exists in the database.");
+        }
+
+        let studentId = null;
+
+        // B. Sign up via sessionless client so admin is NOT logged out!
+        console.log("[Diagnostic] Attempting sessionless auth signUp for email:", studentForm.email);
         const { data: authData, error: authError } = await sessionlessClient.auth.signUp({
           email: studentForm.email,
           password: studentForm.password
         });
 
-        if (authError) throw authError;
-        if (!authData.user) throw new Error("Could not create user account in Supabase Auth.");
+        if (authError) {
+          console.warn("[Diagnostic] Auth signUp failed. Error code:", authError.code, "Message:", authError.message);
+          
+          if (authError.message.toLowerCase().includes("already registered") || 
+              authError.message.toLowerCase().includes("already exists") || 
+              authError.code === "user_already_exists") {
+            console.log("[Diagnostic] User exists in Auth but not in students table. Attempting self-healing by signing in to retrieve User ID.");
+            
+            // Sign in to retrieve user id using provided password
+            const { data: signInData, error: signInError } = await sessionlessClient.auth.signInWithPassword({
+              email: studentForm.email,
+              password: studentForm.password
+            });
 
-        const studentId = authData.user.id;
+            if (signInError) {
+              console.error("[Diagnostic] Self-healing sign-in failed. Error:", signInError.message);
+              throw new Error(`This email is already registered in authentication. To restore their student profile, please enter the correct password for this account.`);
+            }
 
-        // 2. Insert profile record
-        const { error: dbError } = await supabase
+            if (signInData.user) {
+              studentId = signInData.user.id;
+              console.log("[Diagnostic] Self-healing sign-in succeeded. Re-using existing Auth User ID:", studentId);
+            } else {
+              throw new Error("Email is already registered. Self-healing failed to retrieve user ID.");
+            }
+          } else {
+            throw authError;
+          }
+        } else {
+          if (!authData.user) throw new Error("Could not create user account in Supabase Auth.");
+          studentId = authData.user.id;
+          console.log("[Diagnostic] Auth signUp succeeded. New User ID:", studentId);
+        }
+
+        // C. Insert profile record — let id auto-generate, store auth link in auth_user_id
+        console.log("[Diagnostic] Inserting student profile row in public.students table with auth_user_id:", studentId);
+        const { data: insertedStudent, error: dbError } = await supabase
           .from("students")
           .insert([{
-            id: studentId,
+            auth_user_id: studentId,
             name: studentForm.name,
             email: studentForm.email,
             phone: studentForm.phone,
@@ -1191,27 +1240,35 @@ export default function AdminDashboard() {
             emergency_contact: studentForm.emergency_contact,
             passport_details: studentForm.passport_details,
             current_stage: studentForm.current_stage
-          }]);
+          }])
+          .select("id")
+          .single();
 
-        if (dbError) throw dbError;
+        if (dbError) {
+          console.error("[Diagnostic] Inserting student profile failed. Error:", dbError.message);
+          throw dbError;
+        }
+
+        const newStudentId = insertedStudent.id;
+        console.log("[Diagnostic] Student profile inserted. Internal ID:", newStudentId, "Auth User ID:", studentId);
 
         // 3. Initialize default visa status stage
         await supabase.from("student_visa_status").insert([{
-          student_id: studentId,
+          student_id: newStudentId,
           status: "Application Started",
           details: "Visa process has been initialized by counselor."
         }]);
 
         // 4. Log admin action
         await supabase.from("student_activity_logs").insert({
-          student_id: studentId,
+          student_id: newStudentId,
           action: "Account Created",
           details: "Student credentials and profile generated by Admin."
         });
 
         // 5. Send welcome notification
         await supabase.from("student_notifications").insert([{
-          student_id: studentId,
+          student_id: newStudentId,
           title: "Welcome to Annex Consultancy!",
           content: "Your student portal is ready. Check your progress and message your counselor here."
         }]);
