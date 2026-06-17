@@ -141,13 +141,27 @@ export default function AdminDashboard() {
   const [chatCenterHasMore, setChatCenterHasMore] = React.useState(false);
 
   // Audit modal internal states
-  const [auditTab, setAuditTab] = React.useState<"progress" | "documents" | "offers" | "visa" | "chat" | "logs">("progress");
+  const [auditTab, setAuditTab] = React.useState<"progress" | "documents" | "offers" | "visa" | "chat" | "logs" | "meetings">("progress");
   const [auditTasks, setAuditTasks] = React.useState<any[]>([]);
   const [auditDocs, setAuditDocs] = React.useState<any[]>([]);
   const [auditOffers, setAuditOffers] = React.useState<any[]>([]);
   const [auditVisa, setAuditVisa] = React.useState<any>(null);
   const [auditMessages, setAuditMessages] = React.useState<any[]>([]);
   const [auditLogs, setAuditLogs] = React.useState<any[]>([]);
+  const [auditMeetings, setAuditMeetings] = React.useState<any[]>([]);
+
+  // Meeting scheduling state in audit sheet
+  const [meetingForm, setMeetingForm] = React.useState({
+    title: "",
+    description: "",
+    date: "",
+    time: "",
+    duration_minutes: "30",
+    meeting_link: "",
+    meeting_type: "Google Meet"
+  });
+  const [editingMeeting, setEditingMeeting] = React.useState<any | null>(null);
+  const [savingMeeting, setSavingMeeting] = React.useState(false);
 
   // Task creation/editing state in audit sheet
   const [newTaskTitle, setNewTaskTitle] = React.useState("");
@@ -1589,6 +1603,9 @@ export default function AdminDashboard() {
 
       const { data: l } = await supabase.from("student_activity_logs").select("*").eq("student_id", id).order("created_at", { ascending: false });
       setAuditLogs(l || []);
+
+      const { data: mtgs } = await supabase.from("meetings").select("*, counselors(full_name)").eq("student_id", id).order("scheduled_at", { ascending: false });
+      setAuditMeetings(mtgs || []);
     } catch (err: any) {
       console.error("Error loading student audit details:", err.message);
     }
@@ -4912,7 +4929,8 @@ export default function AdminDashboard() {
                 { id: "offers", label: "Offer Letters" },
                 { id: "visa", label: "Visa Timeline" },
                 { id: "chat", label: "Counselor Chat" },
-                { id: "logs", label: "Activity Logs" }
+                { id: "logs", label: "Activity Logs" },
+                { id: "meetings", label: "Schedule Meetings" }
               ].map(subTab => (
                 <button 
                   key={subTab.id}
@@ -5407,6 +5425,384 @@ export default function AdminDashboard() {
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* TAB G: SCHEDULE MEETINGS */}
+              {auditTab === "meetings" && (
+                <div className="space-y-6">
+                  
+                  {/* Meeting Counters */}
+                  <div className="grid grid-cols-3 gap-4">
+                    {[
+                      { label: "Upcoming", count: auditMeetings.filter(m => m.status === "Scheduled" || m.status === "Rescheduled").length, color: "bg-blue-50 text-blue-700 border-blue-200" },
+                      { label: "Completed", count: auditMeetings.filter(m => m.status === "Completed").length, color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+                      { label: "Cancelled", count: auditMeetings.filter(m => m.status === "Cancelled").length, color: "bg-red-50 text-red-700 border-red-200" }
+                    ].map(c => (
+                      <div key={c.label} className={`p-4 rounded-2xl border text-center ${c.color}`}>
+                        <span className="text-2xl font-bold font-display block">{c.count}</span>
+                        <span className="text-[10px] uppercase font-bold tracking-wider">{c.label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Meeting Form */}
+                  <div className="border border-hairline rounded-2xl bg-white p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm text-primary flex items-center gap-2">
+                        <Calendar size={16} weight="fill" />
+                        {editingMeeting ? "Edit Meeting" : "Schedule New Meeting"}
+                      </h4>
+                      {editingMeeting && (
+                        <button
+                          onClick={() => {
+                            setEditingMeeting(null);
+                            setMeetingForm({ title: "", description: "", date: "", time: "", duration_minutes: "30", meeting_link: "", meeting_type: "Google Meet" });
+                          }}
+                          className="text-[10px] text-slate-400 hover:text-red-500 font-bold uppercase cursor-pointer"
+                        >
+                          Cancel Edit
+                        </button>
+                      )}
+                    </div>
+
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!meetingForm.title || !meetingForm.date || !meetingForm.time) return;
+                      setSavingMeeting(true);
+                      try {
+                        const scheduledAt = new Date(`${meetingForm.date}T${meetingForm.time}`).toISOString();
+                        const counselorId = selectedStudent?.counselor_id || null;
+
+                        if (editingMeeting) {
+                          // Update
+                          const { error } = await supabase
+                            .from("meetings")
+                            .update({
+                              title: meetingForm.title,
+                              description: meetingForm.description,
+                              meeting_type: meetingForm.meeting_type,
+                              meeting_link: meetingForm.meeting_link,
+                              scheduled_at: scheduledAt,
+                              duration_minutes: parseInt(meetingForm.duration_minutes) || 30,
+                              counselor_id: counselorId
+                            })
+                            .eq("id", editingMeeting.id);
+                          if (error) throw error;
+
+                          // Send update email
+                          fetch("/api/send-meeting-notification", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              action: "updated",
+                              studentId: selectedStudent.id,
+                              meetingData: { title: meetingForm.title, scheduled_at: scheduledAt, meeting_link: meetingForm.meeting_link, meeting_type: meetingForm.meeting_type, duration_minutes: parseInt(meetingForm.duration_minutes) || 30 }
+                            })
+                          }).catch(err => console.error("Meeting update email error:", err));
+
+                          // Notification
+                          await supabase.from("student_notifications").insert([{
+                            student_id: selectedStudent.id,
+                            title: "Meeting Updated",
+                            content: `Your meeting "${meetingForm.title}" has been updated. Check your Appointments for new details.`
+                          }]);
+
+                          // Activity log
+                          await supabase.from("student_activity_logs").insert({
+                            student_id: selectedStudent.id,
+                            action: "Meeting Updated",
+                            details: `Meeting "${meetingForm.title}" updated by admin.`
+                          });
+
+                          showToast("Meeting updated successfully");
+                        } else {
+                          // Create
+                          const { error } = await supabase
+                            .from("meetings")
+                            .insert([{
+                              student_id: selectedStudent.id,
+                              counselor_id: counselorId,
+                              title: meetingForm.title,
+                              description: meetingForm.description,
+                              meeting_type: meetingForm.meeting_type,
+                              meeting_link: meetingForm.meeting_link,
+                              scheduled_at: scheduledAt,
+                              duration_minutes: parseInt(meetingForm.duration_minutes) || 30
+                            }]);
+                          if (error) throw error;
+
+                          // Send scheduled email
+                          fetch("/api/send-meeting-notification", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              action: "scheduled",
+                              studentId: selectedStudent.id,
+                              meetingData: { title: meetingForm.title, scheduled_at: scheduledAt, meeting_link: meetingForm.meeting_link, meeting_type: meetingForm.meeting_type, duration_minutes: parseInt(meetingForm.duration_minutes) || 30 }
+                            })
+                          }).catch(err => console.error("Meeting schedule email error:", err));
+
+                          // Notification
+                          await supabase.from("student_notifications").insert([{
+                            student_id: selectedStudent.id,
+                            title: "New Meeting Scheduled",
+                            content: `A new meeting "${meetingForm.title}" has been scheduled. Check your Appointments tab.`
+                          }]);
+
+                          // Activity log
+                          await supabase.from("student_activity_logs").insert({
+                            student_id: selectedStudent.id,
+                            action: "Meeting Scheduled",
+                            details: `Meeting "${meetingForm.title}" scheduled for ${meetingForm.date} at ${meetingForm.time}.`
+                          });
+
+                          showToast("Meeting scheduled successfully!");
+                        }
+
+                        setMeetingForm({ title: "", description: "", date: "", time: "", duration_minutes: "30", meeting_link: "", meeting_type: "Google Meet" });
+                        setEditingMeeting(null);
+                        await loadAuditDetails(selectedStudent.id);
+                      } catch (err: any) {
+                        alert("Error saving meeting: " + err.message);
+                      } finally {
+                        setSavingMeeting(false);
+                      }
+                    }} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1 md:col-span-2">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Meeting Title *</label>
+                        <input
+                          type="text"
+                          required
+                          value={meetingForm.title}
+                          onChange={e => setMeetingForm(f => ({ ...f, title: e.target.value }))}
+                          placeholder="e.g. University Application Review"
+                          className="w-full border border-hairline px-3.5 py-2 rounded-xl text-xs outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-1 md:col-span-2">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Description</label>
+                        <textarea
+                          rows={2}
+                          value={meetingForm.description}
+                          onChange={e => setMeetingForm(f => ({ ...f, description: e.target.value }))}
+                          placeholder="Optional meeting description or agenda..."
+                          className="w-full border border-hairline px-3.5 py-2 rounded-xl text-xs outline-none focus:border-primary resize-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Date *</label>
+                        <input
+                          type="date"
+                          required
+                          value={meetingForm.date}
+                          onChange={e => setMeetingForm(f => ({ ...f, date: e.target.value }))}
+                          className="w-full border border-hairline px-3.5 py-2 rounded-xl text-xs outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Time *</label>
+                        <input
+                          type="time"
+                          required
+                          value={meetingForm.time}
+                          onChange={e => setMeetingForm(f => ({ ...f, time: e.target.value }))}
+                          className="w-full border border-hairline px-3.5 py-2 rounded-xl text-xs outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Duration (minutes)</label>
+                        <select
+                          value={meetingForm.duration_minutes}
+                          onChange={e => setMeetingForm(f => ({ ...f, duration_minutes: e.target.value }))}
+                          className="w-full border border-hairline px-3.5 py-2 rounded-xl text-xs outline-none focus:border-primary bg-white"
+                        >
+                          <option value="15">15 min</option>
+                          <option value="30">30 min</option>
+                          <option value="45">45 min</option>
+                          <option value="60">1 hour</option>
+                          <option value="90">1.5 hours</option>
+                          <option value="120">2 hours</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Meeting Type</label>
+                        <select
+                          value={meetingForm.meeting_type}
+                          onChange={e => setMeetingForm(f => ({ ...f, meeting_type: e.target.value }))}
+                          className="w-full border border-hairline px-3.5 py-2 rounded-xl text-xs outline-none focus:border-primary bg-white"
+                        >
+                          <option>Google Meet</option>
+                          <option>Zoom</option>
+                          <option>Microsoft Teams</option>
+                          <option>Phone Call</option>
+                          <option>Office Visit</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1 md:col-span-2">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Meeting Link</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="url"
+                            value={meetingForm.meeting_link}
+                            onChange={e => setMeetingForm(f => ({ ...f, meeting_link: e.target.value }))}
+                            placeholder="https://meet.google.com/abc-defg-hij"
+                            className="flex-grow border border-hairline px-3.5 py-2 rounded-xl text-xs outline-none focus:border-primary"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => window.open("https://meet.google.com/new", "_blank")}
+                            className="px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-[10px] font-bold hover:bg-blue-100 transition-colors cursor-pointer whitespace-nowrap"
+                          >
+                            Generate Meet
+                          </button>
+                        </div>
+                      </div>
+                      <div className="md:col-span-2 flex justify-end gap-2">
+                        <button
+                          type="submit"
+                          disabled={savingMeeting}
+                          className="px-5 py-2 bg-primary text-white rounded-full text-xs font-bold hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer transition-colors"
+                        >
+                          {savingMeeting ? (
+                            <SpinnerGap size={14} className="animate-spin" />
+                          ) : (
+                            <Calendar size={14} weight="fill" />
+                          )}
+                          {editingMeeting ? "Update Meeting" : "Schedule Meeting"}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Meetings List */}
+                  <div className="space-y-3">
+                    <h4 className="font-bold text-sm text-primary">All Meetings</h4>
+                    {auditMeetings.length === 0 ? (
+                      <p className="text-slate-400 py-8 text-center border border-dashed border-hairline rounded-2xl bg-white">No meetings scheduled yet for this student.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {auditMeetings.map(meeting => {
+                          const dt = new Date(meeting.scheduled_at);
+                          const isPast = dt < new Date();
+                          const statusColors: Record<string, string> = {
+                            "Scheduled": "bg-blue-50 text-blue-700 border-blue-200",
+                            "Rescheduled": "bg-amber-50 text-amber-700 border-amber-200",
+                            "Completed": "bg-emerald-50 text-emerald-700 border-emerald-200",
+                            "Cancelled": "bg-red-50 text-red-700 border-red-200"
+                          };
+                          const typeIcons: Record<string, string> = {
+                            "Google Meet": "🟢",
+                            "Zoom": "🔵",
+                            "Microsoft Teams": "🟣",
+                            "Phone Call": "📞",
+                            "Office Visit": "🏢"
+                          };
+
+                          return (
+                            <div key={meeting.id} className="border border-hairline rounded-2xl bg-white p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                              <div className="flex-grow space-y-1.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm">{typeIcons[meeting.meeting_type] || "📅"}</span>
+                                  <h5 className="text-sm font-bold text-primary">{meeting.title}</h5>
+                                  <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${statusColors[meeting.status] || "bg-slate-100 text-slate-600 border-slate-200"}`}>
+                                    {meeting.status}
+                                  </span>
+                                </div>
+                                <p className="text-xs font-semibold text-slate-600">
+                                  {dt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })} at {dt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                                </p>
+                                <div className="flex items-center gap-3 text-[10px] text-slate-400 font-semibold">
+                                  <span>{meeting.duration_minutes} min</span>
+                                  <span>•</span>
+                                  <span>{meeting.meeting_type}</span>
+                                  {meeting.counselors?.full_name && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{meeting.counselors.full_name}</span>
+                                    </>
+                                  )}
+                                </div>
+                                {meeting.description && (
+                                  <p className="text-[11px] text-slate-500 mt-1">{meeting.description}</p>
+                                )}
+                                {meeting.meeting_link && (
+                                  <a href={meeting.meeting_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-blue-600 font-bold hover:underline mt-1">
+                                    <ArrowSquareOut size={10} /> {meeting.meeting_link.substring(0, 50)}{meeting.meeting_link.length > 50 ? "..." : ""}
+                                  </a>
+                                )}
+                              </div>
+
+                              {/* Actions */}
+                              {(meeting.status === "Scheduled" || meeting.status === "Rescheduled") && (
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    onClick={() => {
+                                      const d = new Date(meeting.scheduled_at);
+                                      setEditingMeeting(meeting);
+                                      setMeetingForm({
+                                        title: meeting.title,
+                                        description: meeting.description || "",
+                                        date: d.toISOString().split("T")[0],
+                                        time: d.toTimeString().substring(0, 5),
+                                        duration_minutes: String(meeting.duration_minutes),
+                                        meeting_link: meeting.meeting_link || "",
+                                        meeting_type: meeting.meeting_type
+                                      });
+                                    }}
+                                    className="px-3 py-1.5 border border-hairline text-slate-600 hover:bg-slate-50 rounded-full text-[10px] font-bold cursor-pointer transition-colors"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (!confirm("Mark this meeting as completed?")) return;
+                                      await supabase.from("meetings").update({ status: "Completed" }).eq("id", meeting.id);
+                                      await supabase.from("student_activity_logs").insert({ student_id: selectedStudent.id, action: "Meeting Completed", details: `Meeting "${meeting.title}" marked as completed.` });
+                                      showToast("Meeting marked as completed");
+                                      await loadAuditDetails(selectedStudent.id);
+                                    }}
+                                    className="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 rounded-full text-[10px] font-bold cursor-pointer transition-colors"
+                                  >
+                                    Complete
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (!confirm("Cancel this meeting? The student will be notified.")) return;
+                                      await supabase.from("meetings").update({ status: "Cancelled" }).eq("id", meeting.id);
+
+                                      fetch("/api/send-meeting-notification", {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({
+                                          action: "cancelled",
+                                          studentId: selectedStudent.id,
+                                          meetingData: { title: meeting.title, scheduled_at: meeting.scheduled_at }
+                                        })
+                                      }).catch(err => console.error("Meeting cancel email error:", err));
+
+                                      await supabase.from("student_notifications").insert([{
+                                        student_id: selectedStudent.id,
+                                        title: "Meeting Cancelled",
+                                        content: `Your meeting "${meeting.title}" has been cancelled by your counselor.`
+                                      }]);
+
+                                      await supabase.from("student_activity_logs").insert({ student_id: selectedStudent.id, action: "Meeting Cancelled", details: `Meeting "${meeting.title}" cancelled by admin.` });
+                                      showToast("Meeting cancelled");
+                                      await loadAuditDetails(selectedStudent.id);
+                                    }}
+                                    className="px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 rounded-full text-[10px] font-bold cursor-pointer transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

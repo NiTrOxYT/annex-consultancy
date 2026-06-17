@@ -159,3 +159,230 @@ export async function sendCounselorMessageEmail({
     html,
   });
 }
+
+// ── Meeting Email Functions ──────────────────────────────────────
+
+export async function sendMeetingScheduledEmail({
+  studentEmail,
+  studentName,
+  meetingTitle,
+  meetingDate,
+  meetingTime,
+  meetingLink,
+  counselorName,
+  meetingType,
+  duration,
+}: {
+  studentEmail: string;
+  studentName: string;
+  meetingTitle: string;
+  meetingDate: string;
+  meetingTime: string;
+  meetingLink?: string;
+  counselorName: string;
+  meetingType: string;
+  duration: number;
+}) {
+  const portalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/student-login`;
+  const linkBlock = meetingLink
+    ? `<div style="text-align: center; margin: 20px 0;">
+        <a href="${meetingLink}" style="display: inline-block; background-color: #059669; color: #ffffff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Join Meeting</a>
+      </div>`
+    : "";
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 12px; background-color: #ffffff;">
+      <h2 style="color: #0f172a; margin-bottom: 8px;">📅 New Meeting Scheduled</h2>
+      <p style="color: #475569; font-size: 14px;">Hello ${studentName},</p>
+      <p style="color: #475569; font-size: 14px;">A new meeting has been scheduled for you by your counselor.</p>
+      
+      <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #f1f5f9; margin: 20px 0; font-size: 14px; color: #334155;">
+        <p style="margin: 0 0 8px 0;"><strong>Meeting:</strong> ${meetingTitle}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Date:</strong> ${meetingDate}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Time:</strong> ${meetingTime}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Duration:</strong> ${duration} minutes</p>
+        <p style="margin: 0 0 8px 0;"><strong>Type:</strong> ${meetingType}</p>
+        <p style="margin: 0;"><strong>Counselor:</strong> ${counselorName}</p>
+      </div>
+      
+      ${linkBlock}
+      
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${portalUrl}" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Access Student Portal</a>
+      </div>
+      
+      <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+      <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">This is an automated notification from the Annex Student Portal system.</p>
+    </div>
+  `;
+
+  return sendEmail({
+    to: studentEmail,
+    subject: `New Meeting Scheduled - ${meetingTitle}`,
+    html,
+  });
+}
+
+export async function sendMeetingUpdatedEmail({
+  studentEmail,
+  studentName,
+  meetingTitle,
+  meetingDate,
+  meetingTime,
+  meetingLink,
+  counselorName,
+  meetingType,
+  duration,
+}: {
+  studentEmail: string;
+  studentName: string;
+  meetingTitle: string;
+  meetingDate: string;
+  meetingTime: string;
+  meetingLink?: string;
+  counselorName: string;
+  meetingType: string;
+  duration: number;
+}) {
+  const portalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/student-login`;
+  const linkBlock = meetingLink
+    ? `<div style="text-align: center; margin: 20px 0;">
+        <a href="${meetingLink}" style="display: inline-block; background-color: #059669; color: #ffffff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Join Meeting</a>
+      </div>`
+    : "";
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 12px; background-color: #ffffff;">
+      <h2 style="color: #0f172a; margin-bottom: 8px;">🔄 Meeting Updated</h2>
+      <p style="color: #475569; font-size: 14px;">Hello ${studentName},</p>
+      <p style="color: #475569; font-size: 14px;">Your scheduled meeting has been updated by your counselor. Please review the new details below.</p>
+      
+      <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #f1f5f9; margin: 20px 0; font-size: 14px; color: #334155;">
+        <p style="margin: 0 0 8px 0;"><strong>Meeting:</strong> ${meetingTitle}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Date:</strong> ${meetingDate}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Time:</strong> ${meetingTime}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Duration:</strong> ${duration} minutes</p>
+        <p style="margin: 0 0 8px 0;"><strong>Type:</strong> ${meetingType}</p>
+        <p style="margin: 0;"><strong>Counselor:</strong> ${counselorName}</p>
+      </div>
+      
+      ${linkBlock}
+      
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${portalUrl}" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Access Student Portal</a>
+      </div>
+      
+      <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+      <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">This is an automated notification from the Annex Student Portal system.</p>
+    </div>
+  `;
+
+  return sendEmail({
+    to: studentEmail,
+    subject: `Meeting Updated - ${meetingTitle}`,
+    html,
+  });
+}
+
+export async function sendMeetingCancelledEmail({
+  studentEmail,
+  studentName,
+  meetingTitle,
+  meetingDate,
+  meetingTime,
+  counselorName,
+}: {
+  studentEmail: string;
+  studentName: string;
+  meetingTitle: string;
+  meetingDate: string;
+  meetingTime: string;
+  counselorName: string;
+}) {
+  const portalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/student-login`;
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 12px; background-color: #ffffff;">
+      <h2 style="color: #0f172a; margin-bottom: 8px;">❌ Meeting Cancelled</h2>
+      <p style="color: #475569; font-size: 14px;">Hello ${studentName},</p>
+      <p style="color: #475569; font-size: 14px;">The following meeting has been cancelled by your counselor. Please contact your counselor if you have any questions.</p>
+      
+      <div style="background-color: #fef2f2; padding: 16px; border-radius: 8px; border: 1px solid #fecaca; margin: 20px 0; font-size: 14px; color: #991b1b;">
+        <p style="margin: 0 0 8px 0;"><strong>Meeting:</strong> ${meetingTitle}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Date:</strong> ${meetingDate}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Time:</strong> ${meetingTime}</p>
+        <p style="margin: 0;"><strong>Counselor:</strong> ${counselorName}</p>
+      </div>
+      
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${portalUrl}" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Access Student Portal</a>
+      </div>
+      
+      <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+      <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">This is an automated notification from the Annex Student Portal system.</p>
+    </div>
+  `;
+
+  return sendEmail({
+    to: studentEmail,
+    subject: `Meeting Cancelled - ${meetingTitle}`,
+    html,
+  });
+}
+
+export async function sendMeetingReminderEmail({
+  studentEmail,
+  studentName,
+  meetingTitle,
+  meetingDate,
+  meetingTime,
+  meetingLink,
+  counselorName,
+  meetingType,
+}: {
+  studentEmail: string;
+  studentName: string;
+  meetingTitle: string;
+  meetingDate: string;
+  meetingTime: string;
+  meetingLink?: string;
+  counselorName: string;
+  meetingType: string;
+}) {
+  const portalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/student-login`;
+  const linkBlock = meetingLink
+    ? `<div style="text-align: center; margin: 20px 0;">
+        <a href="${meetingLink}" style="display: inline-block; background-color: #059669; color: #ffffff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Join Meeting Now</a>
+      </div>`
+    : "";
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 12px; background-color: #ffffff;">
+      <h2 style="color: #0f172a; margin-bottom: 8px;">⏰ Meeting Reminder — Starting Soon!</h2>
+      <p style="color: #475569; font-size: 14px;">Hello ${studentName},</p>
+      <p style="color: #475569; font-size: 14px;">Your meeting is starting within the next hour. Please be ready!</p>
+      
+      <div style="background-color: #fffbeb; padding: 16px; border-radius: 8px; border: 1px solid #fde68a; margin: 20px 0; font-size: 14px; color: #92400e;">
+        <p style="margin: 0 0 8px 0;"><strong>Meeting:</strong> ${meetingTitle}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Date:</strong> ${meetingDate}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Time:</strong> ${meetingTime}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Type:</strong> ${meetingType}</p>
+        <p style="margin: 0;"><strong>Counselor:</strong> ${counselorName}</p>
+      </div>
+      
+      ${linkBlock}
+      
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${portalUrl}" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Access Student Portal</a>
+      </div>
+      
+      <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+      <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">This is an automated notification from the Annex Student Portal system.</p>
+    </div>
+  `;
+
+  return sendEmail({
+    to: studentEmail,
+    subject: `Reminder: ${meetingTitle} — Starting Soon!`,
+    html,
+  });
+}

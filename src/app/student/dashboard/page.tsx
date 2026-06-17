@@ -7,7 +7,8 @@ import {
   FileArrowUp, FileText, SignOut, Calendar, User, 
   PaperPlaneRight, Paperclip, ArrowSquareOut, WarningCircle, 
   UploadSimple, Check, X, SpinnerGap, Bell, ArrowLeft,
-  CalendarCheck, ShieldWarning, ChatCircleDots, Gear, Checks, Download
+  CalendarCheck, ShieldWarning, ChatCircleDots, Gear, Checks, Download,
+  VideoCamera, Phone, MapPin
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "@/lib/supabase";
@@ -55,7 +56,7 @@ export default function StudentDashboard() {
   const [visaStatus, setVisaStatus] = React.useState<any>(null);
   const [messages, setMessages] = React.useState<any[]>([]);
   const [notifications, setNotifications] = React.useState<any[]>([]);
-  const [appointments, setAppointments] = React.useState<any[]>([]);
+  const [meetings, setMeetings] = React.useState<any[]>([]);
   const [hasMoreMessages, setHasMoreMessages] = React.useState(false);
 
   // Forms / Actions state
@@ -259,6 +260,43 @@ export default function StudentDashboard() {
     };
   }, [studentId, activeTab, markMessagesAsRead]);
 
+  // Realtime subscription for meetings
+  React.useEffect(() => {
+    if (!studentId) return;
+
+    console.log(`[Diagnostic] Subscribing to realtime meetings channel for studentId: ${studentId}`);
+    const meetingsChannel = supabase
+      .channel(`student_meetings:${studentId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "meetings",
+          filter: `student_id=eq.${studentId}`,
+        },
+        async (payload) => {
+          console.log(`[Diagnostic] Real-time meetings event: ${payload.eventType}`, payload);
+          // Refresh all meetings on any change
+          const { data: refreshedMeetings } = await supabase
+            .from("meetings")
+            .select("*, counselors(full_name)")
+            .eq("student_id", studentId)
+            .order("scheduled_at", { ascending: true });
+          setMeetings(refreshedMeetings || []);
+        }
+      )
+      .subscribe((status, err) => {
+        console.log(`[Diagnostic] Realtime meetings channel status: ${status}`);
+        if (err) console.error(`[Diagnostic] Realtime meetings channel error:`, err);
+      });
+
+    return () => {
+      console.log(`[Diagnostic] Cleaning up meetings channel for studentId: ${studentId}`);
+      supabase.removeChannel(meetingsChannel);
+    };
+  }, [studentId]);
+
   // Mark messages as read when Chat tab is opened
   React.useEffect(() => {
     if (activeTab === "chat" && studentId) {
@@ -329,15 +367,13 @@ export default function StudentDashboard() {
         .order("created_at", { ascending: false });
       setNotifications(studentNotifs || []);
 
-      // 8. Fetch Appointments (linked to student email)
-      if (student.email) {
-        const { data: appts } = await supabase
-          .from("bookings")
-          .select("*")
-          .eq("email", student.email)
-          .order("preferred_date", { ascending: true });
-        setAppointments(appts || []);
-      }
+      // 8. Fetch Meetings (from meetings table, with counselor join)
+      const { data: studentMeetings } = await supabase
+        .from("meetings")
+        .select("*, counselors(full_name)")
+        .eq("student_id", id)
+        .order("scheduled_at", { ascending: true });
+      setMeetings(studentMeetings || []);
     } catch (err: any) {
       console.error("Error loading student data:", err.message);
     }
@@ -569,23 +605,23 @@ export default function StudentDashboard() {
     }
   };
 
-  // Reschedule requested appointment
+  // Reschedule requested meeting
   const handleReschedule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!rescheduleBookingId || !newDate || !newTime) return;
 
     setRescheduling(true);
     try {
-      const selectedBooking = appointments.find(a => a.id === rescheduleBookingId);
-      const updatedNotes = `${selectedBooking?.notes || ""}\n[Student Reschedule Request: ${newDate} at ${newTime}. Note: ${rescheduleNotes}]`;
+      const selectedMeeting = meetings.find(m => m.id === rescheduleBookingId);
+      const scheduledAt = new Date(`${newDate}T${newTime}`).toISOString();
+      const updatedDescription = `${selectedMeeting?.description || ""}\n[Student Reschedule Request: ${newDate} at ${newTime}. Note: ${rescheduleNotes}]`.trim();
 
       const { error } = await supabase
-        .from("bookings")
+        .from("meetings")
         .update({
-          preferred_date: newDate,
-          preferred_time: newTime,
-          status: "Pending", // Resets to pending for Admin approval
-          notes: updatedNotes
+          scheduled_at: scheduledAt,
+          status: "Rescheduled",
+          description: updatedDescription
         })
         .eq("id", rescheduleBookingId);
       
@@ -593,6 +629,23 @@ export default function StudentDashboard() {
 
       alert("Reschedule request submitted successfully. Counselor will review it shortly.");
       
+      // Send reschedule email / API call
+      fetch("/api/send-meeting-notification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "updated",
+          studentId: studentId,
+          meetingData: {
+            title: selectedMeeting?.title || "Counseling Session",
+            scheduled_at: scheduledAt,
+            meeting_link: selectedMeeting?.meeting_link || undefined,
+            meeting_type: selectedMeeting?.meeting_type || "Google Meet",
+            duration_minutes: selectedMeeting?.duration_minutes || 30
+          }
+        })
+      }).catch(err => console.error("Meeting reschedule email error:", err));
+
       setRescheduleBookingId(null);
       setNewDate("");
       setNewTime("");
@@ -603,9 +656,16 @@ export default function StudentDashboard() {
       // Log Activity
       await supabase.from("student_activity_logs").insert({
         student_id: studentId,
-        action: "Reschedule Appointment Requested",
-        details: `Booking ID: ${rescheduleBookingId}`
+        action: "Meeting Rescheduled",
+        details: `Student rescheduled meeting "${selectedMeeting?.title || ""}" to ${newDate} at ${newTime}.`
       });
+
+      // Notification
+      await supabase.from("student_notifications").insert([{
+        student_id: studentId,
+        title: "Meeting Rescheduled",
+        content: `You rescheduled "${selectedMeeting?.title || ""}" to ${new Date(scheduledAt).toLocaleString()}.`
+      }]);
 
     } catch (err: any) {
       alert("Error requesting reschedule: " + err.message);
@@ -668,6 +728,13 @@ export default function StudentDashboard() {
   const currentStageIndex = studentData ? STAGES.indexOf(studentData.current_stage) : 0;
   const progressPercent = Math.round(((currentStageIndex + 1) / STAGES.length) * 100);
 
+  // Find nearest upcoming meeting
+  const upcomingMeeting = React.useMemo(() => {
+    const activeMeetings = meetings.filter(m => (m.status === "Scheduled" || m.status === "Rescheduled") && new Date(m.scheduled_at) > new Date());
+    if (activeMeetings.length === 0) return null;
+    return [...activeMeetings].sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())[0];
+  }, [meetings]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center">
@@ -717,7 +784,7 @@ export default function StudentDashboard() {
             { id: "offers", label: "Offer Letters", icon: FileText },
             { id: "visa", label: "Visa Timeline", icon: Calendar },
             { id: "chat", label: "Counselor Chat", icon: ChatCircleDots },
-            { id: "appointments", label: "Appointments", icon: CalendarCheck },
+            { id: "appointments", label: "Scheduled Meetings", icon: CalendarCheck },
             { id: "profile", label: "My Profile", icon: Gear }
           ].map(tab => {
             const Icon = tab.icon;
@@ -897,6 +964,78 @@ export default function StudentDashboard() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Upcoming Meeting Widget */}
+            {upcomingMeeting && (
+              <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-3xl p-6 shadow-md border border-slate-700/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 bg-amber-500/20 text-amber-300 rounded-full border border-amber-500/30">
+                      Upcoming Consultation
+                    </span>
+                    <span className="text-xs text-slate-300 flex items-center gap-1">
+                      <Clock size={14} />
+                      {upcomingMeeting.duration_minutes} mins
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-lg md:text-xl tracking-tight text-white">
+                      {upcomingMeeting.title}
+                    </h3>
+                    {upcomingMeeting.description && (
+                      <p className="text-slate-400 text-xs mt-1.5 line-clamp-2 max-w-xl">
+                        {upcomingMeeting.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-300 pt-1">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar size={14} className="text-slate-400" />
+                      <span>
+                        {new Date(upcomingMeeting.scheduled_at).toLocaleDateString("en-US", {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                        })}{" "}
+                        at{" "}
+                        {new Date(upcomingMeeting.scheduled_at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <User size={14} className="text-slate-400" />
+                      <span>{upcomingMeeting.counselors?.full_name || "Annex Counselor"}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 w-full md:w-auto shrink-0">
+                  {upcomingMeeting.meeting_link ? (
+                    <a
+                      href={upcomingMeeting.meeting_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-grow md:flex-grow-0 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full transition-all text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-900/30"
+                    >
+                      Join Meeting
+                      <ArrowSquareOut size={13} />
+                    </a>
+                  ) : (
+                    <span className="text-xs font-medium text-slate-400 italic bg-slate-800 px-4 py-2.5 rounded-full border border-slate-700">
+                      Link will be shared shortly
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setActiveTab("appointments")}
+                    className="flex-grow md:flex-grow-0 px-5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded-full transition-all text-xs font-bold flex items-center justify-center gap-1.5"
+                  >
+                    View All
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Split layout: Pending tasks & Notifications */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -1620,7 +1759,7 @@ export default function StudentDashboard() {
           <div className="space-y-8">
             <div className="max-w-3xl">
               <h1 className="font-display font-bold text-2xl md:text-3xl text-primary tracking-tight mb-2">
-                Consultations & Appointments
+                Scheduled Meetings & Consultations
               </h1>
               <p className="text-slate-500 text-sm">
                 View scheduled counseling sessions, click online meeting links, or request reschedule coordinates.
@@ -1629,66 +1768,84 @@ export default function StudentDashboard() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               
-              {/* Appointments grid list */}
+              {/* Meetings grid list */}
               <div className="lg:col-span-2 space-y-4">
-                {appointments.length === 0 ? (
+                {meetings.length === 0 ? (
                   <Card className="py-12 text-center text-slate-400">
                     <CalendarCheck size={48} className="mx-auto text-slate-300 mb-3" />
-                    <h3 className="font-bold text-base text-slate-500">No Consultations Slotted</h3>
-                    <p className="text-sm mt-1">Book a counseling slot via contact section or wait for dashboard updates.</p>
+                    <h3 className="font-bold text-base text-slate-500">No Meetings Slotted</h3>
+                    <p className="text-sm mt-1">Wait for your counselor to schedule a meeting or check back later.</p>
                   </Card>
                 ) : (
-                  appointments.map(appt => (
-                    <Card key={appt.id}>
-                      <CardContent className="p-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div className="flex items-start gap-4">
-                          <div className="w-11 h-11 rounded-2xl bg-primary/5 text-primary border border-primary/10 flex items-center justify-center shrink-0">
-                            <Calendar size={22} weight="fill" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="text-sm font-bold text-primary">Study {appt.destination} Guidance session</h4>
-                              <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                                appt.status === "Confirmed" 
-                                  ? "bg-emerald-50 text-emerald-600 border-emerald-200" 
-                                  : appt.status === "Cancelled"
-                                  ? "bg-red-50 text-red-600 border-red-200"
-                                  : "bg-amber-50 text-amber-600 border-amber-200"
-                              }`}>
-                                {appt.status}
-                              </span>
+                  meetings.map(appt => {
+                    const isUpcoming = appt.status === "Scheduled" || appt.status === "Rescheduled";
+                    return (
+                      <Card key={appt.id} className={appt.status === "Cancelled" ? "opacity-60" : ""}>
+                        <CardContent className="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                          <div className="flex items-start gap-4">
+                            <div className="w-11 h-11 rounded-2xl bg-primary/5 text-primary border border-primary/10 flex items-center justify-center shrink-0">
+                              <Calendar size={22} weight="fill" />
                             </div>
-                            <p className="text-xs font-semibold text-slate-600 mt-1">
-                              {new Date(appt.preferred_date).toLocaleDateString("en-US", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at {appt.preferred_time}
-                            </p>
-                            <p className="text-[10px] text-slate-400 mt-0.5">Academic Level: {appt.study_level}</p>
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="text-sm font-bold text-primary">{appt.title}</h4>
+                                <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                                  appt.status === "Completed" 
+                                    ? "bg-emerald-50 text-emerald-600 border-emerald-200" 
+                                    : appt.status === "Cancelled"
+                                    ? "bg-red-50 text-red-600 border-red-200"
+                                    : appt.status === "Rescheduled"
+                                    ? "bg-amber-50 text-amber-600 border-amber-200"
+                                    : "bg-blue-50 text-blue-600 border-blue-200"
+                                }`}>
+                                  {appt.status}
+                                </span>
+                              </div>
+                              <p className="text-xs font-semibold text-slate-600">
+                                {new Date(appt.scheduled_at).toLocaleDateString("en-US", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at {new Date(appt.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({appt.duration_minutes} mins)
+                              </p>
+                              {appt.description && (
+                                <p className="text-xs text-slate-500 whitespace-pre-wrap max-w-xl">{appt.description}</p>
+                              )}
+                              <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-400 pt-1">
+                                <span>Type: <strong className="text-slate-600">{appt.meeting_type}</strong></span>
+                                <span>•</span>
+                                <span>Counselor: <strong className="text-slate-600">{appt.counselors?.full_name || "Annex Team"}</strong></span>
+                              </div>
+                            </div>
                           </div>
-                        </div>
 
-                        <div className="flex items-center gap-2 w-full sm:w-auto">
-                          
-                          {/* Live Meeting Link representation (Mock online session) */}
-                          <a 
-                            href="https://meet.google.com" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="flex-grow sm:flex-grow-0 px-4 py-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 transition-colors text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/10"
-                          >
-                            Join Online Meet
-                            <ArrowSquareOut size={12} />
-                          </a>
+                          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 mt-3 sm:mt-0">
+                            {isUpcoming && appt.meeting_link && (
+                              <a 
+                                href={appt.meeting_link} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="flex-grow sm:flex-grow-0 px-4 py-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 transition-colors text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/10 animate-fade-in"
+                              >
+                                Join Meet
+                                <ArrowSquareOut size={12} />
+                              </a>
+                            )}
 
-                          <button
-                            onClick={() => { setRescheduleBookingId(appt.id); setNewDate(appt.preferred_date); }}
-                            className="flex-grow sm:flex-grow-0 px-4 py-2 border border-hairline hover:bg-slate-50 text-slate-600 rounded-full text-xs font-bold transition-colors cursor-pointer"
-                          >
-                            Reschedule
-                          </button>
-
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
+                            {isUpcoming && (
+                              <button
+                                onClick={() => { 
+                                  const d = new Date(appt.scheduled_at);
+                                  setRescheduleBookingId(appt.id); 
+                                  setNewDate(d.toLocaleDateString('en-CA')); 
+                                  setNewTime(d.toTimeString().substring(0, 5));
+                                }}
+                                className="flex-grow sm:flex-grow-0 px-4 py-2 border border-hairline hover:bg-slate-50 text-slate-600 rounded-full text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                Reschedule
+                              </button>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })
                 )}
               </div>
 
@@ -1697,7 +1854,7 @@ export default function StudentDashboard() {
                 <Card className="h-fit border-primary/30">
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle>Reschedule Slot</CardTitle>
+                      <CardTitle>Reschedule Meeting</CardTitle>
                       <button 
                         onClick={() => setRescheduleBookingId(null)}
                         className="p-1 rounded-full hover:bg-slate-200 text-slate-500 cursor-pointer"
@@ -1705,7 +1862,7 @@ export default function StudentDashboard() {
                         <X size={16} />
                       </button>
                     </div>
-                    <CardDescription>Request a modified timing slot for this consultation</CardDescription>
+                    <CardDescription>Request a modified timing slot for this meeting</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <form onSubmit={handleReschedule} className="space-y-4">
