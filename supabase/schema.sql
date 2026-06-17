@@ -313,3 +313,125 @@ CREATE POLICY "Allow public read on student-files" ON storage.objects
 
 CREATE POLICY "Allow public write on student-files" ON storage.objects
     FOR ALL USING (bucket_id = 'student-files') WITH CHECK (bucket_id = 'student-files');
+
+----------------------------------------------------
+-- 7. Chat System Upgrades (Realtime, Unread, and Attachments)
+----------------------------------------------------
+
+-- A. Alter student_messages to add status column if it doesn't exist
+ALTER TABLE public.student_messages ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'sent';
+
+-- B. Create student_conversations table
+CREATE TABLE IF NOT EXISTS public.student_conversations (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    student_id UUID REFERENCES public.students(id) ON DELETE CASCADE UNIQUE,
+    last_message TEXT,
+    last_sender_type TEXT,
+    last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    unread_count_admin INTEGER DEFAULT 0,
+    unread_count_student INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.student_conversations ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public select student_conversations" ON public.student_conversations;
+DROP POLICY IF EXISTS "Allow public write student_conversations" ON public.student_conversations;
+
+CREATE POLICY "Allow public select student_conversations" ON public.student_conversations FOR SELECT USING (true);
+CREATE POLICY "Allow public write student_conversations" ON public.student_conversations FOR ALL USING (true) WITH CHECK (true);
+
+-- C. Create message_attachments table
+CREATE TABLE IF NOT EXISTS public.message_attachments (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    message_id UUID REFERENCES public.student_messages(id) ON DELETE CASCADE,
+    file_url TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    file_type TEXT,
+    file_size INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.message_attachments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public select message_attachments" ON public.message_attachments;
+DROP POLICY IF EXISTS "Allow public write message_attachments" ON public.message_attachments;
+
+CREATE POLICY "Allow public select message_attachments" ON public.message_attachments FOR SELECT USING (true);
+CREATE POLICY "Allow public write message_attachments" ON public.message_attachments FOR ALL USING (true) WITH CHECK (true);
+
+-- D. Create message_notifications table
+CREATE TABLE IF NOT EXISTS public.message_notifications (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    message_id UUID REFERENCES public.student_messages(id) ON DELETE CASCADE,
+    notification_type TEXT NOT NULL, -- 'email'
+    recipient_email TEXT NOT NULL,
+    status TEXT DEFAULT 'pending', -- 'pending', 'sent', 'failed'
+    error_details TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.message_notifications ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public select message_notifications" ON public.message_notifications;
+DROP POLICY IF EXISTS "Allow public write message_notifications" ON public.message_notifications;
+
+CREATE POLICY "Allow public select message_notifications" ON public.message_notifications FOR SELECT USING (true);
+CREATE POLICY "Allow public write message_notifications" ON public.message_notifications FOR ALL USING (true) WITH CHECK (true);
+
+-- E. Create function and trigger to handle student conversations updates on new messages
+CREATE OR REPLACE FUNCTION public.handle_new_student_message()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.student_conversations (
+        student_id,
+        last_message,
+        last_sender_type,
+        last_activity_at,
+        unread_count_admin,
+        unread_count_student
+    )
+    VALUES (
+        NEW.student_id,
+        NEW.message,
+        NEW.sender_type,
+        NEW.created_at,
+        CASE WHEN NEW.sender_type = 'student' THEN 1 ELSE 0 END,
+        CASE WHEN NEW.sender_type = 'counselor' THEN 1 ELSE 0 END
+    )
+    ON CONFLICT (student_id) DO UPDATE
+    SET 
+        last_message = NEW.message,
+        last_sender_type = NEW.sender_type,
+        last_activity_at = NEW.created_at,
+        unread_count_admin = CASE 
+            WHEN NEW.sender_type = 'student' THEN public.student_conversations.unread_count_admin + 1 
+            ELSE public.student_conversations.unread_count_admin 
+        END,
+        unread_count_student = CASE 
+            WHEN NEW.sender_type = 'counselor' THEN public.student_conversations.unread_count_student + 1 
+            ELSE public.student_conversations.unread_count_student 
+        END;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS on_new_student_message ON public.student_messages;
+CREATE TRIGGER on_new_student_message
+    AFTER INSERT ON public.student_messages
+    FOR EACH ROW
+    EXECUTE FUNCTION public.handle_new_student_message();
+
+-- F. Add performance indexes
+CREATE INDEX IF NOT EXISTS idx_student_messages_student_id ON public.student_messages(student_id);
+CREATE INDEX IF NOT EXISTS idx_student_messages_created_at ON public.student_messages(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_student_conversations_last_activity ON public.student_conversations(last_activity_at DESC);
+
+-- G. Enable Realtime Replication
+-- Note: If tables are already published in replication, these statements might throw a harmless notice/warning.
+-- In Supabase, you can also toggle this via Database -> Replication.
+ALTER PUBLICATION supabase_realtime ADD TABLE public.student_messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.student_conversations;

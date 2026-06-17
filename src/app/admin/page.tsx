@@ -6,7 +6,8 @@ import {
   Calendar, Users, Eye, CheckCircle, XCircle, ChartBar, 
   Download, MagnifyingGlass, Funnel, ArrowSquareOut, Globe, 
   Warning, Check, X, SpinnerGap, GraduationCap, Star, Copy,
-  User, Paperclip, PaperPlaneRight, Gear, UploadSimple, Lock, Clock
+  User, Paperclip, PaperPlaneRight, Gear, UploadSimple, Lock, Clock, Checks,
+  ChatCircleDots
 } from "@phosphor-icons/react";
 import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
@@ -110,7 +111,7 @@ export default function AdminDashboard() {
   const [checkingAuth, setCheckingAuth] = React.useState(true);
   
   // Dashboard Tabs
-  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students">("bookings");
+  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat">("bookings");
 
   // Loaders & table existence flags
   const [loading, setLoading] = React.useState(false);
@@ -128,6 +129,16 @@ export default function AdminDashboard() {
   const [studentDestFilter, setStudentDestFilter] = React.useState("All");
   const [studentStatusFilter, setStudentStatusFilter] = React.useState("All");
   const [pendingDocsCount, setPendingDocsCount] = React.useState(0);
+
+  // Admin Chat Center states
+  const [conversations, setConversations] = React.useState<any[]>([]);
+  const [activeChatStudentId, setActiveChatStudentId] = React.useState<string | null>(null);
+  const [chatCenterMessages, setChatCenterMessages] = React.useState<any[]>([]);
+  const [chatCenterSearch, setChatCenterSearch] = React.useState("");
+  const [sendingAdminChat, setSendingAdminChat] = React.useState(false);
+  const [adminChatText, setAdminChatText] = React.useState("");
+  const [adminChatFile, setAdminChatFile] = React.useState<File | null>(null);
+  const [chatCenterHasMore, setChatCenterHasMore] = React.useState(false);
 
   // Audit modal internal states
   const [auditTab, setAuditTab] = React.useState<"progress" | "documents" | "offers" | "visa" | "chat" | "logs">("progress");
@@ -337,6 +348,109 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchConversations = React.useCallback(async () => {
+    try {
+      const { data: convs, error: convErr } = await supabase
+        .from("student_conversations")
+        .select(`
+          *,
+          students (
+            name,
+            email,
+            counselor,
+            status
+          )
+        `)
+        .order("last_activity_at", { ascending: false });
+
+      if (convErr) throw convErr;
+
+      const { data: studs, error: studErr } = await supabase
+        .from("students")
+        .select("id, name, email, counselor, status, created_at")
+        .eq("status", "Active");
+
+      if (studErr) throw studErr;
+
+      const studentMap = new Map(studs?.map(s => [s.id, s]) || []);
+      
+      const mergedConvs = (convs || []).map(c => {
+        studentMap.delete(c.student_id);
+        return {
+          ...c,
+          student: c.students
+        };
+      });
+
+      studentMap.forEach(s => {
+        mergedConvs.push({
+          student_id: s.id,
+          last_message: "No messages yet",
+          last_sender_type: null,
+          last_activity_at: s.created_at || new Date(0).toISOString(),
+          unread_count_admin: 0,
+          unread_count_student: 0,
+          student: s
+        });
+      });
+
+      mergedConvs.sort((a, b) => new Date(b.last_activity_at).getTime() - new Date(a.last_activity_at).getTime());
+      setConversations(mergedConvs);
+    } catch (err: any) {
+      console.error("Error fetching conversations:", err.message);
+    }
+  }, []);
+
+  const loadAdminChatMessages = React.useCallback(async (studentIdVal: string, offsetVal = 0) => {
+    try {
+      const { data, error } = await supabase
+        .from("student_messages")
+        .select(`
+          *,
+          message_attachments (*)
+        `)
+        .eq("student_id", studentIdVal)
+        .order("created_at", { ascending: false })
+        .range(offsetVal, offsetVal + 20 - 1);
+
+      if (error) throw error;
+
+      const newMsgs = data || [];
+      const hasMore = newMsgs.length === 20;
+      setChatCenterHasMore(hasMore);
+
+      const reversedNewMsgs = [...newMsgs].reverse();
+
+      if (offsetVal > 0) {
+        setChatCenterMessages(prev => [...reversedNewMsgs, ...prev]);
+      } else {
+        setChatCenterMessages(reversedNewMsgs);
+      }
+    } catch (err: any) {
+      console.error("Error loading admin chat messages:", err.message);
+    }
+  }, []);
+
+  const markAdminMessagesAsRead = React.useCallback(async (studentIdVal: string) => {
+    try {
+      await supabase
+        .from("student_messages")
+        .update({ status: "read" })
+        .eq("student_id", studentIdVal)
+        .eq("sender_type", "student")
+        .neq("status", "read");
+
+      await supabase
+        .from("student_conversations")
+        .update({ unread_count_admin: 0 })
+        .eq("student_id", studentIdVal);
+
+      fetchConversations();
+    } catch (err: any) {
+      console.error("Error updating unread count:", err.message);
+    }
+  }, [fetchConversations]);
+
   // Fetch Database tables
   const fetchAllData = React.useCallback(async () => {
     setLoading(true);
@@ -433,14 +547,95 @@ export default function AdminDashboard() {
       console.error("Error loading students/counts:", err.message);
     }
     
+    // 6. Fetch Chat Conversations
+    try {
+      await fetchConversations();
+    } catch (err: any) {
+      console.error("Error loading chat conversations in fetchAllData:", err.message);
+    }
+    
     setLoading(false);
-  }, []);
+  }, [fetchConversations]);
 
   React.useEffect(() => {
     if (isAuthenticated) {
       fetchAllData();
     }
   }, [isAuthenticated, fetchAllData]);
+
+  // Realtime subscription for Chat Center
+  React.useEffect(() => {
+    if (activeTab !== "chat" || !isAuthenticated) return;
+
+    // 1. Subscribe to student_messages realtime events
+    const messagesChannel = supabase
+      .channel("admin_chat_messages")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "student_messages" },
+        async (payload) => {
+          if (payload.eventType === "INSERT") {
+            const newMsg = payload.new;
+            const { data: atts } = await supabase
+              .from("message_attachments")
+              .select("*")
+              .eq("message_id", newMsg.id);
+            newMsg.message_attachments = atts || [];
+
+            if (activeChatStudentId && newMsg.student_id === activeChatStudentId) {
+              setChatCenterMessages(prev => {
+                if (prev.some(m => m.id === newMsg.id)) return prev;
+                return [...prev, newMsg];
+              });
+              await markAdminMessagesAsRead(activeChatStudentId);
+            }
+            fetchConversations();
+          } else if (payload.eventType === "UPDATE") {
+            const updatedMsg = payload.new;
+            const { data: atts } = await supabase
+              .from("message_attachments")
+              .select("*")
+              .eq("message_id", updatedMsg.id);
+            updatedMsg.message_attachments = atts || [];
+
+            if (activeChatStudentId && updatedMsg.student_id === activeChatStudentId) {
+              setChatCenterMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
+            }
+            fetchConversations();
+          } else if (payload.eventType === "DELETE") {
+            const deletedId = payload.old.id;
+            setChatCenterMessages(prev => prev.filter(m => m.id !== deletedId));
+            fetchConversations();
+          }
+        }
+      )
+      .subscribe();
+
+    // 2. Subscribe to student_conversations realtime events
+    const conversationsChannel = supabase
+      .channel("admin_conversations")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "student_conversations" },
+        () => {
+          fetchConversations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(messagesChannel);
+      supabase.removeChannel(conversationsChannel);
+    };
+  }, [activeTab, isAuthenticated, activeChatStudentId, fetchConversations, markAdminMessagesAsRead]);
+
+  // Mark messages as read when a conversation is opened in Chat Center
+  React.useEffect(() => {
+    if (activeTab === "chat" && activeChatStudentId) {
+      loadAdminChatMessages(activeChatStudentId);
+      markAdminMessagesAsRead(activeChatStudentId);
+    }
+  }, [activeTab, activeChatStudentId, markAdminMessagesAsRead]);
 
   // Toast Helper
   const showToast = (msg: string) => {
@@ -927,6 +1122,85 @@ export default function AdminDashboard() {
       fetchAllData();
     } catch (err: any) {
       alert("Error deleting student profile: " + err.message);
+    }
+  };
+
+  const handleSendAdminChatReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminChatText.trim() && !adminChatFile || !activeChatStudentId) return;
+
+    setSendingAdminChat(true);
+    const originalText = adminChatText;
+    try {
+      let attachmentUrl = null;
+      let attachmentName = null;
+
+      if (adminChatFile) {
+        const fileExt = adminChatFile.name.split(".").pop();
+        const randomName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        const filePath = `${activeChatStudentId}/chat_attachments/${randomName}`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from("student-files")
+          .upload(filePath, adminChatFile);
+        if (uploadErr) throw uploadErr;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from("student-files")
+          .getPublicUrl(filePath);
+        attachmentUrl = publicUrl;
+        attachmentName = adminChatFile.name;
+      }
+
+      const { data: newMsg, error } = await supabase
+        .from("student_messages")
+        .insert([{
+          student_id: activeChatStudentId,
+          sender_type: "counselor",
+          message: originalText || `Attachment: ${attachmentName}`,
+          attachment_url: attachmentUrl,
+          attachment_name: attachmentName,
+          status: "sent"
+        }])
+        .select()
+        .single();
+      if (error) throw error;
+
+      if (adminChatFile && attachmentUrl && newMsg) {
+        await supabase
+          .from("message_attachments")
+          .insert({
+            message_id: newMsg.id,
+            file_url: attachmentUrl,
+            file_name: attachmentName,
+            file_type: adminChatFile.type,
+            file_size: adminChatFile.size
+          });
+      }
+
+      setAdminChatText("");
+      setAdminChatFile(null);
+      
+      await loadAdminChatMessages(activeChatStudentId);
+      await fetchConversations();
+
+      fetch("/api/send-chat-notification", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          senderType: "counselor",
+          studentId: activeChatStudentId,
+          messageContent: originalText || `Attachment: ${attachmentName}`,
+          counselorName: "Annex Counselor"
+        })
+      }).catch(err => console.error("Email notification error:", err));
+
+    } catch (err: any) {
+      alert("Error sending reply: " + err.message);
+    } finally {
+      setSendingAdminChat(false);
     }
   };
 
@@ -1480,20 +1754,33 @@ export default function AdminDashboard() {
             {[
               { id: "bookings", label: `Consultations (${bookings.length})` },
               { id: "students", label: `Students (${students.length})` },
+              { id: "chat", label: "Chat Center" },
               { id: "universities", label: `Universities (${universities.length})` },
               { id: "blog", label: `Blog posts (${posts.length})` },
               { id: "stories", label: `Success stories (${stories.length})` }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer ${
-                  activeTab === tab.id ? "bg-primary text-white" : "text-slate-500 hover:text-primary hover:bg-slate-50"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            ].map(tab => {
+              const isActive = activeTab === tab.id;
+              const unreadCount = tab.id === "chat" 
+                ? conversations.reduce((sum, c) => sum + (c.unread_count_admin || 0), 0)
+                : 0;
+
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    isActive ? "bg-primary text-white" : "text-slate-500 hover:text-primary hover:bg-slate-50"
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  {tab.id === "chat" && unreadCount > 0 && (
+                    <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[15px] text-center animate-pulse">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </nav>
         </div>
 
@@ -2748,6 +3035,307 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+          </section>
+        )}
+
+        {activeTab === "chat" && (
+          <section className="flex flex-col gap-6 animate-fade-in">
+            <div>
+              <h2 className="font-display font-bold text-2xl text-primary">Chat Center</h2>
+              <p className="text-xs text-slate-400 mt-1">Real-time messaging platform with students. Answer queries, review attachments, and manage communications.</p>
+            </div>
+
+            <div className="flex bg-white border border-hairline rounded-3xl h-[650px] overflow-hidden">
+              {/* Left Panel: Conversations List */}
+              <div className="w-full md:w-80 border-r border-hairline flex flex-col shrink-0 bg-slate-50/20">
+                <div className="p-4 border-b border-hairline bg-slate-50/50">
+                  <div className="flex items-center gap-2.5 px-3 py-2 border border-hairline rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20">
+                    <MagnifyingGlass size={16} className="text-slate-400" />
+                    <input 
+                      type="text" 
+                      placeholder="Search students or messages..." 
+                      value={chatCenterSearch}
+                      onChange={(e) => setChatCenterSearch(e.target.value)}
+                      className="text-xs w-full focus:outline-none text-slate-800 bg-transparent"
+                    />
+                    {chatCenterSearch && (
+                      <button onClick={() => setChatCenterSearch("")} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex-grow overflow-y-auto divide-y divide-hairline/60">
+                  {conversations
+                    .filter(c => {
+                      if (!c.student) return false;
+                      const searchLower = chatCenterSearch.toLowerCase();
+                      const nameMatch = c.student.name.toLowerCase().includes(searchLower);
+                      const emailMatch = c.student.email.toLowerCase().includes(searchLower);
+                      const msgMatch = c.last_message && c.last_message.toLowerCase().includes(searchLower);
+                      return nameMatch || emailMatch || msgMatch;
+                    })
+                    .map(c => {
+                      const isSelected = activeChatStudentId === c.student_id;
+                      const relativeTime = c.last_activity_at && c.last_activity_at !== new Date(0).toISOString()
+                        ? new Date(c.last_activity_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : "";
+                      
+                      return (
+                        <button 
+                          key={c.student_id}
+                          onClick={() => {
+                            setActiveChatStudentId(c.student_id);
+                          }}
+                          className={`w-full text-left p-4 flex items-start gap-3 transition-colors cursor-pointer ${
+                            isSelected ? "bg-primary/5 text-primary" : "hover:bg-slate-50/60"
+                          }`}
+                        >
+                          <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs uppercase shrink-0">
+                            {c.student.name.charAt(0)}
+                          </div>
+                          <div className="flex-grow min-w-0">
+                            <div className="flex justify-between items-baseline mb-0.5">
+                              <h4 className="text-xs font-bold truncate pr-2">{c.student.name}</h4>
+                              <span className="text-[9px] text-slate-400 font-mono-data">{relativeTime}</span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 truncate mb-1">{c.student.email}</p>
+                            <p className="text-[11px] text-slate-500 truncate leading-tight">{c.last_message}</p>
+                          </div>
+                          {c.unread_count_admin > 0 && (
+                            <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[15px] text-center shrink-0 self-center animate-pulse">
+                              {c.unread_count_admin}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+
+                  {conversations.filter(c => {
+                    if (!c.student) return false;
+                    const searchLower = chatCenterSearch.toLowerCase();
+                    const nameMatch = c.student.name.toLowerCase().includes(searchLower);
+                    const emailMatch = c.student.email.toLowerCase().includes(searchLower);
+                    const msgMatch = c.last_message && c.last_message.toLowerCase().includes(searchLower);
+                    return nameMatch || emailMatch || msgMatch;
+                  }).length === 0 && (
+                    <div className="p-8 text-center text-slate-400 text-xs font-medium">No matching conversations.</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Panel: Chat Thread Viewport */}
+              <div className="flex-grow flex flex-col justify-between bg-slate-50/30">
+                {!activeChatStudentId ? (
+                  <div className="flex-grow flex flex-col items-center justify-center text-slate-400 p-8">
+                    <ChatCircleDots size={48} className="text-slate-300 mb-3" />
+                    <h3 className="font-bold text-sm text-slate-500">Select a Conversation</h3>
+                    <p className="text-xs mt-1 max-w-xs text-center leading-normal">
+                      Choose a student from the left panel to load their message timeline, review attachment files, and send counselor replies.
+                    </p>
+                  </div>
+                ) : (
+                  (() => {
+                    const activeConv = conversations.find(c => c.student_id === activeChatStudentId);
+                    const activeStudent = activeConv?.student;
+                    
+                    return (
+                      <>
+                        {/* Thread Header */}
+                        <div className="p-4 border-b border-hairline bg-white flex items-center justify-between shadow-[0_1px_2px_rgba(0,0,0,0.01)] shrink-0">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center font-bold">
+                              {activeStudent?.name?.charAt(0) || "S"}
+                            </div>
+                            <div>
+                              <h3 className="text-sm font-bold text-primary">{activeStudent?.name}</h3>
+                              <p className="text-[10px] text-slate-400 font-medium">
+                                {activeStudent?.email} &middot; counselor: {activeStudent?.counselor || "Annex Team"}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (activeStudent) openAuditModal(activeStudent);
+                            }}
+                            className="px-3.5 py-1.5 border border-hairline hover:bg-slate-50 rounded-full text-xs font-bold text-slate-600 transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            Open Student File <ArrowSquareOut size={12} />
+                          </button>
+                        </div>
+
+                        {/* Messages Area */}
+                        <div className="flex-grow p-6 overflow-y-auto space-y-4 flex flex-col">
+                          {chatCenterHasMore && (
+                            <button 
+                              type="button" 
+                              onClick={() => loadAdminChatMessages(activeChatStudentId, chatCenterMessages.length)}
+                              className="mx-auto block text-xs font-semibold text-primary/80 hover:text-primary bg-primary/5 hover:bg-primary/10 px-3.5 py-1.5 rounded-full transition-all border border-primary/10 cursor-pointer mb-2"
+                            >
+                              Load Older Messages
+                            </button>
+                          )}
+
+                          {chatCenterMessages.length === 0 ? (
+                            <div className="my-auto text-center text-slate-400 py-12">
+                              <ChatCircleDots size={48} className="mx-auto text-slate-300 mb-3" />
+                              <h3 className="font-bold text-sm text-slate-500">No Messages Yet</h3>
+                              <p className="text-xs mt-1 max-w-xs mx-auto leading-normal">
+                                Send the first message to initiate contact or schedule worksheets.
+                              </p>
+                            </div>
+                          ) : (
+                            chatCenterMessages.map((msg, index) => {
+                              const isCounselor = msg.sender_type === "counselor" || msg.sender_type === "admin";
+                              return (
+                                <div 
+                                  key={msg.id || index}
+                                  className={`flex flex-col max-w-[75%] ${
+                                    isCounselor ? "self-end items-end" : "self-start items-start"
+                                  }`}
+                                >
+                                  <div className={`p-4 rounded-3xl text-sm leading-relaxed ${
+                                    isCounselor 
+                                      ? "bg-primary text-white rounded-br-none" 
+                                      : "bg-white border border-hairline/60 text-slate-800 rounded-bl-none shadow-sm"
+                                  }`}>
+                                    
+                                    {/* Text Message */}
+                                    <p className="whitespace-pre-wrap">{msg.message}</p>
+
+                                    {/* Attachment Block */}
+                                    {msg.attachment_url && (
+                                      <div className="mt-2.5">
+                                        {/\.(jpeg|jpg|gif|png|webp)$/i.test(msg.attachment_name || "") ? (
+                                          <div className="relative rounded-lg overflow-hidden border border-hairline max-w-[240px] bg-slate-100/10">
+                                            <img 
+                                              src={msg.attachment_url} 
+                                              alt={msg.attachment_name} 
+                                              className="w-full h-auto object-cover max-h-[180px] hover:scale-102 transition-all cursor-pointer"
+                                              onClick={() => window.open(msg.attachment_url, "_blank")}
+                                            />
+                                            <div className="p-2 bg-black/60 backdrop-blur-sm absolute bottom-0 inset-x-0 flex items-center justify-between text-[10px] text-white">
+                                              <span className="truncate pr-2">{msg.attachment_name}</span>
+                                              <a href={msg.attachment_url} download={msg.attachment_name} className="hover:text-gold shrink-0">
+                                                <Download size={12} />
+                                              </a>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <a 
+                                            href={msg.attachment_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className={`p-3 rounded-xl flex items-center gap-2.5 text-xs border ${
+                                              isCounselor 
+                                                ? "bg-white/10 border-white/20 text-white hover:bg-white/20" 
+                                                : "bg-slate-50 border-hairline text-slate-600 hover:bg-slate-100"
+                                            } transition-colors`}
+                                          >
+                                            <FileText size={16} />
+                                            <div className="text-left overflow-hidden">
+                                              <p className="font-bold truncate max-w-[150px]">{msg.attachment_name}</p>
+                                              <p className="text-[9px] opacity-75">Document attachment</p>
+                                            </div>
+                                            <ArrowSquareOut size={12} className="ml-auto shrink-0" />
+                                          </a>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 mt-1">
+                                    <span className="text-[9px] text-slate-400">
+                                      {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                    {isCounselor && (
+                                      <span className="flex items-center">
+                                        {msg.status === "read" ? (
+                                          <Checks size={14} className="text-emerald-400" weight="bold" />
+                                        ) : (
+                                          <Check size={14} className="text-slate-400" />
+                                        )}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+
+                        {/* Message Input form */}
+                        <form onSubmit={handleSendAdminChatReply} className="p-4 border-t border-hairline bg-white flex items-end gap-3.5 shrink-0">
+                          
+                          {/* File Attachment input */}
+                          <div className="relative shrink-0">
+                            <label className={`w-11 h-11 rounded-full border border-hairline flex items-center justify-center cursor-pointer transition-colors ${
+                              adminChatFile ? "bg-primary/10 border-primary/20 text-primary" : "text-slate-400 hover:text-primary hover:bg-slate-50"
+                            }`} title="Add Attachment">
+                              <Paperclip size={18} />
+                              <input 
+                                type="file" 
+                                className="hidden" 
+                                onChange={(e) => e.target.files && setAdminChatFile(e.target.files[0])}
+                                disabled={sendingAdminChat}
+                              />
+                            </label>
+                            {adminChatFile && (
+                              <button 
+                                type="button" 
+                                onClick={() => setAdminChatFile(null)}
+                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors"
+                              >
+                                <X size={10} weight="bold" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Text entry field */}
+                          <div className="flex-grow">
+                            {adminChatFile && (
+                              <div className="text-[10px] bg-slate-50 border border-hairline px-3 py-1 rounded-t-xl text-slate-500 truncate max-w-md">
+                                Attachment queue: <span className="font-semibold text-primary">{adminChatFile.name}</span>
+                              </div>
+                            )}
+                            <textarea
+                              rows={1}
+                              value={adminChatText}
+                              onChange={(e) => setAdminChatText(e.target.value)}
+                              placeholder="Type your reply to student..."
+                              className={`w-full border border-hairline px-4.5 py-3 outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-sm transition-all resize-none bg-white ${
+                                adminChatFile ? "rounded-b-2xl border-t-0" : "rounded-2xl"
+                              }`}
+                              disabled={sendingAdminChat}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  handleSendAdminChatReply(e);
+                                }
+                              }}
+                            />
+                          </div>
+
+                          <Button 
+                            type="submit" 
+                            disabled={sendingAdminChat} 
+                            className="rounded-full w-11 h-11 p-0 flex items-center justify-center shrink-0"
+                          >
+                            {sendingAdminChat ? (
+                              <SpinnerGap size={18} className="animate-spin text-white" />
+                            ) : (
+                              <PaperPlaneRight size={18} weight="fill" />
+                            )}
+                          </Button>
+
+                        </form>
+                      </>
+                    );
+                  })()
+                )}
+              </div>
+            </div>
           </section>
         )}
       </div>

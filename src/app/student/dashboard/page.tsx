@@ -7,7 +7,7 @@ import {
   FileArrowUp, FileText, SignOut, Calendar, User, 
   PaperPlaneRight, Paperclip, ArrowSquareOut, WarningCircle, 
   UploadSimple, Check, X, SpinnerGap, Bell, ArrowLeft,
-  CalendarCheck, ShieldWarning, ChatCircleDots, Gear
+  CalendarCheck, ShieldWarning, ChatCircleDots, Gear, Checks, Download
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "@/lib/supabase";
@@ -56,6 +56,7 @@ export default function StudentDashboard() {
   const [messages, setMessages] = React.useState<any[]>([]);
   const [notifications, setNotifications] = React.useState<any[]>([]);
   const [appointments, setAppointments] = React.useState<any[]>([]);
+  const [hasMoreMessages, setHasMoreMessages] = React.useState(false);
 
   // Forms / Actions state
   const [uploadingDoc, setUploadingDoc] = React.useState<string | null>(null);
@@ -84,6 +85,58 @@ export default function StudentDashboard() {
   // Document preview state
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
   const [previewName, setPreviewName] = React.useState<string | null>(null);
+
+  const CHAT_LIMIT = 20;
+
+  const loadChatMessages = React.useCallback(async (studentIdVal: string, offsetVal = 0) => {
+    try {
+      const { data, error } = await supabase
+        .from("student_messages")
+        .select(`
+          *,
+          message_attachments (*)
+        `)
+        .eq("student_id", studentIdVal)
+        .order("created_at", { ascending: false })
+        .range(offsetVal, offsetVal + CHAT_LIMIT - 1);
+
+      if (error) throw error;
+
+      const newMsgs = data || [];
+      const hasMore = newMsgs.length === CHAT_LIMIT;
+      setHasMoreMessages(hasMore);
+
+      const reversedNewMsgs = [...newMsgs].reverse();
+
+      if (offsetVal > 0) {
+        setMessages(prev => [...reversedNewMsgs, ...prev]);
+      } else {
+        setMessages(reversedNewMsgs);
+      }
+    } catch (err: any) {
+      console.error("Error loading chat messages:", err.message);
+    }
+  }, []);
+
+  const markMessagesAsRead = React.useCallback(async (studentIdVal: string) => {
+    try {
+      const { error: updateErr } = await supabase
+        .from("student_messages")
+        .update({ status: "read" })
+        .eq("student_id", studentIdVal)
+        .eq("sender_type", "counselor")
+        .neq("status", "read");
+
+      if (updateErr) throw updateErr;
+
+      await supabase
+        .from("student_conversations")
+        .update({ unread_count_student: 0 })
+        .eq("student_id", studentIdVal);
+    } catch (err: any) {
+      console.error("Error marking messages as read:", err.message);
+    }
+  }, []);
 
   // Initialize and load session/impersonation details
   React.useEffect(() => {
@@ -124,6 +177,68 @@ export default function StudentDashboard() {
     };
     initializePortal();
   }, [router]);
+
+  // Realtime chat subscription effect
+  React.useEffect(() => {
+    if (!studentId) return;
+
+    const channel = supabase
+      .channel(`student_chat_messages:${studentId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "student_messages",
+          filter: `student_id=eq.${studentId}`,
+        },
+        async (payload) => {
+          if (payload.eventType === "INSERT") {
+            const newMsg = payload.new;
+            // Fetch attachments if any exist
+            const { data: atts } = await supabase
+              .from("message_attachments")
+              .select("*")
+              .eq("message_id", newMsg.id);
+            newMsg.message_attachments = atts || [];
+
+            setMessages(prev => {
+              if (prev.some(m => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
+
+            // If active tab is chat and it's a counselor message, mark as read
+            if (activeTab === "chat" && newMsg.sender_type === "counselor") {
+              await markMessagesAsRead(studentId);
+            }
+          } else if (payload.eventType === "UPDATE") {
+            const updatedMsg = payload.new;
+            const { data: atts } = await supabase
+              .from("message_attachments")
+              .select("*")
+              .eq("message_id", updatedMsg.id);
+            updatedMsg.message_attachments = atts || [];
+
+            setMessages(prev => prev.map(m => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
+          } else if (payload.eventType === "DELETE") {
+            const deletedId = payload.old.id;
+            setMessages(prev => prev.filter(m => m.id !== deletedId));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [studentId, activeTab, markMessagesAsRead]);
+
+  // Mark messages as read when Chat tab is opened
+  React.useEffect(() => {
+    if (activeTab === "chat" && studentId) {
+      markMessagesAsRead(studentId);
+    }
+  }, [activeTab, studentId, markMessagesAsRead]);
 
   // Load everything for the specific student ID
   const loadStudentData = async (id: string) => {
@@ -178,12 +293,7 @@ export default function StudentDashboard() {
       setVisaStatus(studentVisa);
 
       // 6. Fetch Messages
-      const { data: studentMessages } = await supabase
-        .from("student_messages")
-        .select("*")
-        .eq("student_id", id)
-        .order("created_at", { ascending: true });
-      setMessages(studentMessages || []);
+      await loadChatMessages(id);
 
       // 7. Fetch Notifications
       const { data: studentNotifs } = await supabase
@@ -323,6 +433,7 @@ export default function StudentDashboard() {
     if (!chatMessage.trim() && !chatFile) return;
 
     setSendingMessage(true);
+    const originalMsgText = chatMessage;
     try {
       let attachmentUrl = null;
       let attachmentName = null;
@@ -348,34 +459,58 @@ export default function StudentDashboard() {
       }
 
       // Insert message
-      const { error: msgErr } = await supabase
+      const { data: insertedMsg, error: msgErr } = await supabase
         .from("student_messages")
         .insert({
           student_id: studentId,
           sender_type: "student",
-          message: chatMessage || `Uploaded attachment: ${attachmentName}`,
+          message: originalMsgText || `Uploaded attachment: ${attachmentName}`,
           attachment_url: attachmentUrl,
-          attachment_name: attachmentName
-        });
+          attachment_name: attachmentName,
+          status: "sent"
+        })
+        .select()
+        .single();
       
       if (msgErr) throw msgErr;
+
+      // Insert message attachments mapping if exists
+      if (chatFile && attachmentUrl && insertedMsg) {
+        await supabase
+          .from("message_attachments")
+          .insert({
+            message_id: insertedMsg.id,
+            file_url: attachmentUrl,
+            file_name: attachmentName,
+            file_type: chatFile.type,
+            file_size: chatFile.size
+          });
+      }
 
       setChatMessage("");
       setChatFile(null);
       
       // Reload Chat messages
-      const { data: studentMessages } = await supabase
-        .from("student_messages")
-        .select("*")
-        .eq("student_id", studentId)
-        .order("created_at", { ascending: true });
-      setMessages(studentMessages || []);
+      await loadChatMessages(studentId!);
+
+      // Trigger server-side email notification
+      fetch("/api/send-chat-notification", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          senderType: "student",
+          studentId: studentId,
+          messageContent: originalMsgText || `Uploaded attachment: ${attachmentName}`
+        })
+      }).catch(err => console.error("Email notification trigger failed:", err));
 
       // Log activity
       await supabase.from("student_activity_logs").insert({
         student_id: studentId,
         action: "Message Sent",
-        details: chatMessage.substring(0, 50)
+        details: originalMsgText.substring(0, 50) || `Attachment: ${attachmentName}`
       });
       
     } catch (err: any) {
@@ -552,9 +687,15 @@ export default function StudentDashboard() {
                 <span>{tab.label}</span>
                 
                 {/* Notification bubble for Chat or Notifications count */}
-                {tab.id === "chat" && messages.filter(m => m.sender_type !== "student" && !m.resolved).length > 0 && (
-                  <span className="ml-auto w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                )}
+                {tab.id === "chat" && (() => {
+                  const unreadCount = messages.filter(m => m.sender_type === "counselor" && m.status !== "read").length;
+                  if (unreadCount === 0) return null;
+                  return (
+                    <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[18px] text-center animate-pulse">
+                      {unreadCount}
+                    </span>
+                  );
+                })()}
               </button>
             );
           })}
@@ -637,7 +778,7 @@ export default function StudentDashboard() {
                 </div>
 
                 {/* Grid listing all steps with visual highlight */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-9 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-3.5">
                   {STAGES.map((stage, idx) => {
                     const isDone = idx < currentStageIndex;
                     const isCurrent = idx === currentStageIndex;
@@ -646,20 +787,20 @@ export default function StudentDashboard() {
                     return (
                       <div 
                         key={stage} 
-                        className={`p-3 rounded-2xl border flex flex-col justify-between h-20 transition-all ${
+                        className={`p-4 rounded-2xl border flex flex-col justify-between min-h-[95px] h-auto gap-2 transition-all ${
                           isDone 
-                            ? "bg-slate-50 border-emerald-100 text-emerald-800" 
+                            ? "bg-emerald-50/20 border-emerald-100 text-emerald-800 shadow-[0_2px_8px_rgba(16,185,129,0.02)]" 
                             : isCurrent 
-                            ? "bg-primary text-white border-primary shadow-sm" 
+                            ? "bg-primary text-white border-primary shadow-md scale-102 font-medium" 
                             : "bg-white border-hairline/80 text-slate-400"
                         }`}
                       >
-                        <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">Stage {idx + 1}</span>
-                        <div className="flex items-center gap-1.5 justify-between">
-                          <span className="text-xs font-bold leading-tight line-clamp-2">{stage}</span>
-                          {isDone && <CheckCircle size={16} className="text-emerald-500 shrink-0" weight="fill" />}
-                          {isCurrent && <Clock size={16} className="text-white shrink-0 animate-pulse" weight="fill" />}
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">Stage {idx + 1}</span>
+                          {isDone && <CheckCircle size={15} className="text-emerald-500 shrink-0" weight="fill" />}
+                          {isCurrent && <Clock size={15} className="text-white shrink-0 animate-pulse" weight="fill" />}
                         </div>
+                        <span className="text-xs font-bold leading-tight break-words pr-1">{stage}</span>
                       </div>
                     );
                   })}
@@ -1191,6 +1332,16 @@ export default function StudentDashboard() {
 
               {/* Chat messages viewport */}
               <div className="flex-grow p-6 overflow-y-auto bg-slate-50/50 space-y-4 flex flex-col">
+                {hasMoreMessages && (
+                  <button 
+                    type="button" 
+                    onClick={() => loadChatMessages(studentId!, messages.length)}
+                    className="mx-auto block text-xs font-semibold text-primary/80 hover:text-primary bg-primary/5 hover:bg-primary/10 px-3.5 py-1.5 rounded-full transition-all border border-primary/10 cursor-pointer mb-2"
+                  >
+                    Load Older Messages
+                  </button>
+                )}
+
                 {messages.length === 0 ? (
                   <div className="my-auto text-center text-slate-400 py-12">
                     <ChatCircleDots size={48} className="mx-auto text-slate-300 mb-3" />
@@ -1218,28 +1369,61 @@ export default function StudentDashboard() {
                           {/* Text Message */}
                           <p className="whitespace-pre-wrap">{msg.message}</p>
 
-                          {/* Attachment Link */}
+                          {/* Attachment Block */}
                           {msg.attachment_url && (
-                            <a 
-                              href={msg.attachment_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={`mt-2.5 p-2 rounded-xl flex items-center gap-2 text-xs border ${
-                                isStudent 
-                                  ? "bg-white/10 border-white/20 text-white hover:bg-white/20" 
-                                  : "bg-slate-50 border-hairline text-slate-600 hover:bg-slate-100"
-                              } transition-colors`}
-                            >
-                              <Paperclip size={14} />
-                              <span className="truncate max-w-[180px] font-bold">{msg.attachment_name}</span>
-                              <ArrowSquareOut size={12} className="shrink-0" />
-                            </a>
+                            <div className="mt-2.5">
+                              {/\.(jpeg|jpg|gif|png|webp)$/i.test(msg.attachment_name || "") ? (
+                                <div className="relative rounded-lg overflow-hidden border border-hairline max-w-[240px] bg-slate-100/10">
+                                  <img 
+                                    src={msg.attachment_url} 
+                                    alt={msg.attachment_name} 
+                                    className="w-full h-auto object-cover max-h-[180px] hover:scale-102 transition-all cursor-pointer"
+                                    onClick={() => window.open(msg.attachment_url, "_blank")}
+                                  />
+                                  <div className="p-2 bg-black/60 backdrop-blur-sm absolute bottom-0 inset-x-0 flex items-center justify-between text-[10px] text-white">
+                                    <span className="truncate pr-2">{msg.attachment_name}</span>
+                                    <a href={msg.attachment_url} download={msg.attachment_name} className="hover:text-gold shrink-0">
+                                      <Download size={12} />
+                                    </a>
+                                  </div>
+                                </div>
+                              ) : (
+                                <a 
+                                  href={msg.attachment_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`p-3 rounded-xl flex items-center gap-2.5 text-xs border ${
+                                    isStudent 
+                                      ? "bg-white/10 border-white/20 text-white hover:bg-white/20" 
+                                      : "bg-slate-50 border-hairline text-slate-600 hover:bg-slate-100"
+                                  } transition-colors`}
+                                >
+                                  <FileText size={16} />
+                                  <div className="text-left overflow-hidden">
+                                    <p className="font-bold truncate max-w-[150px]">{msg.attachment_name}</p>
+                                    <p className="text-[9px] opacity-75">Document attachment</p>
+                                  </div>
+                                  <ArrowSquareOut size={12} className="ml-auto shrink-0" />
+                                </a>
+                              )}
+                            </div>
                           )}
                         </div>
 
-                        <span className="text-[9px] text-slate-400 mt-1">
-                          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="text-[9px] text-slate-400">
+                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          {isStudent && (
+                            <span className="flex items-center">
+                              {msg.status === "read" ? (
+                                <Checks size={14} className="text-emerald-400" weight="bold" />
+                              ) : (
+                                <Check size={14} className="text-slate-400" />
+                              )}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     );
                   })
