@@ -11,12 +11,15 @@ export async function sendEmail({
   const brevoKey = process.env.BREVO_API_KEY;
   const fromEmail = process.env.EMAIL_FROM || "notifications@annexconsultancy.com";
 
+  console.log(`[Diagnostic] Email queued for: ${to} (Subject: "${subject}")`);
+
   if (!resendKey && !brevoKey) {
     console.log("---------- LOCAL EMAIL NOTIFICATION (MOCKED) ----------");
     console.log(`To: ${to}`);
     console.log(`Subject: ${subject}`);
     console.log(`Body: ${html}`);
     console.log("-------------------------------------------------------");
+    console.log(`[Diagnostic] Email sent successfully (MOCKED) to: ${to}`);
     return { success: true, mocked: true };
   }
 
@@ -38,10 +41,12 @@ export async function sendEmail({
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`[Diagnostic] Email failed via Resend to ${to}. Error: ${errorText}`);
         throw new Error(`Resend API Error: ${errorText}`);
       }
 
       const data = await response.json();
+      console.log(`[Diagnostic] Email sent successfully via Resend to: ${to}`);
       return { success: true, data };
     } else if (brevoKey) {
       const response = await fetch("https://api.brevo.com/v3/smtp/email", {
@@ -60,14 +65,16 @@ export async function sendEmail({
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`[Diagnostic] Email failed via Brevo to ${to}. Error: ${errorText}`);
         throw new Error(`Brevo API Error: ${errorText}`);
       }
 
       const data = await response.json();
+      console.log(`[Diagnostic] Email sent successfully via Brevo to: ${to}`);
       return { success: true, data };
     }
   } catch (error: any) {
-    console.error("Email sending failed:", error);
+    console.error(`[Diagnostic] Email sending failed to: ${to}. Error:`, error.message);
     return { success: false, error: error.message };
   }
 }

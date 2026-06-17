@@ -435,3 +435,34 @@ CREATE INDEX IF NOT EXISTS idx_student_conversations_last_activity ON public.stu
 -- In Supabase, you can also toggle this via Database -> Replication.
 ALTER PUBLICATION supabase_realtime ADD TABLE public.student_messages;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.student_conversations;
+
+----------------------------------------------------
+-- 8. Counselor Management System Tables
+----------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.counselors (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    full_name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    phone TEXT,
+    designation TEXT,
+    avatar_url TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.counselors ENABLE ROW LEVEL SECURITY;
+
+-- Policies
+DROP POLICY IF EXISTS "Allow public select counselors" ON public.counselors;
+DROP POLICY IF EXISTS "Allow public write counselors" ON public.counselors;
+
+CREATE POLICY "Allow public select counselors" ON public.counselors FOR SELECT USING (true);
+CREATE POLICY "Allow public write counselors" ON public.counselors FOR ALL USING (true) WITH CHECK (true);
+
+-- Update students table to reference counselor_id
+ALTER TABLE public.students ADD COLUMN IF NOT EXISTS counselor_id UUID REFERENCES public.counselors(id) ON DELETE SET NULL;
+
+-- Enable replication for counselors
+ALTER PUBLICATION supabase_realtime ADD TABLE public.counselors;

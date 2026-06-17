@@ -111,7 +111,7 @@ export default function AdminDashboard() {
   const [checkingAuth, setCheckingAuth] = React.useState(true);
   
   // Dashboard Tabs
-  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat">("bookings");
+  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat" | "counselors">("bookings");
 
   // Loaders & table existence flags
   const [loading, setLoading] = React.useState(false);
@@ -182,6 +182,7 @@ export default function AdminDashboard() {
     destination: "UK",
     intake: "",
     counselor: "Annex Counselor",
+    counselor_id: "",
     status: "Active",
     academic_details: "",
     preferred_course: "",
@@ -203,6 +204,85 @@ export default function AdminDashboard() {
 
   // Toast Notification State
   const [toastMessage, setToastMessage] = React.useState<string | null>(null);
+
+  // System Health States
+  const [healthStatus, setHealthStatus] = React.useState({
+    supabase: "checking", // "connected" | "failed" | "checking"
+    realtime: "checking", // "connected" | "failed" | "checking"
+    email: "checking",    // "connected" | "failed" | "checking"
+    emailProviderName: "", // "Resend", "Brevo", or "Mocked (Local Console)"
+    storage: "checking",   // "connected" | "failed" | "checking"
+  });
+
+  // Counselor Management States
+  const [counselors, setCounselors] = React.useState<any[]>([]);
+  const [isCounselorModalOpen, setIsCounselorModalOpen] = React.useState(false);
+  const [editingCounselor, setEditingCounselor] = React.useState<any | null>(null);
+  const [counselorForm, setCounselorForm] = React.useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    designation: "",
+    avatar_url: "",
+    is_active: true
+  });
+  const [savingCounselor, setSavingCounselor] = React.useState(false);
+  const [uploadingCounselorAvatar, setUploadingCounselorAvatar] = React.useState(false);
+
+  // Messaging Center filter states
+  const [chatCounselorFilter, setChatCounselorFilter] = React.useState("All");
+  const [chatActiveOnlyFilter, setChatActiveOnlyFilter] = React.useState(false);
+
+  const checkSystemHealth = React.useCallback(async () => {
+    // 1. Supabase Check
+    let supabaseStatus = "connected";
+    try {
+      const { error } = await supabase.from("students").select("id").limit(1);
+      if (error) throw error;
+    } catch (err) {
+      console.error("[Diagnostic] Health check: Supabase connection failed", err);
+      supabaseStatus = "failed";
+    }
+
+    // 2. Storage Check
+    let storageStatus = "connected";
+    try {
+      const { error } = await supabase.storage.from("student-files").list("", { limit: 1 });
+      if (error) throw error;
+    } catch (err) {
+      console.error("[Diagnostic] Health check: Supabase Storage list failed", err);
+      storageStatus = "failed";
+    }
+
+    // 3. Email Check via POST /api/send-chat-notification (action: "health")
+    let emailStatus = "connected";
+    let providerName = "Mocked (Local Console)";
+    try {
+      const res = await fetch("/api/send-chat-notification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "health" }),
+      });
+      if (!res.ok) throw new Error("HTTP error " + res.status);
+      const data = await res.json();
+      if (data.success) {
+        providerName = data.provider;
+      } else {
+        emailStatus = "failed";
+      }
+    } catch (err) {
+      console.error("[Diagnostic] Health check: Email API connection failed", err);
+      emailStatus = "failed";
+    }
+
+    setHealthStatus(prev => ({
+      ...prev,
+      supabase: supabaseStatus,
+      email: emailStatus,
+      emailProviderName: providerName,
+      storage: storageStatus,
+    }));
+  }, []);
 
   // University Tab states
   const [universities, setUniversities] = React.useState<University[]>([]);
@@ -358,7 +438,13 @@ export default function AdminDashboard() {
             name,
             email,
             counselor,
-            status
+            counselor_id,
+            status,
+            counselors (
+              full_name,
+              email,
+              designation
+            )
           )
         `)
         .order("last_activity_at", { ascending: false });
@@ -367,7 +453,20 @@ export default function AdminDashboard() {
 
       const { data: studs, error: studErr } = await supabase
         .from("students")
-        .select("id, name, email, counselor, status, created_at")
+        .select(`
+          id,
+          name,
+          email,
+          counselor,
+          counselor_id,
+          status,
+          created_at,
+          counselors (
+            full_name,
+            email,
+            designation
+          )
+        `)
         .eq("status", "Active");
 
       if (studErr) throw studErr;
@@ -531,7 +630,7 @@ export default function AdminDashboard() {
     try {
       const { data, error } = await supabase
         .from("students")
-        .select("*")
+        .select("*, counselors(*)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       setStudents(data || []);
@@ -553,6 +652,18 @@ export default function AdminDashboard() {
     } catch (err: any) {
       console.error("Error loading chat conversations in fetchAllData:", err.message);
     }
+
+    // 7. Fetch Counselors
+    try {
+      const { data, error } = await supabase
+        .from("counselors")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setCounselors(data || []);
+    } catch (err: any) {
+      console.error("Error loading counselors:", err.message);
+    }
     
     setLoading(false);
   }, [fetchConversations]);
@@ -563,10 +674,37 @@ export default function AdminDashboard() {
     }
   }, [isAuthenticated, fetchAllData]);
 
+  // System Health check and realtime diagnostics subscription
+  React.useEffect(() => {
+    if (!isAuthenticated) return;
+
+    checkSystemHealth();
+
+    console.log(`[Diagnostic] Initializing admin health check channel`);
+    const healthChannel = supabase
+      .channel("admin_health_check")
+      .on("system" as any, { event: "presence" }, () => {})
+      .subscribe((status, err) => {
+        console.log(`[Diagnostic] Realtime health check channel connection status change: ${status}`);
+        if (status === "SUBSCRIBED") {
+          setHealthStatus(prev => ({ ...prev, realtime: "connected" }));
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.error(`[Diagnostic] Realtime health check connection error:`, err);
+          setHealthStatus(prev => ({ ...prev, realtime: "failed" }));
+        }
+      });
+
+    return () => {
+      console.log(`[Diagnostic] Cleaning up admin health check channel`);
+      supabase.removeChannel(healthChannel);
+    };
+  }, [isAuthenticated, checkSystemHealth]);
+
   // Realtime subscription for Chat Center
   React.useEffect(() => {
     if (activeTab !== "chat" || !isAuthenticated) return;
 
+    console.log(`[Diagnostic] Subscribing to admin realtime channels`);
     // 1. Subscribe to student_messages realtime events
     const messagesChannel = supabase
       .channel("admin_chat_messages")
@@ -574,6 +712,7 @@ export default function AdminDashboard() {
         "postgres_changes",
         { event: "*", schema: "public", table: "student_messages" },
         async (payload) => {
+          console.log(`[Diagnostic] Admin received realtime message event: ${payload.eventType}`, payload);
           if (payload.eventType === "INSERT") {
             const newMsg = payload.new;
             const { data: atts } = await supabase
@@ -584,8 +723,16 @@ export default function AdminDashboard() {
 
             if (activeChatStudentId && newMsg.student_id === activeChatStudentId) {
               setChatCenterMessages(prev => {
-                if (prev.some(m => m.id === newMsg.id)) return prev;
-                return [...prev, newMsg];
+                // Filter out duplicate IDs or matching optimistic messages
+                const filtered = prev.filter(m => {
+                  if (m.is_optimistic && m.sender_type === newMsg.sender_type && m.message === newMsg.message) {
+                    console.log(`[Diagnostic] De-duplicating matched admin optimistic message`);
+                    return false;
+                  }
+                  if (m.id === newMsg.id) return false;
+                  return true;
+                });
+                return [...filtered, newMsg];
               });
               await markAdminMessagesAsRead(activeChatStudentId);
             }
@@ -609,7 +756,10 @@ export default function AdminDashboard() {
           }
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log(`[Diagnostic] Realtime messagesChannel status: ${status}`);
+        if (err) console.error(`[Diagnostic] Realtime messagesChannel error:`, err);
+      });
 
     // 2. Subscribe to student_conversations realtime events
     const conversationsChannel = supabase
@@ -621,9 +771,13 @@ export default function AdminDashboard() {
           fetchConversations();
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log(`[Diagnostic] Realtime conversationsChannel status: ${status}`);
+        if (err) console.error(`[Diagnostic] Realtime conversationsChannel error:`, err);
+      });
 
     return () => {
+      console.log(`[Diagnostic] Unsubscribing from admin realtime channels`);
       supabase.removeChannel(messagesChannel);
       supabase.removeChannel(conversationsChannel);
     };
@@ -981,6 +1135,7 @@ export default function AdminDashboard() {
             destination: studentForm.destination,
             intake: studentForm.intake,
             counselor: studentForm.counselor,
+            counselor_id: studentForm.counselor_id || null,
             status: studentForm.status,
             academic_details: studentForm.academic_details,
             preferred_course: studentForm.preferred_course,
@@ -1029,6 +1184,7 @@ export default function AdminDashboard() {
             destination: studentForm.destination,
             intake: studentForm.intake,
             counselor: studentForm.counselor,
+            counselor_id: studentForm.counselor_id || null,
             status: studentForm.status,
             academic_details: studentForm.academic_details,
             preferred_course: studentForm.preferred_course,
@@ -1125,12 +1281,146 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleSaveCounselor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!counselorForm.full_name || !counselorForm.email) {
+      alert("Name and Email are required.");
+      return;
+    }
+
+    setSavingCounselor(true);
+    try {
+      if (editingCounselor) {
+        // Update existing counselor
+        const { error } = await supabase
+          .from("counselors")
+          .update({
+            full_name: counselorForm.full_name,
+            email: counselorForm.email,
+            phone: counselorForm.phone || null,
+            designation: counselorForm.designation || null,
+            avatar_url: counselorForm.avatar_url || null,
+            is_active: counselorForm.is_active
+          })
+          .eq("id", editingCounselor.id);
+
+        if (error) throw error;
+        showToast("Counselor profile updated successfully");
+      } else {
+        // Create new counselor
+        const { error } = await supabase
+          .from("counselors")
+          .insert([{
+            full_name: counselorForm.full_name,
+            email: counselorForm.email,
+            phone: counselorForm.phone || null,
+            designation: counselorForm.designation || null,
+            avatar_url: counselorForm.avatar_url || null,
+            is_active: counselorForm.is_active
+          }]);
+
+        if (error) throw error;
+        showToast("Counselor created successfully!");
+      }
+      setIsCounselorModalOpen(false);
+      setEditingCounselor(null);
+      setCounselorForm({
+        full_name: "",
+        email: "",
+        phone: "",
+        designation: "",
+        avatar_url: "",
+        is_active: true
+      });
+      fetchAllData();
+    } catch (err: any) {
+      alert("Error saving counselor: " + err.message);
+    } finally {
+      setSavingCounselor(false);
+    }
+  };
+
+  const toggleCounselorStatus = async (counselor: any) => {
+    const newStatus = !counselor.is_active;
+    try {
+      const { error } = await supabase
+        .from("counselors")
+        .update({ is_active: newStatus })
+        .eq("id", counselor.id);
+      if (error) throw error;
+
+      showToast(`Counselor status marked as ${newStatus ? "Active" : "Inactive"}`);
+      fetchAllData();
+    } catch (err: any) {
+      alert("Error toggling counselor status: " + err.message);
+    }
+  };
+
+  const deleteCounselor = async (counselorId: string) => {
+    if (!confirm("Are you sure you want to delete this counselor? Students assigned to this counselor will be set to Unassigned.")) return;
+    try {
+      const { error } = await supabase.from("counselors").delete().eq("id", counselorId);
+      if (error) throw error;
+      showToast("Counselor deleted successfully");
+      fetchAllData();
+    } catch (err: any) {
+      alert("Error deleting counselor: " + err.message);
+    }
+  };
+
+  const handleCounselorAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingCounselorAvatar(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const randomName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      const filePath = `counselors/avatars/${randomName}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from("student-files")
+        .upload(filePath, file);
+      if (uploadErr) throw uploadErr;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("student-files")
+        .getPublicUrl(filePath);
+
+      setCounselorForm(prev => ({ ...prev, avatar_url: publicUrl }));
+      showToast("Avatar uploaded successfully");
+    } catch (err: any) {
+      alert("Error uploading avatar: " + err.message);
+    } finally {
+      setUploadingCounselorAvatar(false);
+    }
+  };
+
   const handleSendAdminChatReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!adminChatText.trim() && !adminChatFile || !activeChatStudentId) return;
 
     setSendingAdminChat(true);
     const originalText = adminChatText;
+    const tempId = `temp-${Date.now()}`;
+    const attachmentPlaceholderName = adminChatFile ? adminChatFile.name : null;
+
+    // Create optimistic message
+    const optimisticMsg = {
+      id: tempId,
+      student_id: activeChatStudentId,
+      sender_type: "counselor",
+      message: originalText || `Attachment: ${attachmentPlaceholderName}`,
+      attachment_url: null,
+      attachment_name: attachmentPlaceholderName,
+      status: "sending",
+      created_at: new Date().toISOString(),
+      is_optimistic: true
+    };
+
+    console.log(`[Diagnostic] Admin Chat Center optimistic message added:`, optimisticMsg);
+    setChatCenterMessages(prev => [...prev, optimisticMsg]);
+
     try {
       let attachmentUrl = null;
       let attachmentName = null;
@@ -1165,6 +1455,7 @@ export default function AdminDashboard() {
         .select()
         .single();
       if (error) throw error;
+      console.log(`[Diagnostic] Supabase database admin insert succeeded:`, newMsg);
 
       if (adminChatFile && attachmentUrl && newMsg) {
         await supabase
@@ -1181,7 +1472,8 @@ export default function AdminDashboard() {
       setAdminChatText("");
       setAdminChatFile(null);
       
-      await loadAdminChatMessages(activeChatStudentId);
+      // Update optimistic message with actual message returned from database
+      setChatCenterMessages(prev => prev.map(m => m.id === tempId ? { ...newMsg, message_attachments: [] } : m));
       await fetchConversations();
 
       fetch("/api/send-chat-notification", {
@@ -1198,6 +1490,9 @@ export default function AdminDashboard() {
       }).catch(err => console.error("Email notification error:", err));
 
     } catch (err: any) {
+      console.error(`[Diagnostic] Supabase database admin insert failed:`, err);
+      // Mark optimistic message as failed
+      setChatCenterMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: "failed" } : m));
       alert("Error sending reply: " + err.message);
     } finally {
       setSendingAdminChat(false);
@@ -1441,6 +1736,26 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!adminReplyText.trim() && !adminReplyFile || !selectedStudent) return;
     setSendingReply(true);
+    const originalText = adminReplyText;
+    const tempId = `temp-${Date.now()}`;
+    const attachmentPlaceholderName = adminReplyFile ? adminReplyFile.name : null;
+
+    // Create optimistic message
+    const optimisticMsg = {
+      id: tempId,
+      student_id: selectedStudent.id,
+      sender_type: "counselor",
+      message: originalText || `Attachment: ${attachmentPlaceholderName}`,
+      attachment_url: null,
+      attachment_name: attachmentPlaceholderName,
+      status: "sending",
+      created_at: new Date().toISOString(),
+      is_optimistic: true
+    };
+
+    console.log(`[Diagnostic] Admin Audit optimistic message added:`, optimisticMsg);
+    setAuditMessages(prev => [...prev, optimisticMsg]);
+
     try {
       let fileUrl = null;
       let fileName = null;
@@ -1462,28 +1777,52 @@ export default function AdminDashboard() {
         fileName = adminReplyFile.name;
       }
 
-      const { error } = await supabase
+      const { data: newMsg, error } = await supabase
         .from("student_messages")
         .insert([{
           student_id: selectedStudent.id,
           sender_type: "counselor",
-          message: adminReplyText || `Attachment: ${fileName}`,
+          message: originalText || `Attachment: ${fileName}`,
           attachment_url: fileUrl,
-          attachment_name: fileName
-        }]);
+          attachment_name: fileName,
+          status: "sent"
+        }])
+        .select()
+        .single();
       if (error) throw error;
+      console.log(`[Diagnostic] Supabase database admin audit insert succeeded:`, newMsg);
 
       await supabase.from("student_notifications").insert([{
         student_id: selectedStudent.id,
         title: "New Message from Counselor",
-        content: adminReplyText.substring(0, 80)
+        content: originalText.substring(0, 80)
       }]);
 
       setAdminReplyText("");
       setAdminReplyFile(null);
       showToast("Reply sent to student");
-      await loadAuditDetails(selectedStudent.id);
+
+      // Replace optimistic message in state
+      setAuditMessages(prev => prev.map(m => m.id === tempId ? { ...newMsg, message_attachments: [] } : m));
+
+      // Trigger server-side email notification
+      fetch("/api/send-chat-notification", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          senderType: "counselor",
+          studentId: selectedStudent.id,
+          messageContent: originalText || `Attachment: ${fileName}`,
+          counselorName: "Annex Counselor"
+        })
+      }).catch(err => console.error("Email notification error:", err));
+
     } catch (err: any) {
+      console.error(`[Diagnostic] Supabase database admin audit insert failed:`, err);
+      // Mark optimistic message as failed
+      setAuditMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: "failed" } : m));
       alert("Error sending reply: " + err.message);
     } finally {
       setSendingReply(false);
@@ -1754,7 +2093,8 @@ export default function AdminDashboard() {
             {[
               { id: "bookings", label: `Consultations (${bookings.length})` },
               { id: "students", label: `Students (${students.length})` },
-              { id: "chat", label: "Chat Center" },
+              { id: "counselors", label: `Counselors (${counselors.length})` },
+              { id: "chat", label: "Messaging" },
               { id: "universities", label: `Universities (${universities.length})` },
               { id: "blog", label: `Blog posts (${posts.length})` },
               { id: "stories", label: `Success stories (${stories.length})` }
@@ -1823,12 +2163,33 @@ export default function AdminDashboard() {
               ))}
             </div>
 
+            {/* Student Portal & Counselor Overview grid */}
+            <div className="flex flex-col gap-2 mt-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Student Portal & Counselor Metrics</span>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { label: "Total Students", value: students.length, icon: <Users size={18} className="text-primary" weight="bold" />, bg: "bg-slate-50 border-slate-100" },
+                  { label: "Total Counselors", value: counselors.length, icon: <User size={18} className="text-blue-600" weight="bold" />, bg: "bg-blue-50/20 border-blue-100/60" },
+                  { label: "Active Conversations", value: conversations.filter(c => c.last_message !== "No messages yet").length, icon: <ChatCircleDots size={18} className="text-emerald-600" weight="bold" />, bg: "bg-emerald-50/20 border-emerald-100/60" },
+                  { label: "Unread Messages", value: conversations.reduce((sum, c) => sum + (c.unread_count_admin || 0), 0), icon: <Clock size={18} className="text-red-600" weight="bold" />, bg: "bg-red-50/20 border-red-100/60" }
+                ].map((stat, idx) => (
+                  <div key={idx} className={`border rounded-2xl p-4 flex flex-col justify-between min-h-[90px] ${stat.bg}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500">{stat.label}</span>
+                      {stat.icon}
+                    </div>
+                    <span className="text-2xl font-bold font-mono-data text-primary mt-2">{stat.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Sub-panels (Quick Actions / Analytics Insights) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               
               {/* Quick Actions Column */}
               <div className="lg:col-span-5 flex flex-col gap-4">
-                <Card className="h-full">
+                <Card>
                   <CardTitle className="text-sm uppercase tracking-wider text-slate-400 mb-4">Quick Access Links</CardTitle>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <a 
@@ -1860,6 +2221,97 @@ export default function AdminDashboard() {
                       <Globe size={20} className="text-primary group-hover:scale-105 transition-transform" />
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Supabase DB</span>
                     </a>
+                  </div>
+                </Card>
+
+                <Card>
+                  <div className="flex items-center justify-between mb-4">
+                    <CardTitle className="text-sm uppercase tracking-wider text-slate-400 m-0">System Health Diagnostics</CardTitle>
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      onClick={checkSystemHealth} 
+                      className="h-7 px-2.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shrink-0"
+                    >
+                      <SpinnerGap className={healthStatus.supabase === "checking" ? "animate-spin" : ""} size={12} />
+                      Re-Check
+                    </Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Supabase connection indicator */}
+                    <div className="p-3 border border-hairline/80 rounded-xl bg-slate-50 flex items-center justify-between gap-2.5 hover:shadow-sm transition-all">
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Supabase DB</span>
+                        <span className="text-[9px] text-slate-400 truncate">Database API Connection</span>
+                      </div>
+                      <div className="shrink-0 flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${
+                          healthStatus.supabase === "connected" ? "bg-emerald-500 animate-pulse" : 
+                          healthStatus.supabase === "failed" ? "bg-red-500 animate-pulse" : "bg-yellow-500 animate-bounce"
+                        }`} />
+                        <span className="text-[10px] font-semibold text-slate-600">
+                          {healthStatus.supabase === "connected" ? "OK" : 
+                           healthStatus.supabase === "failed" ? "Failed" : "Checking"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Realtime connection indicator */}
+                    <div className="p-3 border border-hairline/80 rounded-xl bg-slate-50 flex items-center justify-between gap-2.5 hover:shadow-sm transition-all">
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Realtime</span>
+                        <span className="text-[9px] text-slate-400 truncate">Websocket Channels</span>
+                      </div>
+                      <div className="shrink-0 flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${
+                          healthStatus.realtime === "connected" ? "bg-emerald-500 animate-pulse" : 
+                          healthStatus.realtime === "failed" ? "bg-red-500 animate-pulse" : "bg-yellow-500 animate-bounce"
+                        }`} />
+                        <span className="text-[10px] font-semibold text-slate-600">
+                          {healthStatus.realtime === "connected" ? "OK" : 
+                           healthStatus.realtime === "failed" ? "Failed" : "Checking"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Email connection indicator */}
+                    <div className="p-3 border border-hairline/80 rounded-xl bg-slate-50 flex items-center justify-between gap-2.5 col-span-2 hover:shadow-sm transition-all">
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Email Service</span>
+                        <span className="text-[9px] text-slate-400 truncate">
+                          {healthStatus.emailProviderName ? `Provider: ${healthStatus.emailProviderName}` : "Checking API config..."}
+                        </span>
+                      </div>
+                      <div className="shrink-0 flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${
+                          healthStatus.email === "connected" ? "bg-emerald-500 animate-pulse" : 
+                          healthStatus.email === "failed" ? "bg-red-500 animate-pulse" : "bg-yellow-500 animate-bounce"
+                        }`} />
+                        <span className="text-[10px] font-semibold text-slate-600">
+                          {healthStatus.email === "connected" ? "Active" : 
+                           healthStatus.email === "failed" ? "Failed" : "Checking"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Storage connection indicator */}
+                    <div className="p-3 border border-hairline/80 rounded-xl bg-slate-50 flex items-center justify-between gap-2.5 col-span-2 hover:shadow-sm transition-all">
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Storage Buckets</span>
+                        <span className="text-[9px] text-slate-400 truncate">student-files bucket list</span>
+                      </div>
+                      <div className="shrink-0 flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${
+                          healthStatus.storage === "connected" ? "bg-emerald-500 animate-pulse" : 
+                          healthStatus.storage === "failed" ? "bg-red-500 animate-pulse" : "bg-yellow-500 animate-bounce"
+                        }`} />
+                        <span className="text-[10px] font-semibold text-slate-600">
+                          {healthStatus.storage === "connected" ? "OK" : 
+                           healthStatus.storage === "failed" ? "Failed" : "Checking"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </Card>
               </div>
@@ -2740,6 +3192,7 @@ export default function AdminDashboard() {
                     destination: "UK",
                     intake: "",
                     counselor: "Annex Counselor",
+                    counselor_id: "",
                     status: "Active",
                     academic_details: "",
                     preferred_course: "",
@@ -2877,7 +3330,7 @@ export default function AdminDashboard() {
                             </span>
                           </td>
                           <td className="p-4 text-slate-600 font-medium">
-                            {student.counselor || "Annex Counselor"}
+                            {student.counselors?.full_name || student.counselor || "Annex Counselor"}
                           </td>
                           <td className="p-4 font-mono-data text-slate-400">
                             {student.last_activity ? new Date(student.last_activity).toLocaleDateString() : "N/A"}
@@ -2901,6 +3354,7 @@ export default function AdminDashboard() {
                                   destination: student.destination || "UK",
                                   intake: student.intake || "",
                                   counselor: student.counselor || "Annex Counselor",
+                                  counselor_id: student.counselor_id || "",
                                   status: student.status || "Active",
                                   academic_details: student.academic_details || "",
                                   preferred_course: student.preferred_course || "",
@@ -3038,6 +3492,179 @@ export default function AdminDashboard() {
           </section>
         )}
 
+        {activeTab === "counselors" && (
+          <section className="flex flex-col gap-6 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-display font-bold text-2xl text-primary">Counselor Directory</h2>
+                <p className="text-xs text-slate-400 mt-1">Manage admissions counselors, view workload distributions, and update staff active status.</p>
+              </div>
+              <Button 
+                onClick={() => {
+                  setEditingCounselor(null);
+                  setCounselorForm({
+                    full_name: "",
+                    email: "",
+                    phone: "",
+                    designation: "",
+                    avatar_url: "",
+                    is_active: true
+                  });
+                  setIsCounselorModalOpen(true);
+                }} 
+                variant="primary" 
+                size="sm" 
+                className="flex items-center gap-1"
+              >
+                <Plus size={14} /> Add Counselor
+              </Button>
+            </div>
+
+            {/* Counselors List metrics cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { label: "Total Counselors", value: counselors.length, icon: <User size={18} className="text-primary" weight="bold" />, bg: "bg-slate-50 border-slate-100" },
+                { label: "Active Counselors", value: counselors.filter(c => c.is_active).length, icon: <CheckCircle size={18} className="text-emerald-600" weight="bold" />, bg: "bg-emerald-50/20 border-emerald-100/60" },
+                { label: "Inactive Staff", value: counselors.filter(c => !c.is_active).length, icon: <XCircle size={18} className="text-red-600" weight="bold" />, bg: "bg-red-50/20 border-red-100/60" },
+                { label: "Assigned Students", value: students.filter(s => s.counselor_id).length, icon: <GraduationCap size={18} className="text-purple-600" weight="bold" />, bg: "bg-purple-50/20 border-purple-100/60" }
+              ].map((stat, idx) => (
+                <div key={idx} className={`border rounded-2xl p-4 flex flex-col justify-between min-h-[90px] ${stat.bg}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500">{stat.label}</span>
+                    {stat.icon}
+                  </div>
+                  <span className="text-2xl font-bold font-mono-data text-primary mt-2">{stat.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Directory Table */}
+            {loading ? (
+              <div className="text-center py-12 text-slate-400 text-xs font-semibold">Loading counselors...</div>
+            ) : counselors.length === 0 ? (
+              <div className="text-center py-12 border border-dashed border-hairline rounded-2xl text-slate-400 text-xs font-semibold">
+                No counselors created yet. Click "Add Counselor" to register staff.
+              </div>
+            ) : (
+              <div className="border border-hairline rounded-2xl overflow-x-auto bg-white font-sans text-slate-700">
+                <table className="w-full text-left border-collapse text-xs min-w-[800px]">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-hairline text-slate-500 font-bold uppercase tracking-wider">
+                      <th className="p-4">Name</th>
+                      <th className="p-4">Designation</th>
+                      <th className="p-4">Phone</th>
+                      <th className="p-4">Assigned Students</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4">Last Activity</th>
+                      <th className="p-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-hairline">
+                    {counselors.map(c => {
+                      const studentCount = students.filter(s => s.counselor_id === c.id).length;
+                      
+                      // Calculate computed Last Activity
+                      // Find student IDs assigned to this counselor
+                      const assignedStudentIds = students.filter(s => s.counselor_id === c.id).map(s => s.id);
+                      // Find conversations of these students
+                      const counselorConversations = conversations.filter(conv => assignedStudentIds.includes(conv.student_id));
+                      // Get the max last_activity_at or fall back to counselor created_at
+                      const activities = counselorConversations
+                        .map(conv => conv.last_activity_at ? new Date(conv.last_activity_at).getTime() : 0)
+                        .filter(time => time > 0);
+                      
+                      const maxActivityTime = activities.length > 0 ? Math.max(...activities) : 0;
+                      const lastActivityFormatted = maxActivityTime > 0 
+                        ? new Date(maxActivityTime).toLocaleDateString()
+                        : "No recent activity";
+
+                      return (
+                        <tr key={c.id} className="hover:bg-subtle-gray/30">
+                          <td className="p-4 font-semibold text-primary">
+                            <div className="flex items-center gap-3">
+                              {c.avatar_url ? (
+                                <img 
+                                  src={c.avatar_url} 
+                                  alt={c.full_name} 
+                                  className="w-8 h-8 rounded-full object-cover border border-hairline shadow-sm"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 border border-slate-200 flex items-center justify-center font-bold">
+                                  {c.full_name.charAt(0)}
+                                </div>
+                              )}
+                              <div>
+                                <span className="text-xs font-bold text-primary block">{c.full_name}</span>
+                                <span className="text-[10px] text-slate-400 font-normal font-mono-data">{c.email}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4 text-slate-600 font-medium">{c.designation || "Counselor"}</td>
+                          <td className="p-4 font-mono-data text-slate-500">{c.phone || "N/A"}</td>
+                          <td className="p-4 font-bold text-primary">{studentCount} students</td>
+                          <td className="p-4">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                              c.is_active
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                : "bg-red-50 text-red-600 border-red-100"
+                            }`}>
+                              {c.is_active ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                          <td className="p-4 font-mono-data text-slate-400">{lastActivityFormatted}</td>
+                          <td className="p-4 text-right flex justify-end gap-1.5 items-center h-full">
+                            <button
+                              onClick={() => {
+                                setEditingCounselor(c);
+                                setCounselorForm({
+                                  full_name: c.full_name,
+                                  email: c.email,
+                                  phone: c.phone || "",
+                                  designation: c.designation || "",
+                                  avatar_url: c.avatar_url || "",
+                                  is_active: c.is_active
+                                });
+                                setIsCounselorModalOpen(true);
+                              }}
+                              className="p-1.5 text-slate-500 hover:text-primary hover:bg-slate-50 rounded transition-colors cursor-pointer"
+                              title="Edit profile"
+                            >
+                              <Gear size={16} />
+                            </button>
+                            <button
+                              onClick={() => toggleCounselorStatus(c)}
+                              className={`p-1.5 rounded transition-colors cursor-pointer ${
+                                c.is_active ? "text-red-500 hover:bg-red-50" : "text-emerald-500 hover:bg-emerald-50"
+                              }`}
+                            >
+                              {c.is_active ? (
+                                <span title="Disable counselor">
+                                  <XCircle size={16} />
+                                </span>
+                              ) : (
+                                <span title="Activate counselor">
+                                  <CheckCircle size={16} />
+                                </span>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => deleteCounselor(c.id)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                              title="Delete Counselor"
+                            >
+                              <Trash size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
+
         {activeTab === "chat" && (
           <section className="flex flex-col gap-6 animate-fade-in">
             <div>
@@ -3048,7 +3675,7 @@ export default function AdminDashboard() {
             <div className="flex bg-white border border-hairline rounded-3xl h-[650px] overflow-hidden">
               {/* Left Panel: Conversations List */}
               <div className="w-full md:w-80 border-r border-hairline flex flex-col shrink-0 bg-slate-50/20">
-                <div className="p-4 border-b border-hairline bg-slate-50/50">
+                <div className="p-4 border-b border-hairline bg-slate-50/50 flex flex-col gap-2">
                   <div className="flex items-center gap-2.5 px-3 py-2 border border-hairline rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20">
                     <MagnifyingGlass size={16} className="text-slate-400" />
                     <input 
@@ -3064,17 +3691,62 @@ export default function AdminDashboard() {
                       </button>
                     )}
                   </div>
+                  
+                  {/* Counselor & Active Filters */}
+                  <div className="flex gap-2">
+                    <select
+                      value={chatCounselorFilter}
+                      onChange={(e) => setChatCounselorFilter(e.target.value)}
+                      className="flex-grow px-2.5 py-1.5 border border-hairline bg-white rounded-xl text-[10px] font-semibold text-slate-600 focus:outline-none cursor-pointer min-w-0"
+                    >
+                      <option value="All">All Counselors</option>
+                      <option value="Unassigned">Unassigned</option>
+                      {counselors.map(c => (
+                        <option key={c.id} value={c.id}>{c.full_name}</option>
+                      ))}
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={() => setChatActiveOnlyFilter(!chatActiveOnlyFilter)}
+                      className={`px-3 py-1.5 border rounded-xl text-[10px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                        chatActiveOnlyFilter 
+                          ? "bg-primary border-primary text-white" 
+                          : "bg-white border-hairline text-slate-500 hover:text-primary hover:bg-slate-50"
+                      }`}
+                    >
+                      Active Only
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex-grow overflow-y-auto divide-y divide-hairline/60">
                   {conversations
                     .filter(c => {
                       if (!c.student) return false;
+                      
+                      // 1. Search query filter
                       const searchLower = chatCenterSearch.toLowerCase();
                       const nameMatch = c.student.name.toLowerCase().includes(searchLower);
                       const emailMatch = c.student.email.toLowerCase().includes(searchLower);
                       const msgMatch = c.last_message && c.last_message.toLowerCase().includes(searchLower);
-                      return nameMatch || emailMatch || msgMatch;
+                      if (chatCenterSearch && !nameMatch && !emailMatch && !msgMatch) return false;
+
+                      // 2. Counselor filter
+                      if (chatCounselorFilter !== "All") {
+                        if (chatCounselorFilter === "Unassigned") {
+                          if (c.student.counselor_id) return false;
+                        } else {
+                          if (c.student.counselor_id !== chatCounselorFilter) return false;
+                        }
+                      }
+
+                      // 3. Active only filter
+                      if (chatActiveOnlyFilter && c.last_message === "No messages yet") {
+                        return false;
+                      }
+
+                      return true;
                     })
                     .map(c => {
                       const isSelected = activeChatStudentId === c.student_id;
@@ -3082,6 +3754,8 @@ export default function AdminDashboard() {
                         ? new Date(c.last_activity_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                         : "";
                       
+                      const assignedCounselorName = c.student.counselors?.full_name || c.student.counselor || "Unassigned";
+
                       return (
                         <button 
                           key={c.student_id}
@@ -3100,7 +3774,13 @@ export default function AdminDashboard() {
                               <h4 className="text-xs font-bold truncate pr-2">{c.student.name}</h4>
                               <span className="text-[9px] text-slate-400 font-mono-data">{relativeTime}</span>
                             </div>
-                            <p className="text-[10px] text-slate-400 truncate mb-1">{c.student.email}</p>
+                            <p className="text-[10px] text-slate-400 truncate mb-0.5">{c.student.email}</p>
+                            
+                            {/* Assigned Counselor display */}
+                            <p className="text-[9px] text-primary/70 font-semibold mb-1 truncate">
+                              Counselor: {assignedCounselorName}
+                            </p>
+                            
                             <p className="text-[11px] text-slate-500 truncate leading-tight">{c.last_message}</p>
                           </div>
                           {c.unread_count_admin > 0 && (
@@ -3114,11 +3794,26 @@ export default function AdminDashboard() {
 
                   {conversations.filter(c => {
                     if (!c.student) return false;
+                    
                     const searchLower = chatCenterSearch.toLowerCase();
                     const nameMatch = c.student.name.toLowerCase().includes(searchLower);
                     const emailMatch = c.student.email.toLowerCase().includes(searchLower);
                     const msgMatch = c.last_message && c.last_message.toLowerCase().includes(searchLower);
-                    return nameMatch || emailMatch || msgMatch;
+                    if (chatCenterSearch && !nameMatch && !emailMatch && !msgMatch) return false;
+
+                    if (chatCounselorFilter !== "All") {
+                      if (chatCounselorFilter === "Unassigned") {
+                        if (c.student.counselor_id) return false;
+                      } else {
+                        if (c.student.counselor_id !== chatCounselorFilter) return false;
+                      }
+                    }
+
+                    if (chatActiveOnlyFilter && c.last_message === "No messages yet") {
+                      return false;
+                    }
+
+                    return true;
                   }).length === 0 && (
                     <div className="p-8 text-center text-slate-400 text-xs font-medium">No matching conversations.</div>
                   )}
@@ -3253,6 +3948,12 @@ export default function AdminDashboard() {
                                       <span className="flex items-center">
                                         {msg.status === "read" ? (
                                           <Checks size={14} className="text-emerald-400" weight="bold" />
+                                        ) : msg.status === "sending" ? (
+                                          <SpinnerGap size={14} className="text-slate-400 animate-spin" />
+                                        ) : msg.status === "failed" ? (
+                                          <span title="Failed to send">
+                                            <XCircle size={14} className="text-red-500" />
+                                          </span>
                                         ) : (
                                           <Check size={14} className="text-slate-400" />
                                         )}
@@ -3899,13 +4600,25 @@ export default function AdminDashboard() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="font-bold text-primary uppercase tracking-wider">Counselor Assigned</label>
-                  <input 
-                    type="text" 
-                    value={studentForm.counselor} 
-                    onChange={(e) => setStudentForm({ ...studentForm, counselor: e.target.value })} 
-                    className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
-                  />
+                  <label className="font-bold text-primary uppercase tracking-wider">Assigned Counselor *</label>
+                  <select 
+                    value={studentForm.counselor_id || ""} 
+                    onChange={(e) => {
+                      const idVal = e.target.value;
+                      const selected = counselors.find(c => c.id === idVal);
+                      setStudentForm({ 
+                        ...studentForm, 
+                        counselor_id: idVal,
+                        counselor: selected ? selected.full_name : "Annex Counselor"
+                      });
+                    }} 
+                    className="px-3.5 py-2 border border-hairline bg-white rounded-xl text-xs text-slate-800 focus:outline-none cursor-pointer"
+                  >
+                    <option value="">Select Counselor</option>
+                    {counselors.filter(c => c.is_active).map(c => (
+                      <option key={c.id} value={c.id}>{c.full_name} ({c.designation})</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="font-bold text-primary uppercase tracking-wider">Journey Stage *</label>
@@ -3969,6 +4682,135 @@ export default function AdminDashboard() {
                   {savingStudent ? "Saving..." : "Save Student"}
                 </Button>
                 <Button type="button" onClick={() => setIsStudentModalOpen(false)} variant="ghost" size="sm">Cancel</Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* 5b. ADD/EDIT COUNSELOR MODAL */}
+      {isCounselorModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+          <Card className="max-w-md w-full p-6 relative bg-white shadow-2xl">
+            <button onClick={() => setIsCounselorModalOpen(false)} className="absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer">
+              <X size={20} />
+            </button>
+            <div className="flex items-center gap-2 mb-6 border-b border-hairline pb-4 text-slate-700">
+              <User size={22} className="text-primary" />
+              <div>
+                <CardTitle className="text-lg">{editingCounselor ? "Edit Counselor Profile" : "Add New Counselor"}</CardTitle>
+                <CardDescription className="text-xs">Setup details and profile settings for Annex Consultancy counselors.</CardDescription>
+              </div>
+            </div>
+            <form onSubmit={handleSaveCounselor} className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-1 text-xs text-slate-700">
+              
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Full Name *</label>
+                <input 
+                  type="text" 
+                  value={counselorForm.full_name} 
+                  onChange={(e) => setCounselorForm({ ...counselorForm, full_name: e.target.value })} 
+                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Email Address *</label>
+                <input 
+                  type="email" 
+                  value={counselorForm.email} 
+                  onChange={(e) => setCounselorForm({ ...counselorForm, email: e.target.value })} 
+                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Phone Number</label>
+                <input 
+                  type="text" 
+                  value={counselorForm.phone} 
+                  onChange={(e) => setCounselorForm({ ...counselorForm, phone: e.target.value })} 
+                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Designation</label>
+                <input 
+                  type="text" 
+                  value={counselorForm.designation} 
+                  onChange={(e) => setCounselorForm({ ...counselorForm, designation: e.target.value })} 
+                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                  placeholder="e.g. Senior Admission Counselor"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Profile Photo (Avatar)</label>
+                <div className="flex items-center gap-3">
+                  {counselorForm.avatar_url ? (
+                    <img 
+                      src={counselorForm.avatar_url} 
+                      alt="Avatar Preview" 
+                      className="w-10 h-10 rounded-full object-cover border border-hairline"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-400">
+                      ?
+                    </div>
+                  )}
+                  <div className="flex-grow">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleCounselorAvatarUpload} 
+                      disabled={uploadingCounselorAvatar}
+                      className="hidden" 
+                      id="counselorAvatarFileInput"
+                    />
+                    <label 
+                      htmlFor="counselorAvatarFileInput"
+                      className="px-3 py-2 border border-hairline rounded-xl hover:bg-slate-50 cursor-pointer flex items-center justify-center gap-1.5 font-bold uppercase tracking-wider text-[10px]"
+                    >
+                      {uploadingCounselorAvatar ? (
+                        <>
+                          <SpinnerGap className="animate-spin text-slate-400" size={14} />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <UploadSimple size={14} />
+                          Upload Image
+                        </>
+                      )}
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 mt-2">
+                <input 
+                  type="checkbox" 
+                  id="counselorActive" 
+                  checked={counselorForm.is_active} 
+                  onChange={(e) => setCounselorForm({ ...counselorForm, is_active: e.target.checked })} 
+                  className="w-4 h-4 text-primary cursor-pointer border-hairline rounded"
+                />
+                <label htmlFor="counselorActive" className="text-xs font-bold text-primary uppercase tracking-wider cursor-pointer">Active Counselor</label>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-hairline pt-4 mt-2">
+                <Button type="submit" variant="primary" size="sm" disabled={savingCounselor}>
+                  {savingCounselor ? (
+                    <>
+                      <SpinnerGap className="animate-spin" size={14} />
+                      Saving...
+                    </>
+                  ) : "Save Record"}
+                </Button>
+                <Button type="button" onClick={() => setIsCounselorModalOpen(false)} variant="ghost" size="sm">Cancel</Button>
               </div>
             </form>
           </Card>
@@ -4402,9 +5244,26 @@ export default function AdminDashboard() {
                                 </a>
                               )}
                             </div>
-                            <span className="text-[8px] text-slate-400 mt-0.5">
-                              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <span className="text-[8px] text-slate-400">
+                                {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              {!isStudent && (
+                                <span className="flex items-center">
+                                  {msg.status === "read" ? (
+                                    <Checks size={10} className="text-emerald-400" weight="bold" />
+                                  ) : msg.status === "sending" ? (
+                                    <SpinnerGap size={10} className="text-slate-400 animate-spin" />
+                                  ) : msg.status === "failed" ? (
+                                    <span title="Failed to send">
+                                      <XCircle size={10} className="text-red-500" />
+                                    </span>
+                                  ) : (
+                                    <Check size={10} className="text-slate-400" />
+                                  )}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         );
                       })

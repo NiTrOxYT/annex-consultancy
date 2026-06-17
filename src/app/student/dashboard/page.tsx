@@ -182,6 +182,7 @@ export default function StudentDashboard() {
   React.useEffect(() => {
     if (!studentId) return;
 
+    console.log(`[Diagnostic] Subscribing to realtime channel student_chat_messages:${studentId}`);
     const channel = supabase
       .channel(`student_chat_messages:${studentId}`)
       .on(
@@ -193,6 +194,7 @@ export default function StudentDashboard() {
           filter: `student_id=eq.${studentId}`,
         },
         async (payload) => {
+          console.log(`[Diagnostic] Real-time message event: ${payload.eventType}`, payload);
           if (payload.eventType === "INSERT") {
             const newMsg = payload.new;
             // Fetch attachments if any exist
@@ -203,8 +205,16 @@ export default function StudentDashboard() {
             newMsg.message_attachments = atts || [];
 
             setMessages(prev => {
-              if (prev.some(m => m.id === newMsg.id)) return prev;
-              return [...prev, newMsg];
+              // Filter out duplicate IDs or matching optimistic messages
+              const filtered = prev.filter(m => {
+                if (m.is_optimistic && m.sender_type === newMsg.sender_type && m.message === newMsg.message) {
+                  console.log(`[Diagnostic] De-duplicating matched optimistic message`);
+                  return false;
+                }
+                if (m.id === newMsg.id) return false;
+                return true;
+              });
+              return [...filtered, newMsg];
             });
 
             // If active tab is chat and it's a counselor message, mark as read
@@ -226,9 +236,15 @@ export default function StudentDashboard() {
           }
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log(`[Diagnostic] Realtime Channel connection status change: ${status}`);
+        if (err) {
+          console.error(`[Diagnostic] Realtime Channel connection error:`, err);
+        }
+      });
 
     return () => {
+      console.log(`[Diagnostic] Cleaning up/unsubscribing channel for studentId: ${studentId}`);
       supabase.removeChannel(channel);
     };
   }, [studentId, activeTab, markMessagesAsRead]);
@@ -243,10 +259,10 @@ export default function StudentDashboard() {
   // Load everything for the specific student ID
   const loadStudentData = async (id: string) => {
     try {
-      // 1. Fetch Student Info
+      // 1. Fetch Student Info (including assigned counselor profile details)
       const { data: student, error: studentErr } = await supabase
         .from("students")
-        .select("*")
+        .select("*, counselors(*)")
         .eq("id", id)
         .single();
       
@@ -434,6 +450,25 @@ export default function StudentDashboard() {
 
     setSendingMessage(true);
     const originalMsgText = chatMessage;
+    const tempId = `temp-${Date.now()}`;
+    const attachmentPlaceholderName = chatFile ? chatFile.name : null;
+
+    // Create optimistic message
+    const optimisticMsg = {
+      id: tempId,
+      student_id: studentId,
+      sender_type: "student",
+      message: originalMsgText || `Uploaded attachment: ${attachmentPlaceholderName}`,
+      attachment_url: null,
+      attachment_name: attachmentPlaceholderName,
+      status: "sending",
+      created_at: new Date().toISOString(),
+      is_optimistic: true
+    };
+
+    console.log(`[Diagnostic] Optimistic message added:`, optimisticMsg);
+    setMessages(prev => [...prev, optimisticMsg]);
+
     try {
       let attachmentUrl = null;
       let attachmentName = null;
@@ -473,6 +508,7 @@ export default function StudentDashboard() {
         .single();
       
       if (msgErr) throw msgErr;
+      console.log(`[Diagnostic] Supabase database insert succeeded:`, insertedMsg);
 
       // Insert message attachments mapping if exists
       if (chatFile && attachmentUrl && insertedMsg) {
@@ -490,8 +526,8 @@ export default function StudentDashboard() {
       setChatMessage("");
       setChatFile(null);
       
-      // Reload Chat messages
-      await loadChatMessages(studentId!);
+      // Update the optimistic message with the database inserted message, resolving status
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...insertedMsg, message_attachments: [] } : m));
 
       // Trigger server-side email notification
       fetch("/api/send-chat-notification", {
@@ -514,6 +550,9 @@ export default function StudentDashboard() {
       });
       
     } catch (err: any) {
+      console.error(`[Diagnostic] Supabase database insert failed:`, err);
+      // Mark optimistic message as failed
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: "failed" } : m));
       alert("Error sending message: " + err.message);
     } finally {
       setSendingMessage(false);
@@ -777,33 +816,74 @@ export default function StudentDashboard() {
                   />
                 </div>
 
-                {/* Grid listing all steps with visual highlight */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-3.5">
-                  {STAGES.map((stage, idx) => {
-                    const isDone = idx < currentStageIndex;
-                    const isCurrent = idx === currentStageIndex;
-                    const isUpcoming = idx > currentStageIndex;
-                    
-                    return (
-                      <div 
-                        key={stage} 
-                        className={`p-4 rounded-2xl border flex flex-col justify-between min-h-[95px] h-auto gap-2 transition-all ${
-                          isDone 
-                            ? "bg-emerald-50/20 border-emerald-100 text-emerald-800 shadow-[0_2px_8px_rgba(16,185,129,0.02)]" 
-                            : isCurrent 
-                            ? "bg-primary text-white border-primary shadow-md scale-102 font-medium" 
-                            : "bg-white border-hairline/80 text-slate-400"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">Stage {idx + 1}</span>
-                          {isDone && <CheckCircle size={15} className="text-emerald-500 shrink-0" weight="fill" />}
-                          {isCurrent && <Clock size={15} className="text-white shrink-0 animate-pulse" weight="fill" />}
+                {/* Visual Timeline Stepper */}
+                <div className="block md:hidden">
+                  {/* Vertical Stepper for Mobile */}
+                  <div className="relative pl-6 border-l border-slate-200 space-y-4 py-2 ml-3">
+                    {STAGES.map((stage, idx) => {
+                      const isDone = idx < currentStageIndex;
+                      const isCurrent = idx === currentStageIndex;
+                      const isUpcoming = idx > currentStageIndex;
+                      
+                      return (
+                        <div key={stage} className="relative flex items-start gap-4">
+                          {/* Stepper Dot */}
+                          <div className={`absolute -left-[30px] w-4 h-4 rounded-full border border-slate-350 bg-white flex items-center justify-center transition-all ${
+                            isDone 
+                              ? "bg-emerald-500 border-emerald-500 text-white" 
+                              : isCurrent 
+                              ? "bg-primary border-primary text-white scale-110 shadow-sm" 
+                              : "text-slate-400"
+                          }`}>
+                            {isDone && <Check size={8} weight="bold" className="text-white" />}
+                            {isCurrent && <Clock size={8} weight="bold" className="text-white animate-pulse" />}
+                          </div>
+                          
+                          <div className={`flex-grow p-4 rounded-2xl border transition-all ${
+                            isDone 
+                              ? "bg-emerald-50/20 border-emerald-100/60 text-emerald-800" 
+                              : isCurrent 
+                              ? "bg-primary text-white border-primary shadow-sm" 
+                              : "bg-white border-hairline/80 text-slate-500"
+                          }`}>
+                            <span className="text-[9px] uppercase font-bold tracking-wider opacity-70 block mb-1">Stage {idx + 1}</span>
+                            <span className="text-xs font-bold leading-tight break-words">{stage}</span>
+                          </div>
                         </div>
-                        <span className="text-xs font-bold leading-tight break-words pr-1">{stage}</span>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="hidden md:block">
+                  {/* Horizontal Scrollable Stepper for Desktop */}
+                  <div className="flex items-stretch gap-4 overflow-x-auto pb-4 pt-1 snap-x scrollbar-thin">
+                    {STAGES.map((stage, idx) => {
+                      const isDone = idx < currentStageIndex;
+                      const isCurrent = idx === currentStageIndex;
+                      const isUpcoming = idx > currentStageIndex;
+                      
+                      return (
+                        <div 
+                          key={stage} 
+                          className={`snap-align-start flex-grow shrink-0 w-[170px] p-4 rounded-2xl border flex flex-col justify-between min-h-[105px] gap-2 transition-all ${
+                            isDone 
+                              ? "bg-emerald-50/20 border-emerald-100 text-emerald-800 shadow-[0_2px_8px_rgba(16,185,129,0.02)]" 
+                              : isCurrent 
+                              ? "bg-primary text-white border-primary shadow-md scale-102 font-medium" 
+                              : "bg-white border-hairline/85 text-slate-400"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-bold uppercase tracking-wider opacity-70">Stage {idx + 1}</span>
+                            {isDone && <CheckCircle size={15} className="text-emerald-500 shrink-0" weight="fill" />}
+                            {isCurrent && <Clock size={15} className="text-white shrink-0 animate-pulse" weight="fill" />}
+                          </div>
+                          <span className="text-xs font-bold leading-tight break-words pr-1 mt-2">{stage}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1317,15 +1397,34 @@ export default function StudentDashboard() {
               {/* Header inside chat box */}
               <div className="p-4 border-b border-hairline bg-slate-50 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center font-bold">
-                    C
-                  </div>
+                  {studentData?.counselors?.avatar_url ? (
+                    <img 
+                      src={studentData.counselors.avatar_url} 
+                      alt={studentData.counselors.full_name} 
+                      className="w-10 h-10 rounded-full object-cover border border-hairline/80 shadow-sm shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center font-bold shrink-0">
+                      {studentData?.counselors?.full_name?.charAt(0) || "C"}
+                    </div>
+                  )}
                   <div>
-                    <h3 className="text-sm font-bold text-primary">Annex Counseling Hub</h3>
-                    <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1.5 mt-0.5">
-                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
-                      Counselor Assigned
-                    </p>
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400">Your Counselor</span>
+                    <h3 className="text-sm font-bold text-primary -mt-0.5">
+                      {studentData?.counselors?.full_name || studentData?.counselor || "Annex Counselor"}
+                    </h3>
+                    {studentData?.counselors ? (
+                      <p className="text-[10px] text-slate-500 font-semibold flex items-center gap-1.5 flex-wrap">
+                        <span>{studentData.counselors.designation}</span>
+                        <span className="text-slate-300">&bull;</span>
+                        <a href={`mailto:${studentData.counselors.email}`} className="text-primary hover:underline">{studentData.counselors.email}</a>
+                      </p>
+                    ) : (
+                      <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1.5 mt-0.5">
+                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
+                        Counselor Assigned
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1418,6 +1517,12 @@ export default function StudentDashboard() {
                             <span className="flex items-center">
                               {msg.status === "read" ? (
                                 <Checks size={14} className="text-emerald-400" weight="bold" />
+                              ) : msg.status === "sending" ? (
+                                <SpinnerGap size={14} className="text-slate-400 animate-spin" />
+                              ) : msg.status === "failed" ? (
+                                <span title="Failed to send. Click to retry or check connection.">
+                                  <WarningCircle size={14} className="text-red-500" />
+                                </span>
                               ) : (
                                 <Check size={14} className="text-slate-400" />
                               )}
