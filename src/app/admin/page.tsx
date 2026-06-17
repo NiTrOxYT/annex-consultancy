@@ -5,11 +5,35 @@ import {
   Sparkle, ShieldCheck, SignOut, Trash, Plus, FileText, 
   Calendar, Users, Eye, CheckCircle, XCircle, ChartBar, 
   Download, MagnifyingGlass, Funnel, ArrowSquareOut, Globe, 
-  Warning, Check, X, SpinnerGap, GraduationCap, Star, Copy
+  Warning, Check, X, SpinnerGap, GraduationCap, Star, Copy,
+  User, Paperclip, PaperPlaneRight, Gear, UploadSimple, Lock, Clock
 } from "@phosphor-icons/react";
+import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-url.supabase.co";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key";
+const sessionlessClient = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false
+  }
+});
+
+const STAGES = [
+  "Consultation",
+  "Documents Collection",
+  "University Shortlisting",
+  "Application Submission",
+  "Offer Letter Received",
+  "Tuition Payment",
+  "Visa Processing",
+  "Visa Approved",
+  "Enrolled"
+];
 
 interface Booking {
   id: string;
@@ -86,13 +110,75 @@ export default function AdminDashboard() {
   const [checkingAuth, setCheckingAuth] = React.useState(true);
   
   // Dashboard Tabs
-  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories">("bookings");
+  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students">("bookings");
 
   // Loaders & table existence flags
   const [loading, setLoading] = React.useState(false);
   const [uniTableExists, setUniTableExists] = React.useState<boolean | null>(null);
   const [postsTableExists, setPostsTableExists] = React.useState<boolean | null>(null);
   const [storiesTableExists, setStoriesTableExists] = React.useState<boolean | null>(null);
+
+  // Student Portal Tab states
+  const [students, setStudents] = React.useState<any[]>([]);
+  const [selectedStudent, setSelectedStudent] = React.useState<any | null>(null);
+  const [isStudentModalOpen, setIsStudentModalOpen] = React.useState(false);
+  const [isAuditModalOpen, setIsAuditModalOpen] = React.useState(false);
+  const [editingStudent, setEditingStudent] = React.useState<any | null>(null);
+  const [studentSearch, setStudentSearch] = React.useState("");
+  const [studentDestFilter, setStudentDestFilter] = React.useState("All");
+  const [studentStatusFilter, setStudentStatusFilter] = React.useState("All");
+  const [pendingDocsCount, setPendingDocsCount] = React.useState(0);
+
+  // Audit modal internal states
+  const [auditTab, setAuditTab] = React.useState<"progress" | "documents" | "offers" | "visa" | "chat" | "logs">("progress");
+  const [auditTasks, setAuditTasks] = React.useState<any[]>([]);
+  const [auditDocs, setAuditDocs] = React.useState<any[]>([]);
+  const [auditOffers, setAuditOffers] = React.useState<any[]>([]);
+  const [auditVisa, setAuditVisa] = React.useState<any>(null);
+  const [auditMessages, setAuditMessages] = React.useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = React.useState<any[]>([]);
+
+  // Task creation/editing state in audit sheet
+  const [newTaskTitle, setNewTaskTitle] = React.useState("");
+  const [newTaskDesc, setNewTaskDesc] = React.useState("");
+  const [addingTask, setAddingTask] = React.useState(false);
+
+  // Document feedback input state in audit sheet
+  const [docFeedbackId, setDocFeedbackId] = React.useState<string | null>(null);
+  const [docFeedbackText, setDocFeedbackText] = React.useState("");
+
+  // Offer letter upload state in audit sheet
+  const [adminOfferType, setAdminOfferType] = React.useState("Conditional Offer");
+  const [adminOfferFile, setAdminOfferFile] = React.useState<File | null>(null);
+  const [uploadingOffer, setUploadingOffer] = React.useState(false);
+
+  // Visa stage modification state in audit sheet
+  const [adminVisaStatus, setAdminVisaStatus] = React.useState("Application Started");
+  const [adminVisaDetails, setAdminVisaDetails] = React.useState("");
+  const [updatingVisa, setUpdatingVisa] = React.useState(false);
+
+  // Chat reply state in audit sheet
+  const [adminReplyText, setAdminReplyText] = React.useState("");
+  const [adminReplyFile, setAdminReplyFile] = React.useState<File | null>(null);
+  const [sendingReply, setSendingReply] = React.useState(false);
+
+  // Student Creation/Editing Form
+  const [studentForm, setStudentForm] = React.useState({
+    name: "",
+    email: "",
+    password: "", // Only for new student creation
+    phone: "",
+    destination: "UK",
+    intake: "",
+    counselor: "Annex Counselor",
+    status: "Active",
+    academic_details: "",
+    preferred_course: "",
+    emergency_contact: "",
+    passport_details: "",
+    current_stage: "Consultation"
+  });
+  const [savingStudent, setSavingStudent] = React.useState(false);
 
   // Booking states
   const [bookings, setBookings] = React.useState<Booking[]>([]);
@@ -327,6 +413,26 @@ export default function AdminDashboard() {
       console.error("Error loading success stories:", err.message);
     }
 
+    // 5. Fetch Students
+    try {
+      const { data, error } = await supabase
+        .from("students")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setStudents(data || []);
+
+      // Count documents pending review
+      const { count: docsCount } = await supabase
+        .from("student_documents")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "Pending Review");
+      setPendingDocsCount(docsCount || 0);
+
+    } catch (err: any) {
+      console.error("Error loading students/counts:", err.message);
+    }
+    
     setLoading(false);
   }, []);
 
@@ -659,7 +765,454 @@ export default function AdminDashboard() {
       showToast("Success story deleted successfully");
       fetchAllData();
     } catch (err: any) {
-      alert("Error deleting story: " + err.message);
+      alert("Error deleting success story: " + err.message);
+    }
+  };
+
+  // ----------------------------------------------------
+  // STUDENT PORTAL ADMIN ACTIONS
+  // ----------------------------------------------------
+  const handleSaveStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingStudent(true);
+    try {
+      if (editingStudent) {
+        // Update existing student
+        const { error } = await supabase
+          .from("students")
+          .update({
+            name: studentForm.name,
+            phone: studentForm.phone,
+            destination: studentForm.destination,
+            intake: studentForm.intake,
+            counselor: studentForm.counselor,
+            status: studentForm.status,
+            academic_details: studentForm.academic_details,
+            preferred_course: studentForm.preferred_course,
+            emergency_contact: studentForm.emergency_contact,
+            passport_details: studentForm.passport_details,
+            current_stage: studentForm.current_stage,
+            last_activity: new Date().toISOString()
+          })
+          .eq("id", editingStudent.id);
+        
+        if (error) throw error;
+        
+        // Log admin action
+        await supabase.from("student_activity_logs").insert({
+          student_id: editingStudent.id,
+          action: "Profile Edited by Admin",
+          details: `Admin updated fields. Counselor assigned: ${studentForm.counselor}.`
+        });
+
+        showToast("Student profile updated successfully");
+      } else {
+        // Create new student
+        if (!studentForm.password) {
+          throw new Error("Password is required for new students.");
+        }
+
+        // 1. Sign up via sessionless client so admin is NOT logged out!
+        const { data: authData, error: authError } = await sessionlessClient.auth.signUp({
+          email: studentForm.email,
+          password: studentForm.password
+        });
+
+        if (authError) throw authError;
+        if (!authData.user) throw new Error("Could not create user account in Supabase Auth.");
+
+        const studentId = authData.user.id;
+
+        // 2. Insert profile record
+        const { error: dbError } = await supabase
+          .from("students")
+          .insert([{
+            id: studentId,
+            name: studentForm.name,
+            email: studentForm.email,
+            phone: studentForm.phone,
+            destination: studentForm.destination,
+            intake: studentForm.intake,
+            counselor: studentForm.counselor,
+            status: studentForm.status,
+            academic_details: studentForm.academic_details,
+            preferred_course: studentForm.preferred_course,
+            emergency_contact: studentForm.emergency_contact,
+            passport_details: studentForm.passport_details,
+            current_stage: studentForm.current_stage
+          }]);
+
+        if (dbError) throw dbError;
+
+        // 3. Initialize default visa status stage
+        await supabase.from("student_visa_status").insert([{
+          student_id: studentId,
+          status: "Application Started",
+          details: "Visa process has been initialized by counselor."
+        }]);
+
+        // 4. Log admin action
+        await supabase.from("student_activity_logs").insert({
+          student_id: studentId,
+          action: "Account Created",
+          details: "Student credentials and profile generated by Admin."
+        });
+
+        // 5. Send welcome notification
+        await supabase.from("student_notifications").insert([{
+          student_id: studentId,
+          title: "Welcome to Annex Consultancy!",
+          content: "Your student portal is ready. Check your progress and message your counselor here."
+        }]);
+
+        showToast("Student created successfully!");
+      }
+      setIsStudentModalOpen(false);
+      setEditingStudent(null);
+      fetchAllData();
+    } catch (err: any) {
+      alert("Error saving student: " + err.message);
+    } finally {
+      setSavingStudent(false);
+    }
+  };
+
+  const toggleStudentStatus = async (student: any) => {
+    const newStatus = student.status === "Active" ? "Disabled" : "Active";
+    try {
+      const { error } = await supabase
+        .from("students")
+        .update({ status: newStatus })
+        .eq("id", student.id);
+      if (error) throw error;
+      
+      await supabase.from("student_activity_logs").insert({
+        student_id: student.id,
+        action: newStatus === "Disabled" ? "Account Disabled" : "Account Enabled",
+        details: "Admin updated account activation status."
+      });
+
+      showToast(`Student account marked as ${newStatus}`);
+      fetchAllData();
+    } catch (err: any) {
+      alert("Error toggling account status: " + err.message);
+    }
+  };
+
+  const resetStudentPassword = async (student: any) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(student.email, {
+        redirectTo: `${window.location.origin}/student-login`
+      });
+      if (error) throw error;
+      showToast(`Password reset email triggered for ${student.email}`);
+    } catch (err: any) {
+      alert("Error sending password reset: " + err.message);
+    }
+  };
+
+  const loginAsStudent = (student: any) => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("annex_impersonate_student_id", student.id);
+      window.open("/student/dashboard", "_blank");
+    }
+  };
+
+  const deleteStudent = async (studentId: string) => {
+    if (!confirm("Are you sure you want to delete this student profile? This deletes all associated tasks, documents, offer letters, chat messages, and logs. (Profile deletion will cascade on Supabase).")) return;
+    try {
+      const { error } = await supabase.from("students").delete().eq("id", studentId);
+      if (error) throw error;
+      showToast("Student profile deleted successfully");
+      fetchAllData();
+    } catch (err: any) {
+      alert("Error deleting student profile: " + err.message);
+    }
+  };
+
+  const openAuditModal = async (student: any) => {
+    setSelectedStudent(student);
+    setAuditTab("progress");
+    setIsAuditModalOpen(true);
+    await loadAuditDetails(student.id);
+  };
+
+  const loadAuditDetails = async (id: string) => {
+    try {
+      const { data: t } = await supabase.from("student_tasks").select("*").eq("student_id", id).order("created_at", { ascending: true });
+      setAuditTasks(t || []);
+
+      const { data: d } = await supabase.from("student_documents").select("*").eq("student_id", id).order("uploaded_at", { ascending: false });
+      setAuditDocs(d || []);
+
+      const { data: o } = await supabase.from("student_offer_letters").select("*").eq("student_id", id).order("uploaded_at", { ascending: false });
+      setAuditOffers(o || []);
+
+      const { data: v } = await supabase.from("student_visa_status").select("*").eq("student_id", id).maybeSingle();
+      setAuditVisa(v);
+      if (v) {
+        setAdminVisaStatus(v.status);
+        setAdminVisaDetails(v.details || "");
+      } else {
+        setAdminVisaStatus("Application Started");
+        setAdminVisaDetails("");
+      }
+
+      const { data: m } = await supabase.from("student_messages").select("*").eq("student_id", id).order("created_at", { ascending: true });
+      setAuditMessages(m || []);
+
+      const { data: l } = await supabase.from("student_activity_logs").select("*").eq("student_id", id).order("created_at", { ascending: false });
+      setAuditLogs(l || []);
+    } catch (err: any) {
+      console.error("Error loading student audit details:", err.message);
+    }
+  };
+
+  // Audit Actions
+  const handleAddTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim() || !selectedStudent) return;
+    setAddingTask(true);
+    try {
+      const { error } = await supabase
+        .from("student_tasks")
+        .insert([{
+          student_id: selectedStudent.id,
+          title: newTaskTitle,
+          description: newTaskDesc
+        }]);
+      if (error) throw error;
+      
+      setNewTaskTitle("");
+      setNewTaskDesc("");
+      showToast("Task assigned successfully");
+      
+      await supabase.from("student_notifications").insert([{
+        student_id: selectedStudent.id,
+        title: "New Task Assigned",
+        content: `Your counselor assigned a new task: "${newTaskTitle}"`
+      }]);
+
+      await supabase.from("student_activity_logs").insert({
+        student_id: selectedStudent.id,
+        action: "Task Assigned",
+        details: `Task: ${newTaskTitle}`
+      });
+
+      await loadAuditDetails(selectedStudent.id);
+    } catch (err: any) {
+      alert("Error adding task: " + err.message);
+    } finally {
+      setAddingTask(false);
+    }
+  };
+
+  const approveTask = async (taskId: string, title: string) => {
+    try {
+      const { error } = await supabase
+        .from("student_tasks")
+        .update({ approved: true })
+        .eq("id", taskId);
+      if (error) throw error;
+      showToast("Task completion approved");
+
+      await supabase.from("student_notifications").insert([{
+        student_id: selectedStudent.id,
+        title: "Task Approved",
+        content: `Your counselor verified and approved: "${title}"`
+      }]);
+
+      await supabase.from("student_activity_logs").insert({
+        student_id: selectedStudent.id,
+        action: "Task Approved",
+        details: `Task: ${title}`
+      });
+
+      await loadAuditDetails(selectedStudent.id);
+    } catch (err: any) {
+      alert("Error approving task: " + err.message);
+    }
+  };
+
+  const updateDocStatus = async (docId: string, status: string, feedback: string = "") => {
+    try {
+      const { error } = await supabase
+        .from("student_documents")
+        .update({ status, feedback: feedback || null })
+        .eq("id", docId);
+      if (error) throw error;
+      showToast(`Document marked as ${status}`);
+
+      const docRecord = auditDocs.find(d => d.id === docId);
+      await supabase.from("student_notifications").insert([{
+        student_id: selectedStudent.id,
+        title: `Document ${status}`,
+        content: `Your upload for "${docRecord?.document_type}" was marked as ${status}.`
+      }]);
+
+      await supabase.from("student_activity_logs").insert({
+        student_id: selectedStudent.id,
+        action: `Document ${status}`,
+        details: `Document type: ${docRecord?.document_type}. Feedback: ${feedback || "None"}`
+      });
+
+      setDocFeedbackId(null);
+      setDocFeedbackText("");
+      await loadAuditDetails(selectedStudent.id);
+    } catch (err: any) {
+      alert("Error updating document status: " + err.message);
+    }
+  };
+
+  const handleUploadOfferLetter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminOfferFile || !selectedStudent) return;
+    setUploadingOffer(true);
+    try {
+      const fileExt = adminOfferFile.name.split(".").pop();
+      const randomName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      const filePath = `${selectedStudent.id}/offers/${adminOfferType.toLowerCase().replace(/[^a-z0-9]+/g, "-")}_${randomName}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from("student-files")
+        .upload(filePath, adminOfferFile);
+      if (uploadErr) throw uploadErr;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("student-files")
+        .getPublicUrl(filePath);
+
+      const { error: dbErr } = await supabase
+        .from("student_offer_letters")
+        .insert([{
+          student_id: selectedStudent.id,
+          letter_type: adminOfferType,
+          file_url: publicUrl,
+          file_name: adminOfferFile.name
+        }]);
+      if (dbErr) throw dbErr;
+
+      await supabase.from("student_notifications").insert([{
+        student_id: selectedStudent.id,
+        title: "New Admission Offer Document",
+        content: `Your counselor uploaded your "${adminOfferType}" letter.`
+      }]);
+
+      await supabase.from("student_activity_logs").insert({
+        student_id: selectedStudent.id,
+        action: "Offer Letter Issued",
+        details: `Type: ${adminOfferType}, File: ${adminOfferFile.name}`
+      });
+
+      setAdminOfferFile(null);
+      showToast("Offer letter issued successfully");
+      await loadAuditDetails(selectedStudent.id);
+    } catch (err: any) {
+      alert("Error uploading offer letter: " + err.message);
+    } finally {
+      setUploadingOffer(false);
+    }
+  };
+
+  const handleUpdateVisaStatus = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStudent) return;
+    setUpdatingVisa(true);
+    try {
+      let error;
+      if (auditVisa) {
+        const res = await supabase
+          .from("student_visa_status")
+          .update({ status: adminVisaStatus, details: adminVisaDetails, updated_at: new Date().toISOString() })
+          .eq("student_id", selectedStudent.id);
+        error = res.error;
+      } else {
+        const res = await supabase
+          .from("student_visa_status")
+          .insert([{ student_id: selectedStudent.id, status: adminVisaStatus, details: adminVisaDetails }]);
+        error = res.error;
+      }
+      
+      if (error) throw error;
+
+      // Update general stage as well
+      let studentStage = "Visa Processing";
+      if (adminVisaStatus === "Visa Approved") {
+        studentStage = "Visa Approved";
+      }
+      await supabase.from("students").update({ current_stage: studentStage }).eq("id", selectedStudent.id);
+
+      await supabase.from("student_notifications").insert([{
+        student_id: selectedStudent.id,
+        title: "Visa Status Progressed",
+        content: `Your visa application step was updated to: ${adminVisaStatus}`
+      }]);
+
+      await supabase.from("student_activity_logs").insert({
+        student_id: selectedStudent.id,
+        action: "Visa Stage Updated",
+        details: `New Stage: ${adminVisaStatus}. Details: ${adminVisaDetails}`
+      });
+
+      showToast("Visa status timeline modified");
+      await loadAuditDetails(selectedStudent.id);
+    } catch (err: any) {
+      alert("Error updating visa status: " + err.message);
+    } finally {
+      setUpdatingVisa(false);
+    }
+  };
+
+  const handleSendAdminReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminReplyText.trim() && !adminReplyFile || !selectedStudent) return;
+    setSendingReply(true);
+    try {
+      let fileUrl = null;
+      let fileName = null;
+
+      if (adminReplyFile) {
+        const fileExt = adminReplyFile.name.split(".").pop();
+        const randomName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        const filePath = `${selectedStudent.id}/chat_attachments/${randomName}`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from("student-files")
+          .upload(filePath, adminReplyFile);
+        if (uploadErr) throw uploadErr;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from("student-files")
+          .getPublicUrl(filePath);
+        fileUrl = publicUrl;
+        fileName = adminReplyFile.name;
+      }
+
+      const { error } = await supabase
+        .from("student_messages")
+        .insert([{
+          student_id: selectedStudent.id,
+          sender_type: "counselor",
+          message: adminReplyText || `Attachment: ${fileName}`,
+          attachment_url: fileUrl,
+          attachment_name: fileName
+        }]);
+      if (error) throw error;
+
+      await supabase.from("student_notifications").insert([{
+        student_id: selectedStudent.id,
+        title: "New Message from Counselor",
+        content: adminReplyText.substring(0, 80)
+      }]);
+
+      setAdminReplyText("");
+      setAdminReplyFile(null);
+      showToast("Reply sent to student");
+      await loadAuditDetails(selectedStudent.id);
+    } catch (err: any) {
+      alert("Error sending reply: " + err.message);
+    } finally {
+      setSendingReply(false);
     }
   };
 
@@ -926,6 +1479,7 @@ export default function AdminDashboard() {
           <nav className="flex gap-1 sm:gap-2">
             {[
               { id: "bookings", label: `Consultations (${bookings.length})` },
+              { id: "students", label: `Students (${students.length})` },
               { id: "universities", label: `Universities (${universities.length})` },
               { id: "blog", label: `Blog posts (${posts.length})` },
               { id: "stories", label: `Success stories (${stories.length})` }
@@ -1880,6 +2434,322 @@ export default function AdminDashboard() {
             )}
           </section>
         )}
+
+        {activeTab === "students" && (
+          <section className="flex flex-col gap-6 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-display font-bold text-2xl text-primary">Student Management</h2>
+                <p className="text-xs text-slate-400 mt-1">Generate login credentials, manage profiles, track visa lodgements, and review uploaded documents.</p>
+              </div>
+              <Button 
+                onClick={() => {
+                  setEditingStudent(null);
+                  setStudentForm({
+                    name: "",
+                    email: "",
+                    password: "",
+                    phone: "",
+                    destination: "UK",
+                    intake: "",
+                    counselor: "Annex Counselor",
+                    status: "Active",
+                    academic_details: "",
+                    preferred_course: "",
+                    emergency_contact: "",
+                    passport_details: "",
+                    current_stage: "Consultation"
+                  });
+                  setIsStudentModalOpen(true);
+                }} 
+                variant="primary" 
+                size="sm" 
+                className="flex items-center gap-1"
+              >
+                <Plus size={14} /> Add Student
+              </Button>
+            </div>
+
+            {/* Dashboard metrics cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+              {[
+                { label: "Total Students", value: students.length, icon: <Users size={18} className="text-primary" weight="bold" />, bg: "bg-slate-50 border-slate-100" },
+                { label: "Active Students", value: students.filter(s => s.status === "Active").length, icon: <CheckCircle size={18} className="text-emerald-600" weight="bold" />, bg: "bg-emerald-50/20 border-emerald-100/60" },
+                { label: "Visa Approved", value: students.filter(s => s.current_stage === "Visa Approved").length, icon: <Sparkle size={18} className="text-gold" weight="bold" />, bg: "bg-amber-50/20 border-amber-100/60" },
+                { label: "Enrolled Students", value: students.filter(s => s.current_stage === "Enrolled").length, icon: <GraduationCap size={18} className="text-purple-600" weight="bold" />, bg: "bg-purple-50/20 border-purple-100/60" },
+                { label: "Pending Documents", value: pendingDocsCount, icon: <FileText size={18} className="text-blue-600" weight="bold" />, bg: "bg-blue-50/20 border-blue-100/60" },
+                { label: "Pending Applications", value: students.filter(s => s.current_stage === "Application Submission").length, icon: <Clock size={18} className="text-yellow-600" weight="bold" />, bg: "bg-yellow-50/20 border-yellow-100/60" }
+              ].map((stat, idx) => (
+                <div key={idx} className={`border rounded-2xl p-4 flex flex-col justify-between min-h-[90px] ${stat.bg}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500">{stat.label}</span>
+                    {stat.icon}
+                  </div>
+                  <span className="text-2xl font-bold font-mono-data text-primary mt-2">{stat.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Filter controls */}
+            <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center bg-slate-50 border border-hairline p-4 rounded-2xl">
+              <div className="flex flex-grow max-w-md items-center gap-2.5 px-3 py-2 border border-hairline rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20">
+                <MagnifyingGlass size={16} className="text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search by student name, email, phone..." 
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  className="text-xs w-full focus:outline-none text-slate-800 bg-transparent"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <select 
+                  value={studentDestFilter}
+                  onChange={(e) => setStudentDestFilter(e.target.value)}
+                  className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
+                >
+                  <option value="All">All Destinations</option>
+                  <option value="UK">UK</option>
+                  <option value="Australia">Australia</option>
+                  <option value="Europe">Europe</option>
+                  <option value="Dubai">Dubai</option>
+                  <option value="Italy">Italy</option>
+                  <option value="India">India</option>
+                </select>
+
+                <select 
+                  value={studentStatusFilter}
+                  onChange={(e) => setStudentStatusFilter(e.target.value)}
+                  className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Active">Active</option>
+                  <option value="Disabled">Disabled</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Directory Table */}
+            {loading ? (
+              <div className="text-center py-12 text-slate-400 text-xs font-semibold">Loading students...</div>
+            ) : students.length === 0 ? (
+              <div className="text-center py-12 border border-dashed border-hairline rounded-2xl text-slate-400 text-xs font-semibold">
+                No students created yet. Click "Add Student" to create one.
+              </div>
+            ) : (
+              <div className="border border-hairline rounded-2xl overflow-x-auto bg-white font-sans text-slate-700">
+                <table className="w-full text-left border-collapse text-xs min-w-[950px]">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-hairline text-slate-500 font-bold uppercase tracking-wider">
+                      <th className="p-4">Name</th>
+                      <th className="p-4">Phone</th>
+                      <th className="p-4">Destination</th>
+                      <th className="p-4">Intake</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4">Counselor</th>
+                      <th className="p-4">Last Activity</th>
+                      <th className="p-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-hairline">
+                    {students
+                      .filter(s => {
+                        const matchesSearch = 
+                          s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
+                          s.email.toLowerCase().includes(studentSearch.toLowerCase()) ||
+                          (s.phone && s.phone.includes(studentSearch));
+                        
+                        const matchesDest = studentDestFilter === "All" || s.destination === studentDestFilter;
+                        const matchesStatus = studentStatusFilter === "All" || s.status === studentStatusFilter;
+
+                        return matchesSearch && matchesDest && matchesStatus;
+                      })
+                      .map(student => (
+                        <tr key={student.id} className="hover:bg-subtle-gray/30">
+                          <td className="p-4 font-semibold text-primary">
+                            {student.name}<br />
+                            <span className="text-[10px] text-slate-400 font-normal">{student.email}</span>
+                          </td>
+                          <td className="p-4 font-mono-data text-slate-600">
+                            {student.phone || "N/A"}
+                          </td>
+                          <td className="p-4">
+                            <span className="font-semibold text-primary">{student.destination || "N/A"}</span>
+                          </td>
+                          <td className="p-4 font-semibold text-slate-500">
+                            {student.intake || "N/A"}
+                          </td>
+                          <td className="p-4">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                              student.status === "Active"
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                : "bg-red-50 text-red-600 border-red-100"
+                            }`}>
+                              {student.status}
+                            </span>
+                          </td>
+                          <td className="p-4 text-slate-600 font-medium">
+                            {student.counselor || "Annex Counselor"}
+                          </td>
+                          <td className="p-4 font-mono-data text-slate-400">
+                            {student.last_activity ? new Date(student.last_activity).toLocaleDateString() : "N/A"}
+                          </td>
+                          <td className="p-4 text-right flex justify-end gap-1.5 items-center h-full">
+                            <button
+                              onClick={() => openAuditModal(student)}
+                              className="p-1.5 text-slate-500 hover:text-primary hover:bg-slate-50 rounded transition-colors cursor-pointer"
+                              title="Audit File / View details"
+                            >
+                              <Eye size={16} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingStudent(student);
+                                setStudentForm({
+                                  name: student.name,
+                                  email: student.email,
+                                  password: "",
+                                  phone: student.phone || "",
+                                  destination: student.destination || "UK",
+                                  intake: student.intake || "",
+                                  counselor: student.counselor || "Annex Counselor",
+                                  status: student.status || "Active",
+                                  academic_details: student.academic_details || "",
+                                  preferred_course: student.preferred_course || "",
+                                  emergency_contact: student.emergency_contact || "",
+                                  passport_details: student.passport_details || "",
+                                  current_stage: student.current_stage || "Consultation"
+                                });
+                                setIsStudentModalOpen(true);
+                              }}
+                              className="p-1.5 text-slate-500 hover:text-primary hover:bg-slate-50 rounded transition-colors cursor-pointer"
+                              title="Edit profile"
+                            >
+                              <Gear size={16} />
+                            </button>
+                            <button
+                              onClick={() => loginAsStudent(student)}
+                              className="px-2.5 py-1.5 bg-primary/5 text-primary border border-primary/10 hover:bg-primary/10 rounded-full text-[10px] font-bold transition-colors cursor-pointer"
+                              title="Login As Student"
+                            >
+                              Login As
+                            </button>
+                            <button
+                              onClick={() => resetStudentPassword(student)}
+                              className="p-1.5 text-slate-500 hover:text-primary hover:bg-slate-50 rounded transition-colors cursor-pointer"
+                              title="Send Password Reset Email"
+                            >
+                              <Lock size={16} />
+                            </button>
+                            <button
+                              onClick={() => toggleStudentStatus(student)}
+                              className={`p-1.5 rounded transition-colors cursor-pointer ${
+                                student.status === "Active" ? "text-red-500 hover:bg-red-50" : "text-emerald-500 hover:bg-emerald-50"
+                              }`}
+                              title={student.status === "Active" ? "Disable Account" : "Activate Account"}
+                            >
+                              {student.status === "Active" ? <XCircle size={16} /> : <CheckCircle size={16} />}
+                            </button>
+                            <button
+                              onClick={() => deleteStudent(student.id)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                              title="Delete Student"
+                            >
+                              <Trash size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    }
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Student Analytics dashboard section */}
+            <div className="mt-8">
+              <h3 className="font-display font-bold text-lg text-primary mb-4">Student Analytics Insights</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* Stage wise Funnel Breakdown */}
+                <Card className="lg:col-span-2">
+                  <CardTitle className="text-xs uppercase tracking-wider text-slate-400 mb-4">Milestone Conversion Funnel</CardTitle>
+                  <div className="space-y-3.5">
+                    {STAGES.map((stage) => {
+                      const count = students.filter(s => s.current_stage === stage).length;
+                      const maxStudents = students.length || 1;
+                      const barPercent = Math.max(5, Math.round((count / maxStudents) * 100));
+
+                      return (
+                        <div key={stage} className="space-y-1">
+                          <div className="flex justify-between text-xs font-semibold">
+                            <span className="text-primary">{stage}</span>
+                            <span className="font-mono-data text-slate-500">{count} students</span>
+                          </div>
+                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-primary rounded-full" style={{ width: `${barPercent}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+
+                {/* Country breakdown & visa rates */}
+                <div className="space-y-6">
+                  
+                  {/* Country breakdown */}
+                  <Card>
+                    <CardTitle className="text-xs uppercase tracking-wider text-slate-400 mb-4">Destination Countries</CardTitle>
+                    <div className="space-y-2.5">
+                      {(Object.entries(
+                        students.reduce((acc, s) => {
+                          if (s.destination) acc[s.destination] = (acc[s.destination] || 0) + 1;
+                          return acc;
+                        }, {} as Record<string, number>)
+                      ) as [string, number][])
+                        .sort((a,b) => b[1] - a[1])
+                        .map(([dest, count]) => (
+                          <div key={dest} className="flex justify-between items-center text-xs border-b border-hairline/60 pb-2 last:border-0 last:pb-0">
+                            <span className="font-semibold text-primary">{dest}</span>
+                            <span className="font-mono-data text-slate-500 font-bold">{count} students</span>
+                          </div>
+                        ))}
+                      {students.length === 0 && <span className="text-xs text-slate-400">No data.</span>}
+                    </div>
+                  </Card>
+
+                  {/* Visa success metrics */}
+                  <Card>
+                    <CardTitle className="text-xs uppercase tracking-wider text-slate-400 mb-3">Visa Lodgement Analysis</CardTitle>
+                    <div className="space-y-4">
+                      <div className="p-4 bg-slate-50 border border-hairline rounded-xl flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Visa Success Rate</p>
+                          <p className="text-2xl font-bold text-primary mt-1 font-display">
+                            {(() => {
+                              const approvedCount = students.filter(s => s.current_stage === "Visa Approved").length;
+                              const processedCount = students.filter(s => ["Visa Processing", "Visa Approved", "Enrolled"].includes(s.current_stage)).length;
+                              if (processedCount === 0) return "100%";
+                              return `${Math.round((approvedCount / processedCount) * 100)}%`;
+                            })()}
+                          </p>
+                        </div>
+                        <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
+                          <Check size={20} weight="bold" />
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                </div>
+
+              </div>
+            </div>
+
+          </section>
+        )}
       </div>
 
       {/* MODALS */}
@@ -2344,6 +3214,705 @@ export default function AdminDashboard() {
                 <Button type="button" onClick={() => setIsStoryModalOpen(false)} variant="ghost" size="sm">Cancel</Button>
               </div>
             </form>
+          </Card>
+        </div>
+      )}
+
+      {/* 5. ADD/EDIT STUDENT MODAL */}
+      {isStudentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+          <Card className="max-w-2xl w-full p-6 relative bg-white shadow-2xl">
+            <button onClick={() => setIsStudentModalOpen(false)} className="absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer">
+              <X size={20} />
+            </button>
+            <div className="flex items-center gap-2 mb-6 border-b border-hairline pb-4">
+              <User size={22} className="text-primary" />
+              <div>
+                <CardTitle className="text-lg">{editingStudent ? "Edit Student Profile" : "Register New Student"}</CardTitle>
+                <CardDescription className="text-xs">Setup credentials, counselor allocation, and academic particulars.</CardDescription>
+              </div>
+            </div>
+            <form onSubmit={handleSaveStudent} className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-1 text-xs">
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-bold text-primary uppercase tracking-wider">Full Name *</label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={studentForm.name} 
+                    onChange={(e) => setStudentForm({ ...studentForm, name: e.target.value })} 
+                    className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-bold text-primary uppercase tracking-wider">Email Address *</label>
+                  <input 
+                    type="email" 
+                    required 
+                    disabled={!!editingStudent}
+                    value={studentForm.email} 
+                    onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })} 
+                    className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white disabled:bg-slate-50 disabled:text-slate-400"
+                  />
+                </div>
+              </div>
+
+              {!editingStudent && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-bold text-primary uppercase tracking-wider">Temporary Password *</label>
+                  <input 
+                    type="text" 
+                    required 
+                    placeholder="Min 6 characters"
+                    value={studentForm.password} 
+                    onChange={(e) => setStudentForm({ ...studentForm, password: e.target.value })} 
+                    className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white font-mono-data"
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-bold text-primary uppercase tracking-wider">Phone Number</label>
+                  <input 
+                    type="text" 
+                    value={studentForm.phone} 
+                    onChange={(e) => setStudentForm({ ...studentForm, phone: e.target.value })} 
+                    className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-bold text-primary uppercase tracking-wider">Destination Country *</label>
+                  <select 
+                    value={studentForm.destination} 
+                    onChange={(e) => setStudentForm({ ...studentForm, destination: e.target.value })} 
+                    className="px-3.5 py-2 border border-hairline bg-white rounded-xl text-xs text-slate-800 focus:outline-none cursor-pointer"
+                  >
+                    <option value="UK">UK</option>
+                    <option value="Australia">Australia</option>
+                    <option value="Europe">Europe</option>
+                    <option value="Dubai">Dubai</option>
+                    <option value="Italy">Italy</option>
+                    <option value="India">India</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-bold text-primary uppercase tracking-wider">Target Intake Cycle</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Sept 2026"
+                    value={studentForm.intake} 
+                    onChange={(e) => setStudentForm({ ...studentForm, intake: e.target.value })} 
+                    className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-bold text-primary uppercase tracking-wider">Counselor Assigned</label>
+                  <input 
+                    type="text" 
+                    value={studentForm.counselor} 
+                    onChange={(e) => setStudentForm({ ...studentForm, counselor: e.target.value })} 
+                    className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-bold text-primary uppercase tracking-wider">Journey Stage *</label>
+                  <select 
+                    value={studentForm.current_stage} 
+                    onChange={(e) => setStudentForm({ ...studentForm, current_stage: e.target.value })} 
+                    className="px-3.5 py-2 border border-hairline bg-white rounded-xl text-xs text-slate-800 focus:outline-none cursor-pointer"
+                  >
+                    {STAGES.map(stage => (
+                      <option key={stage} value={stage}>{stage}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-bold text-primary uppercase tracking-wider">Account Status *</label>
+                  <select 
+                    value={studentForm.status} 
+                    onChange={(e) => setStudentForm({ ...studentForm, status: e.target.value })} 
+                    className="px-3.5 py-2 border border-hairline bg-white rounded-xl text-xs text-slate-800 focus:outline-none cursor-pointer"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Disabled">Disabled</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Academic scores / details</label>
+                <textarea 
+                  rows={2} 
+                  value={studentForm.academic_details} 
+                  onChange={(e) => setStudentForm({ ...studentForm, academic_details: e.target.value })} 
+                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white resize-none"
+                  placeholder="Qualifications, IELTS scores, GPA background"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-1.5 md:col-span-2">
+                  <label className="font-bold text-primary uppercase tracking-wider">Emergency Contact details</label>
+                  <input 
+                    type="text" 
+                    value={studentForm.emergency_contact} 
+                    onChange={(e) => setStudentForm({ ...studentForm, emergency_contact: e.target.value })} 
+                    className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-bold text-primary uppercase tracking-wider">Passport details</label>
+                  <input 
+                    type="text" 
+                    value={studentForm.passport_details} 
+                    onChange={(e) => setStudentForm({ ...studentForm, passport_details: e.target.value })} 
+                    className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-hairline pt-4 mt-2">
+                <Button type="submit" variant="primary" size="sm" disabled={savingStudent}>
+                  {savingStudent ? "Saving..." : "Save Student"}
+                </Button>
+                <Button type="button" onClick={() => setIsStudentModalOpen(false)} variant="ghost" size="sm">Cancel</Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* 6. STUDENT PORTAL AUDIT WORKSPACE (MODAL) */}
+      {isAuditModalOpen && selectedStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in text-slate-700">
+          <Card className="max-w-5xl w-full h-[85vh] p-0 relative bg-white shadow-2xl flex flex-col justify-between overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="p-5 border-b border-hairline bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-full bg-primary flex items-center justify-center text-white shrink-0">
+                  <User size={22} weight="fill" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-primary leading-tight">{selectedStudent.name}</h3>
+                  <p className="text-xs text-slate-400 font-medium">{selectedStudent.email} &middot; counselor: {selectedStudent.counselor}</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-bold uppercase bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full">
+                  {selectedStudent.current_stage}
+                </span>
+                <button 
+                  onClick={() => setIsAuditModalOpen(false)}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Internal Navigation */}
+            <div className="px-5 border-b border-hairline flex gap-4 text-xs font-bold uppercase tracking-wider text-slate-400 py-3 bg-white">
+              {[
+                { id: "progress", label: "Tasks & Progress" },
+                { id: "documents", label: "Documents Collection" },
+                { id: "offers", label: "Offer Letters" },
+                { id: "visa", label: "Visa Timeline" },
+                { id: "chat", label: "Counselor Chat" },
+                { id: "logs", label: "Activity Logs" }
+              ].map(subTab => (
+                <button 
+                  key={subTab.id}
+                  onClick={() => setAuditTab(subTab.id as any)}
+                  className={`pb-1 cursor-pointer transition-all ${
+                    auditTab === subTab.id ? "text-primary border-b-2 border-primary" : "hover:text-primary"
+                  }`}
+                >
+                  {subTab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Modal Content Scroll viewport */}
+            <div className="flex-grow p-6 overflow-y-auto bg-slate-50/50 text-xs">
+              
+              {/* TAB A: TASKS & PROGRESS */}
+              {auditTab === "progress" && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  
+                  {/* Left: Task lists */}
+                  <div className="md:col-span-2 space-y-4">
+                    <h4 className="font-bold text-sm text-primary mb-2">Assigned Tasks checklist</h4>
+                    {auditTasks.length === 0 ? (
+                      <p className="text-slate-400 py-6 text-center border border-dashed border-hairline rounded-xl bg-white">No tasks assigned.</p>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {auditTasks.map(task => (
+                          <div key={task.id} className="p-4 bg-white border border-hairline rounded-xl flex items-center justify-between gap-4">
+                            <div>
+                              <h5 className={`font-bold ${task.completed ? "line-through text-slate-400" : "text-primary"}`}>{task.title}</h5>
+                              {task.description && <p className="text-[11px] text-slate-500 mt-0.5">{task.description}</p>}
+                            </div>
+                            <div className="shrink-0 flex items-center gap-2">
+                              {task.approved ? (
+                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">Approved</span>
+                              ) : task.completed ? (
+                                <Button 
+                                  onClick={() => approveTask(task.id, task.title)} 
+                                  variant="primary" 
+                                  className="text-[10px] py-1 px-3"
+                                >
+                                  Approve Completion
+                                </Button>
+                              ) : (
+                                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Required</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right: Add new task */}
+                  <div className="bg-white border border-hairline rounded-2xl p-4.5 h-fit">
+                    <h4 className="font-bold text-sm text-primary mb-4">Assign New Task</h4>
+                    <form onSubmit={handleAddTask} className="space-y-4">
+                      <div className="flex flex-col gap-1">
+                        <label className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Task Title *</label>
+                        <input 
+                          type="text" 
+                          required
+                          value={newTaskTitle} 
+                          onChange={(e) => setNewTaskTitle(e.target.value)}
+                          placeholder="e.g. Upload IELTS Certificate" 
+                          className="px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none focus:border-primary bg-white"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Description</label>
+                        <textarea 
+                          rows={3} 
+                          value={newTaskDesc}
+                          onChange={(e) => setNewTaskDesc(e.target.value)}
+                          placeholder="Specify requirements, links, or templates." 
+                          className="px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none focus:border-primary resize-none bg-white"
+                        />
+                      </div>
+                      <Button type="submit" disabled={addingTask} className="w-full text-xs py-2">
+                        {addingTask ? "Assigning..." : "Assign Task"}
+                      </Button>
+                    </form>
+                  </div>
+
+                </div>
+              )}
+
+              {/* TAB B: DOCUMENTS REVIEW */}
+              {auditTab === "documents" && (
+                <div className="space-y-4">
+                  <h4 className="font-bold text-sm text-primary">Verification Checklist</h4>
+                  
+                  {auditDocs.length === 0 ? (
+                    <div className="py-12 border border-dashed border-hairline rounded-2xl bg-white text-center text-slate-400">
+                      <FileText size={32} className="mx-auto text-slate-300 mb-2" />
+                      <p className="text-xs">No documents uploaded by student yet.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3">
+                      {auditDocs.map(doc => (
+                        <div key={doc.id} className="p-4 bg-white border border-hairline rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-sm transition-shadow">
+                          
+                          <div className="flex items-start gap-3">
+                            <div className="w-9 h-9 rounded-full bg-primary/5 text-primary flex items-center justify-center border border-primary/10 shrink-0">
+                              <FileText size={18} weight="fill" />
+                            </div>
+                            <div>
+                              <h5 className="font-bold text-primary">{doc.document_type}</h5>
+                              <p className="text-[11px] text-slate-500 truncate max-w-[300px] sm:max-w-xl">{doc.file_name}</p>
+                              {doc.feedback && (
+                                <p className="text-[10px] text-red-600 bg-red-50 p-2 rounded-xl mt-1 border border-red-100 max-w-lg">
+                                  <strong>Feedback:</strong> {doc.feedback}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2.5 sm:self-center ml-12 sm:ml-0 shrink-0">
+                            <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                              doc.status === "Approved" 
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-200" 
+                                : doc.status === "Rejected"
+                                ? "bg-red-50 text-red-600 border-red-200"
+                                : doc.status === "Requires Correction"
+                                ? "bg-amber-50 text-amber-600 border-amber-200"
+                                : "bg-blue-50 text-blue-600 border-blue-200"
+                            }`}>
+                              {doc.status}
+                            </span>
+                            
+                            <a 
+                              href={doc.file_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="px-3.5 py-1.5 border border-hairline hover:bg-slate-50 rounded-full text-xs font-bold text-slate-600 flex items-center gap-1 transition-colors"
+                            >
+                              View file <ArrowSquareOut size={12} />
+                            </a>
+
+                            {docFeedbackId === doc.id ? (
+                              <div className="flex items-center gap-2">
+                                <input 
+                                  type="text" 
+                                  placeholder="Provide feedback..." 
+                                  value={docFeedbackText}
+                                  onChange={(e) => setDocFeedbackText(e.target.value)}
+                                  className="px-2 py-1.5 border border-hairline rounded-lg text-xs outline-none bg-white"
+                                />
+                                <Button onClick={() => updateDocStatus(doc.id, "Requires Correction", docFeedbackText)} variant="secondary" className="text-[10px] py-1 px-2.5">Send</Button>
+                                <button onClick={() => setDocFeedbackId(null)} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
+                              </div>
+                            ) : (
+                              <>
+                                <button 
+                                  onClick={() => updateDocStatus(doc.id, "Approved")}
+                                  className="px-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm shadow-emerald-600/10 cursor-pointer"
+                                  disabled={doc.status === "Approved"}
+                                >
+                                  Approve
+                                </button>
+                                <button 
+                                  onClick={() => setDocFeedbackId(doc.id)}
+                                  className="px-3.5 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-sm shadow-red-600/10 cursor-pointer"
+                                  disabled={doc.status === "Rejected"}
+                                >
+                                  Request correction
+                                </button>
+                              </>
+                            )}
+                          </div>
+
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                </div>
+              )}
+
+              {/* TAB C: OFFER LETTERS */}
+              {auditTab === "offers" && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  
+                  {/* Left list of offer letters */}
+                  <div className="md:col-span-2 space-y-4">
+                    <h4 className="font-bold text-sm text-primary mb-2">Issued Offer Documents</h4>
+                    {auditOffers.length === 0 ? (
+                      <p className="text-slate-400 py-6 text-center border border-dashed border-hairline rounded-xl bg-white">No offer letters issued yet.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {auditOffers.map(letter => (
+                          <div key={letter.id} className="p-4 bg-white border border-hairline rounded-xl flex items-center justify-between gap-4">
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-lg bg-primary/5 border border-primary/10 text-primary flex items-center justify-center shrink-0">
+                                <FileText size={16} weight="fill" />
+                              </div>
+                              <div className="min-w-0">
+                                <h5 className="font-bold text-primary truncate">{letter.letter_type}</h5>
+                                <p className="text-[10px] text-slate-400 truncate mt-0.5">{letter.file_name}</p>
+                              </div>
+                            </div>
+                            <a 
+                              href={letter.file_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-slate-400 hover:text-primary shrink-0"
+                            >
+                              <ArrowSquareOut size={16} />
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Upload form */}
+                  <div className="bg-white border border-hairline rounded-2xl p-4.5 h-fit text-xs">
+                    <h4 className="font-bold text-sm text-primary mb-4">Upload Offer / Receipt</h4>
+                    <form onSubmit={handleUploadOfferLetter} className="space-y-4">
+                      
+                      <div className="flex flex-col gap-1">
+                        <label className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Document Type *</label>
+                        <select 
+                          value={adminOfferType}
+                          onChange={(e) => setAdminOfferType(e.target.value)}
+                          className="px-3.5 py-2 border border-hairline rounded-xl bg-white text-xs text-slate-800 focus:outline-none cursor-pointer"
+                        >
+                          <option value="Conditional Offer">Conditional Offer</option>
+                          <option value="Unconditional Offer">Unconditional Offer</option>
+                          <option value="CAS Letter">CAS Letter</option>
+                          <option value="Admission Letter">Admission Letter</option>
+                          <option value="Tuition Receipt">Tuition Receipt</option>
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">File Attachment *</label>
+                        <input 
+                          type="file"
+                          required
+                          onChange={(e) => e.target.files && setAdminOfferFile(e.target.files[0])}
+                          className="px-3 py-2 border border-hairline rounded-xl text-xs bg-white text-slate-500 focus:outline-none"
+                        />
+                      </div>
+
+                      <Button type="submit" disabled={uploadingOffer} className="w-full text-xs py-2.5">
+                        {uploadingOffer ? "Uploading..." : "Issue Document"}
+                      </Button>
+
+                    </form>
+                  </div>
+
+                </div>
+              )}
+
+              {/* TAB D: VISA STATUS */}
+              {auditTab === "visa" && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  
+                  {/* Left visa timeline visualization */}
+                  <div className="md:col-span-2 space-y-4 bg-white border border-hairline p-5 rounded-2xl h-fit">
+                    <h4 className="font-bold text-sm text-primary mb-4">Visa Progress Timeline</h4>
+                    <div className="relative pl-6 flex flex-col gap-5 py-2">
+                      <div className="absolute left-2.5 top-2 bottom-2 w-0.5 bg-slate-100" />
+                      {[
+                        "Application Started",
+                        "Documents Submitted",
+                        "Biometrics Scheduled",
+                        "Biometrics Completed",
+                        "Visa Decision Pending",
+                        "Visa Approved"
+                      ].map((step, index) => {
+                        const visaSteps = [
+                          "Application Started",
+                          "Documents Submitted",
+                          "Biometrics Scheduled",
+                          "Biometrics Completed",
+                          "Visa Decision Pending",
+                          "Visa Approved"
+                        ];
+                        const currentVisaIndex = auditVisa ? visaSteps.indexOf(auditVisa.status) : 0;
+                        const isPassed = index < currentVisaIndex;
+                        const isCurrent = index === currentVisaIndex;
+
+                        return (
+                          <div key={step} className="relative z-10 flex items-start gap-3 text-left">
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                              isPassed 
+                                ? "bg-emerald-500 border-emerald-500 text-white" 
+                                : isCurrent
+                                ? "bg-primary border-primary text-white scale-105"
+                                : "bg-white border-slate-200 text-slate-400"
+                            }`}>
+                              {isPassed ? <Check size={10} weight="bold" /> : <span className="text-[9px] font-bold">{index + 1}</span>}
+                            </div>
+                            <div>
+                              <p className={`text-xs font-bold ${isCurrent ? "text-primary font-black" : "text-slate-500"}`}>{step}</p>
+                              {isCurrent && auditVisa?.details && <p className="text-[10px] text-slate-400 mt-0.5">{auditVisa.details}</p>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Right visa modifier form */}
+                  <div className="bg-white border border-hairline rounded-2xl p-4.5 h-fit text-xs">
+                    <h4 className="font-bold text-sm text-primary mb-4">Update Visa Milestone</h4>
+                    <form onSubmit={handleUpdateVisaStatus} className="space-y-4">
+                      
+                      <div className="flex flex-col gap-1">
+                        <label className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Active Stage *</label>
+                        <select 
+                          value={adminVisaStatus}
+                          onChange={(e) => setAdminVisaStatus(e.target.value)}
+                          className="px-3.5 py-2 border border-hairline rounded-xl bg-white text-xs text-slate-800 focus:outline-none cursor-pointer"
+                        >
+                          <option value="Application Started">Application Started</option>
+                          <option value="Documents Submitted">Documents Submitted</option>
+                          <option value="Biometrics Scheduled">Biometrics Scheduled</option>
+                          <option value="Biometrics Completed">Biometrics Completed</option>
+                          <option value="Visa Decision Pending">Visa Decision Pending</option>
+                          <option value="Visa Approved">Visa Approved</option>
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Milestone Notes</label>
+                        <textarea 
+                          rows={3} 
+                          value={adminVisaDetails}
+                          onChange={(e) => setAdminVisaDetails(e.target.value)}
+                          placeholder="e.g. Scheduled for VFS Kathmandu at 10 AM." 
+                          className="px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none focus:border-primary resize-none bg-white"
+                        />
+                      </div>
+
+                      <Button type="submit" disabled={updatingVisa} className="w-full text-xs py-2.5">
+                        {updatingVisa ? "Updating..." : "Update Visa Status"}
+                      </Button>
+
+                    </form>
+                  </div>
+
+                </div>
+              )}
+
+              {/* TAB E: MESSAGING CHAT */}
+              {auditTab === "chat" && (
+                <div className="bg-white border border-hairline rounded-2xl h-[450px] flex flex-col justify-between overflow-hidden">
+                  
+                  {/* Messages container */}
+                  <div className="flex-grow p-4 overflow-y-auto bg-slate-50/50 space-y-3 flex flex-col">
+                    {auditMessages.length === 0 ? (
+                      <p className="text-slate-400 py-6 text-center my-auto">No chat history with this student.</p>
+                    ) : (
+                      auditMessages.map(msg => {
+                        const isStudent = msg.sender_type === "student";
+                        return (
+                          <div 
+                            key={msg.id}
+                            className={`flex flex-col max-w-[75%] ${
+                              isStudent ? "self-start items-start" : "self-end items-end"
+                            }`}
+                          >
+                            <div className={`p-3 rounded-2xl text-[11px] leading-relaxed ${
+                              isStudent 
+                                ? "bg-white border border-hairline/80 text-slate-800 rounded-bl-none shadow-sm"
+                                : "bg-primary text-white rounded-br-none"
+                            }`}>
+                              <p className="whitespace-pre-wrap">{msg.message}</p>
+                              {msg.attachment_url && (
+                                <a 
+                                  href={msg.attachment_url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className={`mt-2 p-1.5 rounded-lg flex items-center gap-1.5 text-[10px] border ${
+                                    isStudent 
+                                      ? "bg-slate-50 border-hairline text-slate-600 hover:bg-slate-100"
+                                      : "bg-white/10 border-white/20 text-white hover:bg-white/20"
+                                  }`}
+                                >
+                                  <Paperclip size={12} />
+                                  <span className="truncate max-w-[150px] font-bold">{msg.attachment_name}</span>
+                                </a>
+                              )}
+                            </div>
+                            <span className="text-[8px] text-slate-400 mt-0.5">
+                              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Send Reply box */}
+                  <form onSubmit={handleSendAdminReply} className="p-3.5 border-t border-hairline bg-white flex items-end gap-3.5">
+                    
+                    {/* File Attachment selector */}
+                    <div className="relative shrink-0">
+                      <label className={`w-9 h-9 rounded-full border border-hairline flex items-center justify-center cursor-pointer transition-colors ${
+                        adminReplyFile ? "bg-primary/10 border-primary/20 text-primary" : "text-slate-400 hover:text-primary hover:bg-slate-50"
+                      }`} title="Add Attachment">
+                        <Paperclip size={16} />
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          onChange={(e) => e.target.files && setAdminReplyFile(e.target.files[0])}
+                          disabled={sendingReply}
+                        />
+                      </label>
+                      {adminReplyFile && (
+                        <button 
+                          type="button" 
+                          onClick={() => setAdminReplyFile(null)}
+                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors"
+                        >
+                          <X size={8} weight="bold" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex-grow">
+                      {adminReplyFile && (
+                        <div className="text-[9px] bg-slate-50 border border-hairline px-2.5 py-0.5 rounded-t-xl text-slate-500 truncate max-w-sm">
+                          Attached: <span className="font-semibold text-primary">{adminReplyFile.name}</span>
+                        </div>
+                      )}
+                      <textarea
+                        rows={1}
+                        value={adminReplyText}
+                        onChange={(e) => setAdminReplyText(e.target.value)}
+                        placeholder="Type counselor reply..."
+                        className={`w-full border border-hairline px-3.5 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs transition-all resize-none bg-white ${
+                          adminReplyFile ? "rounded-b-xl border-t-0" : "rounded-xl"
+                        }`}
+                        disabled={sendingReply}
+                      />
+                    </div>
+
+                    <Button type="submit" disabled={sendingReply} className="w-9 h-9 p-0 rounded-full flex items-center justify-center shrink-0">
+                      {sendingReply ? (
+                        <SpinnerGap size={14} className="animate-spin text-white" />
+                      ) : (
+                        <PaperPlaneRight size={14} weight="fill" />
+                      )}
+                    </Button>
+
+                  </form>
+                </div>
+              )}
+
+              {/* TAB F: ACTIVITY LOGS */}
+              {auditTab === "logs" && (
+                <div className="space-y-4">
+                  <h4 className="font-bold text-sm text-primary">File Activity Logs</h4>
+                  {auditLogs.length === 0 ? (
+                    <p className="text-slate-400 py-6 text-center border border-dashed border-hairline rounded-xl bg-white">No historical actions logged.</p>
+                  ) : (
+                    <div className="border border-hairline rounded-2xl bg-white divide-y divide-hairline">
+                      {auditLogs.map(log => (
+                        <div key={log.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-slate-600 font-medium">
+                          <div>
+                            <span className="font-bold text-primary uppercase tracking-wide text-[9px] bg-slate-100 px-2 py-0.5 rounded-md mr-2">
+                              {log.action}
+                            </span>
+                            <span>{log.details || "No details log."}</span>
+                          </div>
+                          <span className="font-mono-data text-[10px] text-slate-400 shrink-0">
+                            {new Date(log.created_at).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-hairline bg-slate-50 flex justify-end gap-3 shrink-0">
+              <Button onClick={() => setIsAuditModalOpen(false)} variant="ghost" size="sm">Close Workspace</Button>
+            </div>
+
           </Card>
         </div>
       )}

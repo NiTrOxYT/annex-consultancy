@@ -128,7 +128,10 @@ export function Navigation() {
               })}
             </nav>
 
-            <div className="hidden lg:flex items-center">
+            <div className="hidden lg:flex items-center gap-3">
+              <Link href="/student-login">
+                <Button variant="ghost" size="sm">Student Login</Button>
+              </Link>
               <Link href="/contact">
                 <Button size="sm">Book Consultation</Button>
               </Link>
@@ -197,8 +200,13 @@ export function Navigation() {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: navLinks.length * 0.05 }}
-              className="flex flex-col gap-4 border-t border-hairline pt-6 mt-6"
+              className="flex flex-col gap-3 border-t border-hairline pt-6 mt-6"
             >
+              <Link href="/student-login" className="w-full">
+                <Button variant="outline" className="w-full text-center">
+                  Student Login
+                </Button>
+              </Link>
               <Link href="/contact" className="w-full">
                 <Button variant="primary" className="w-full text-center">
                   Book Consultation
