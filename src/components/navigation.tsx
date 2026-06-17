@@ -57,18 +57,38 @@ export function Navigation() {
     <>
       {/* Floating Glass Pill Navigation Bar */}
       <header className="fixed top-0 inset-x-0 z-40 px-4 pt-6 pointer-events-none">
-        <div className="max-w-7xl mx-auto flex items-center justify-between pointer-events-auto">
+        <div className="max-w-[1700px] mx-auto pointer-events-auto">
           {/* Main floating pill */}
-          <div className="w-full flex items-center justify-between bg-white/70 backdrop-blur-xl border border-hairline/80 px-6 py-3.5 rounded-full shadow-[0_8px_32px_rgba(15,23,42,0.04)]">
-            <Link href="/" className="flex items-center gap-2 group">
-              <GraduationCap size={26} className="text-primary transition-transform duration-300 group-hover:rotate-12" weight="fill" />
-              <span className="font-display font-bold text-lg tracking-tight text-primary">
-                ANNEX
-              </span>
-            </Link>
+          <div className="w-full flex items-center bg-white/70 backdrop-blur-xl border border-hairline/80 px-8 py-3.5 rounded-full shadow-[0_8px_32px_rgba(15,23,42,0.04)]">
+
+            {/* Logo */}
+
+            <div className="shrink-0">
+
+              <Link href="/" className="flex items-center gap-3 group">
+
+                <GraduationCap
+
+                  size={26}
+
+                  className="text-primary transition-transform duration-300 group-hover:rotate-12"
+
+                  weight="fill"
+
+                />
+
+                <span className="font-display font-bold text-lg tracking-tight text-primary">
+
+                  ANNEX
+
+                </span>
+
+              </Link>
+
+            </div>
 
             {/* Desktop Menu */}
-            <nav className="hidden lg:flex items-center gap-8">
+            <nav className="hidden xl:flex flex-1 justify-center items-center gap-8 2xl:gap-10 px-6">
               {navLinks.map((link) => {
                 if (link.dropdown) {
                   return (
@@ -128,27 +148,49 @@ export function Navigation() {
               })}
             </nav>
 
-            <div className="hidden lg:flex items-center gap-3">
+            <div className="hidden xl:flex items-center gap-4 shrink-0">
+
               <Link href="/student-login">
+
                 <Button
+
                   size="sm"
-                  className="bg-gradient-to-r from-gold to-yellow-500 text-primary font-semibold hover:scale-105 transition-all duration-300 shadow-md"
+
+                  className="bg-gradient-to-r from-gold to-yellow-500 text-primary font-semibold shadow-md"
+
                 >
+
                   🎓 Student Portal
+
                 </Button>
+
               </Link>
+
               <Link href="/contact">
-                <Button size="sm">Book Consultation</Button>
+
+                <Button size="sm">
+
+                  Book Consultation
+
+                </Button>
+
               </Link>
+
             </div>
 
             {/* Mobile Toggle Button */}
             <button
+
               onClick={() => setIsOpen(!isOpen)}
-              className="lg:hidden p-2 rounded-full hover:bg-subtle-gray transition-colors text-slate-600 hover:text-primary cursor-pointer"
+
+              className="xl:hidden ml-auto p-2 rounded-full hover:bg-subtle-gray"
+
             >
+
               {isOpen ? <X size={20} /> : <List size={20} />}
+
             </button>
+
           </div>
         </div>
       </header>
