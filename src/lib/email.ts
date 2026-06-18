@@ -1,3 +1,14 @@
+import { supabase } from "@/lib/supabase";
+
+const brevoKey = process.env.BREVO_API_KEY;
+const fromEmail = process.env.EMAIL_FROM || "notifications@annexconsultancy.com";
+const isBrevoConfigured = !!brevoKey;
+
+console.log("[Diagnostic] Email System Initialization:");
+console.log(`[Diagnostic] BREVO_API_KEY detected: ${isBrevoConfigured ? "YES" : "NO"}`);
+console.log(`[Diagnostic] EMAIL_FROM: ${fromEmail}`);
+console.log(`[Diagnostic] Email Mode: ${isBrevoConfigured ? "Brevo API Mode" : "Mock/Log Mode"}`);
+
 export async function sendEmail({
   to,
   subject,
@@ -7,77 +18,109 @@ export async function sendEmail({
   subject: string;
   html: string;
 }) {
-  const resendKey = process.env.RESEND_API_KEY;
-  const brevoKey = process.env.BREVO_API_KEY;
-  const fromEmail = process.env.EMAIL_FROM || "notifications@annexconsultancy.com";
+  console.log(`[Diagnostic] Attempting email delivery to: ${to}, Subject: "${subject}"`);
 
-  console.log(`[Diagnostic] Email queued for: ${to} (Subject: "${subject}")`);
-
-  if (!resendKey && !brevoKey) {
+  if (!isBrevoConfigured) {
     console.log("---------- LOCAL EMAIL NOTIFICATION (MOCKED) ----------");
     console.log(`To: ${to}`);
     console.log(`Subject: ${subject}`);
     console.log(`Body: ${html}`);
     console.log("-------------------------------------------------------");
     console.log(`[Diagnostic] Email sent successfully (MOCKED) to: ${to}`);
-    return { success: true, mocked: true };
+
+    // Log in DB under Mock Mode
+    try {
+      await supabase.from("email_logs").insert([{
+        recipient_email: to,
+        subject,
+        status: "delivered",
+        message_id: `mock-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        error_details: "Mock Mode - No real transmission occurred"
+      }]);
+    } catch (dbErr: any) {
+      console.error("[Diagnostic] Failed to log mock email to DB:", dbErr.message);
+    }
+
+    return { success: true, mocked: true, messageId: `mock-${Date.now()}` };
   }
 
   try {
-    if (resendKey) {
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${resendKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: fromEmail,
-          to: [to],
-          subject,
-          html,
-        }),
-      });
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "api-key": brevoKey!,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sender: { email: fromEmail, name: "Annex Consultancy Portal" },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
+    });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[Diagnostic] Email failed via Resend to ${to}. Error: ${errorText}`);
-        throw new Error(`Resend API Error: ${errorText}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Diagnostic] Brevo email delivery failed!
+Recipient: ${to}
+Subject: "${subject}"
+Status: ${response.status} ${response.statusText}
+Error Body: ${errorText}`);
+
+      // Log failure in DB
+      try {
+        await supabase.from("email_logs").insert([{
+          recipient_email: to,
+          subject,
+          status: "failed",
+          error_details: `Brevo API Error (${response.status}): ${errorText}`
+        }]);
+      } catch (dbErr: any) {
+        console.error("[Diagnostic] Failed to log failed email to DB:", dbErr.message);
       }
 
-      const data = await response.json();
-      console.log(`[Diagnostic] Email sent successfully via Resend to: ${to}`);
-      return { success: true, data };
-    } else if (brevoKey) {
-      const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
-        headers: {
-          "api-key": brevoKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          sender: { email: fromEmail, name: "Annex Consultancy Portal" },
-          to: [{ email: to }],
-          subject,
-          htmlContent: html,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[Diagnostic] Email failed via Brevo to ${to}. Error: ${errorText}`);
-        throw new Error(`Brevo API Error: ${errorText}`);
-      }
-
-      const data = await response.json();
-      console.log(`[Diagnostic] Email sent successfully via Brevo to: ${to}`);
-      return { success: true, data };
+      return { success: false, error: `Brevo API Error (${response.status}): ${errorText}` };
     }
+
+    const data = await response.json();
+    console.log(`[Diagnostic] Brevo email delivery successful!
+Recipient: ${to}
+Subject: "${subject}"
+Status: ${response.status}
+MessageId: ${data.messageId || "N/A"}`);
+
+    // Log success in DB
+    try {
+      await supabase.from("email_logs").insert([{
+        recipient_email: to,
+        subject,
+        status: "sent",
+        message_id: data.messageId || null
+      }]);
+    } catch (dbErr: any) {
+      console.error("[Diagnostic] Failed to log sent email to DB:", dbErr.message);
+    }
+
+    return { success: true, messageId: data.messageId };
   } catch (error: any) {
-    console.error(`[Diagnostic] Email sending failed to: ${to}. Error:`, error.message);
+    console.error(`[Diagnostic] Email sending threw exception to: ${to}. Error:`, error.message);
+
+    // Log exception in DB
+    try {
+      await supabase.from("email_logs").insert([{
+        recipient_email: to,
+        subject,
+        status: "failed",
+        error_details: error.message
+      }]);
+    } catch (dbErr: any) {
+      console.error("[Diagnostic] Failed to log exception email to DB:", dbErr.message);
+    }
+
     return { success: false, error: error.message };
   }
 }
+
 
 export async function sendStudentMessageEmail({
   studentName,

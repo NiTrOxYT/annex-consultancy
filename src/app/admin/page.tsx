@@ -5,13 +5,13 @@ import {
   Sparkle, ShieldCheck, SignOut, Trash, Plus, FileText, 
   Calendar, Users, Eye, CheckCircle, XCircle, ChartBar, 
   Download, MagnifyingGlass, Funnel, ArrowSquareOut, Globe, 
-  Warning, Check, X, SpinnerGap, GraduationCap, Star, Copy,
+  Warning, WarningCircle, Check, X, SpinnerGap, GraduationCap, Star, Copy,
   User, Paperclip, PaperPlaneRight, Gear, UploadSimple, Lock, Clock, Checks,
   ChatCircleDots
 } from "@phosphor-icons/react";
 import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
-import { Card, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardTitle, CardDescription, CardHeader, CardContent } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-url.supabase.co";
@@ -111,13 +111,20 @@ export default function AdminDashboard() {
   const [checkingAuth, setCheckingAuth] = React.useState(true);
   
   // Dashboard Tabs
-  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat" | "counselors">("bookings");
+  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat" | "counselors" | "settings">("bookings");
 
   // Loaders & table existence flags
   const [loading, setLoading] = React.useState(false);
   const [uniTableExists, setUniTableExists] = React.useState<boolean | null>(null);
   const [postsTableExists, setPostsTableExists] = React.useState<boolean | null>(null);
   const [storiesTableExists, setStoriesTableExists] = React.useState<boolean | null>(null);
+  const [emailLogsTableExists, setEmailLogsTableExists] = React.useState<boolean | null>(null);
+
+  // Email diagnostics states
+  const [emailLogs, setEmailLogs] = React.useState<any[]>([]);
+  const [testEmailAddress, setTestEmailAddress] = React.useState("");
+  const [sendingTestEmail, setSendingTestEmail] = React.useState(false);
+  const [testEmailResult, setTestEmailResult] = React.useState<{ success: boolean; message?: string } | null>(null);
 
   // Student Portal Tab states
   const [students, setStudents] = React.useState<any[]>([]);
@@ -678,6 +685,27 @@ export default function AdminDashboard() {
     } catch (err: any) {
       console.error("Error loading counselors:", err.message);
     }
+
+    // 8. Fetch Email Logs
+    try {
+      const { data, error } = await supabase
+        .from("email_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) {
+        if (error.code === "42P01" || error.message.includes("does not exist")) {
+          setEmailLogsTableExists(false);
+        } else {
+          throw error;
+        }
+      } else {
+        setEmailLogs(data || []);
+        setEmailLogsTableExists(true);
+      }
+    } catch (err: any) {
+      console.error("Error loading email logs:", err.message);
+    }
     
     setLoading(false);
   }, [fetchConversations]);
@@ -1120,6 +1148,47 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleSendTestEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testEmailAddress) return;
+
+    setSendingTestEmail(true);
+    setTestEmailResult(null);
+    try {
+      const response = await fetch("/api/test-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ email: testEmailAddress })
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        setTestEmailResult({
+          success: false,
+          message: result.error || "Failed to dispatch test email"
+        });
+        showToast("⚠️ Send test email failed! Check status details below.");
+      } else {
+        setTestEmailResult({
+          success: true,
+          message: `Email sent successfully! MessageId: ${result.messageId}`
+        });
+        showToast("✉️ Test email dispatched successfully.");
+        fetchAllData(); // Refresh logs
+      }
+    } catch (err: any) {
+      setTestEmailResult({
+        success: false,
+        message: err.message
+      });
+      showToast("⚠️ Send test email failed: " + err.message);
+    } finally {
+      setSendingTestEmail(false);
+    }
+  };
+
   const handleDeleteStory = async (id: string) => {
     if (!confirm("Are you sure you want to delete this success story?")) return;
     try {
@@ -1556,9 +1625,21 @@ export default function AdminDashboard() {
           senderType: "counselor",
           studentId: activeChatStudentId,
           messageContent: originalText || `Attachment: ${attachmentName}`,
-          counselorName: "Annex Counselor"
+          counselorName: "Annex Counselor",
+          messageId: newMsg.id
         })
-      }).catch(err => console.error("Email notification error:", err));
+      })
+      .then(async (res) => {
+        const result = await res.json();
+        if (!res.ok || !result.success) {
+          const errorMsg = result.error || "Email delivery failed";
+          showToast(`⚠️ Reply sent, but email notification to student failed: ${errorMsg}`);
+        }
+      })
+      .catch(err => {
+        console.error("Email notification error:", err);
+        showToast(`⚠️ Reply sent, but email notification to student failed: ${err.message}`);
+      });
 
     } catch (err: any) {
       console.error(`[Diagnostic] Supabase database admin insert failed:`, err);
@@ -1889,9 +1970,21 @@ export default function AdminDashboard() {
           senderType: "counselor",
           studentId: selectedStudent.id,
           messageContent: originalText || `Attachment: ${fileName}`,
-          counselorName: "Annex Counselor"
+          counselorName: "Annex Counselor",
+          messageId: newMsg.id
         })
-      }).catch(err => console.error("Email notification error:", err));
+      })
+      .then(async (res) => {
+        const result = await res.json();
+        if (!res.ok || !result.success) {
+          const errorMsg = result.error || "Email delivery failed";
+          showToast(`⚠️ Reply sent, but email notification to student failed: ${errorMsg}`);
+        }
+      })
+      .catch(err => {
+        console.error("Email notification error:", err);
+        showToast(`⚠️ Reply sent, but email notification to student failed: ${err.message}`);
+      });
 
     } catch (err: any) {
       console.error(`[Diagnostic] Supabase database admin audit insert failed:`, err);
@@ -2171,7 +2264,8 @@ export default function AdminDashboard() {
               { id: "chat", label: "Messaging" },
               { id: "universities", label: `Universities (${universities.length})` },
               { id: "blog", label: `Blog posts (${posts.length})` },
-              { id: "stories", label: `Success stories (${stories.length})` }
+              { id: "stories", label: `Success stories (${stories.length})` },
+              { id: "settings", label: "Email Status" }
             ].map(tab => {
               const isActive = activeTab === tab.id;
               const unreadCount = tab.id === "chat" 
@@ -4113,6 +4207,210 @@ export default function AdminDashboard() {
             </div>
           </section>
         )}
+
+        {activeTab === "settings" && (
+          <section className="flex flex-col gap-8 animate-fade-in text-slate-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-display font-bold text-2xl text-primary leading-tight">Email System Diagnostics</h2>
+                <p className="text-xs text-slate-400 mt-1">Audit the Brevo Transactional API setup, send test emails, and review recent notification logs.</p>
+              </div>
+              <Button variant="secondary" size="sm" onClick={fetchAllData} className="flex items-center gap-1.5">
+                <SpinnerGap className={loading ? "animate-spin" : ""} size={14} /> Refresh Logs
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              
+              {/* Left Column: Diagnostics & Config Status / Send Test Email */}
+              <div className="lg:col-span-1 space-y-6">
+                
+                {/* Configuration Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                      <Gear size={16} className="text-primary" />
+                      Configuration Status
+                    </CardTitle>
+                    <CardDescription className="text-[11px]">Active environment variables & mailing parameters</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4 text-xs">
+                    <div className="flex justify-between items-center py-2 border-b border-hairline">
+                      <span className="font-semibold text-slate-500">Mailing Provider</span>
+                      <span className="font-bold text-primary">Brevo API</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-hairline">
+                      <span className="font-semibold text-slate-500">BREVO_API_KEY</span>
+                      {process.env.BREVO_API_KEY ? (
+                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] uppercase">Configured</span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full font-bold text-[10px] uppercase">Mock Mode (Local)</span>
+                      )}
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-hairline">
+                      <span className="font-semibold text-slate-500">EMAIL_FROM (Sender)</span>
+                      <span className="font-mono-data text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-hairline/50">
+                        {process.env.EMAIL_FROM || "notifications@annexconsultancy.com"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-hairline">
+                      <span className="font-semibold text-slate-500">Supabase DB Logger</span>
+                      {emailLogsTableExists === false ? (
+                        <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded-full font-bold text-[10px] uppercase">Migration Missing</span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] uppercase">Active Logs Table</span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Send Test Email Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                      <PaperPlaneRight size={16} className="text-primary" />
+                      Send Test Email
+                    </CardTitle>
+                    <CardDescription className="text-[11px]">Dispatch a test email transaction via Brevo</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleSendTestEmail} className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Recipient Email Address</label>
+                        <input
+                          type="email"
+                          required
+                          value={testEmailAddress}
+                          onChange={(e) => setTestEmailAddress(e.target.value)}
+                          placeholder="e.g. test@example.com"
+                          className="w-full border border-hairline px-3.5 py-2.5 rounded-xl text-xs outline-none focus:border-primary bg-white text-slate-800"
+                        />
+                      </div>
+                      
+                      <Button
+                        type="submit"
+                        disabled={sendingTestEmail}
+                        className="w-full text-xs py-2.5 flex items-center justify-center gap-1.5"
+                      >
+                        {sendingTestEmail ? (
+                          <SpinnerGap size={14} className="animate-spin text-white" />
+                        ) : (
+                          <>
+                            <PaperPlaneRight size={14} />
+                            Send Test Email
+                          </>
+                        )}
+                      </Button>
+                      
+                      {testEmailResult && (
+                        <div className={`p-4 rounded-xl border text-xs leading-relaxed ${
+                          testEmailResult.success 
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-200" 
+                            : "bg-red-50 text-red-800 border-red-200"
+                        }`}>
+                          <p className="font-bold mb-1">{testEmailResult.success ? "Success" : "Error Details"}</p>
+                          <p className="break-words whitespace-pre-wrap font-mono-data text-[10px] bg-white/50 p-2 rounded border border-hairline/25">{testEmailResult.message}</p>
+                        </div>
+                      )}
+                    </form>
+                  </CardContent>
+                </Card>
+
+              </div>
+
+              {/* Right Column: Notification Logs attempts */}
+              <div className="lg:col-span-2 space-y-6">
+                
+                <Card className="h-full flex flex-col">
+                  <CardHeader>
+                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                      <Clock size={16} className="text-primary" />
+                      Mailing Log History (Last 50 attempts)
+                    </CardTitle>
+                    <CardDescription className="text-[11px]">Real-time list of email notifications dispatched by the Annex server</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-grow p-0 overflow-x-auto">
+                    {emailLogsTableExists === false ? (
+                      <div className="p-8 text-center text-slate-500 space-y-3">
+                        <WarningCircle size={40} className="mx-auto text-amber-500 animate-pulse" />
+                        <h4 className="font-bold text-sm text-slate-700">Database Table Missing</h4>
+                        <p className="text-xs text-slate-400 max-w-md mx-auto">
+                          The email logger could not retrieve events because the <code>email_logs</code> table does not exist yet. Please execute the SQL migration script in your Supabase SQL editor:
+                        </p>
+                        <textarea
+                          readOnly
+                          rows={6}
+                          className="w-full text-[10px] font-mono-data bg-slate-900 text-slate-300 p-3 rounded-lg border border-hairline resize-none"
+                          value={`CREATE TABLE public.email_logs (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    recipient_email TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    status TEXT DEFAULT 'sent',
+    message_id TEXT,
+    error_details TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);`}
+                        />
+                      </div>
+                    ) : emailLogs.length === 0 ? (
+                      <div className="py-12 text-center text-slate-400 text-xs">
+                        <CheckCircle size={40} className="mx-auto text-slate-300 mb-2" />
+                        <span>No mail logs found in database. Send a test email to initialize logs.</span>
+                      </div>
+                    ) : (
+                      <div className="max-h-[500px] overflow-y-auto">
+                        <table className="w-full text-left text-xs text-slate-600 divide-y divide-hairline">
+                          <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            <tr>
+                              <th className="px-4 py-3">Status</th>
+                              <th className="px-4 py-3">Recipient</th>
+                              <th className="px-4 py-3">Subject</th>
+                              <th className="px-4 py-3">Details / Errors</th>
+                              <th className="px-4 py-3">Date & Time</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-hairline bg-white">
+                            {emailLogs.map((log) => (
+                              <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="px-4 py-3">
+                                  <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                                    log.status === "delivered" 
+                                      ? "bg-emerald-50 text-emerald-600 border-emerald-200" 
+                                      : log.status === "sent"
+                                      ? "bg-blue-50 text-blue-600 border-blue-200"
+                                      : "bg-red-50 text-red-600 border-red-200"
+                                  }`}>
+                                    {log.status}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 font-semibold text-slate-700 truncate max-w-[150px]">{log.recipient_email}</td>
+                                <td className="px-4 py-3 truncate max-w-[180px]">{log.subject}</td>
+                                <td className="px-4 py-3 max-w-[200px]">
+                                  {log.error_details ? (
+                                    <div className="text-[10px] text-red-600 bg-red-50/50 border border-red-100 p-2.5 rounded-xl font-mono-data whitespace-pre-wrap break-words max-h-[100px] overflow-y-auto leading-relaxed">
+                                      {log.error_details}
+                                    </div>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-400 font-mono-data break-all">{log.message_id || "N/A"}</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-slate-400 text-[10px]">
+                                  {new Date(log.created_at).toLocaleDateString()} at {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+              </div>
+
+            </div>
+          </section>
+        )}
       </div>
 
       {/* MODALS */}
@@ -5499,7 +5797,18 @@ export default function AdminDashboard() {
                               studentId: selectedStudent.id,
                               meetingData: { title: meetingForm.title, scheduled_at: scheduledAt, meeting_link: meetingForm.meeting_link, meeting_type: meetingForm.meeting_type, duration_minutes: parseInt(meetingForm.duration_minutes) || 30 }
                             })
-                          }).catch(err => console.error("Meeting update email error:", err));
+                          })
+                          .then(async (res) => {
+                            const result = await res.json();
+                            if (!res.ok || !result.success) {
+                              const errorMsg = result.error || "Email delivery failed";
+                              showToast(`⚠️ Meeting updated, but student email notification failed: ${errorMsg}`);
+                            }
+                          })
+                          .catch(err => {
+                            console.error("Meeting update email error:", err);
+                            showToast(`⚠️ Meeting updated, but student email notification failed: ${err.message}`);
+                          });
 
                           // Notification
                           await supabase.from("student_notifications").insert([{
@@ -5541,7 +5850,18 @@ export default function AdminDashboard() {
                               studentId: selectedStudent.id,
                               meetingData: { title: meetingForm.title, scheduled_at: scheduledAt, meeting_link: meetingForm.meeting_link, meeting_type: meetingForm.meeting_type, duration_minutes: parseInt(meetingForm.duration_minutes) || 30 }
                             })
-                          }).catch(err => console.error("Meeting schedule email error:", err));
+                          })
+                          .then(async (res) => {
+                            const result = await res.json();
+                            if (!res.ok || !result.success) {
+                              const errorMsg = result.error || "Email delivery failed";
+                              showToast(`⚠️ Meeting scheduled, but student email notification failed: ${errorMsg}`);
+                            }
+                          })
+                          .catch(err => {
+                            console.error("Meeting schedule email error:", err);
+                            showToast(`⚠️ Meeting scheduled, but student email notification failed: ${err.message}`);
+                          });
 
                           // Notification
                           await supabase.from("student_notifications").insert([{
@@ -5779,7 +6099,18 @@ export default function AdminDashboard() {
                                           studentId: selectedStudent.id,
                                           meetingData: { title: meeting.title, scheduled_at: meeting.scheduled_at }
                                         })
-                                      }).catch(err => console.error("Meeting cancel email error:", err));
+                                      })
+                                      .then(async (res) => {
+                                        const result = await res.json();
+                                        if (!res.ok || !result.success) {
+                                          const errorMsg = result.error || "Email delivery failed";
+                                          showToast(`⚠️ Meeting cancelled, but student email notification failed: ${errorMsg}`);
+                                        }
+                                      })
+                                      .catch(err => {
+                                        console.error("Meeting cancel email error:", err);
+                                        showToast(`⚠️ Meeting cancelled, but student email notification failed: ${err.message}`);
+                                      });
 
                                       await supabase.from("student_notifications").insert([{
                                         student_id: selectedStudent.id,

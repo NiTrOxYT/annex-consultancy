@@ -584,9 +584,21 @@ export default function StudentDashboard() {
         body: JSON.stringify({
           senderType: "student",
           studentId: studentId,
-          messageContent: originalMsgText || `Uploaded attachment: ${attachmentName}`
+          messageContent: originalMsgText || `Uploaded attachment: ${attachmentName}`,
+          messageId: insertedMsg.id
         })
-      }).catch(err => console.error("Email notification trigger failed:", err));
+      })
+      .then(async (res) => {
+        const result = await res.json();
+        if (!res.ok || !result.success) {
+          const errorMsg = result.error || "Email delivery failed";
+          alert(`⚠️ Chat message sent successfully, but email notification to counselor failed:\n${errorMsg}`);
+        }
+      })
+      .catch(err => {
+        console.error("Email notification trigger failed:", err);
+        alert(`⚠️ Chat message sent successfully, but email notification to counselor failed:\n${err.message}`);
+      });
 
       // Log activity
       await supabase.from("student_activity_logs").insert({

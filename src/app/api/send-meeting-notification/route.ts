@@ -122,6 +122,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
     }
 
+    if (emailResult && !emailResult.success) {
+      return NextResponse.json({
+        success: false,
+        error: emailResult.error || "Email delivery failed",
+        emailResult
+      });
+    }
+
     return NextResponse.json({ success: true, emailResult });
   } catch (error: any) {
     console.error("API send-meeting-notification failed:", error);

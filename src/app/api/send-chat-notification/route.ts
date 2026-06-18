@@ -5,15 +5,12 @@ import { sendStudentMessageEmail, sendCounselorMessageEmail } from "@/lib/email"
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { action, senderType, studentId, messageContent, counselorName } = body;
+    const { action, senderType, studentId, messageContent, counselorName, messageId } = body;
 
     if (action === "health") {
-      const resendKey = process.env.RESEND_API_KEY;
       const brevoKey = process.env.BREVO_API_KEY;
       let provider = "Mocked (Local Console)";
-      if (resendKey) {
-        provider = "Resend";
-      } else if (brevoKey) {
+      if (brevoKey) {
         provider = "Brevo";
       }
       console.log(`[Diagnostic] Health check: email provider is configured as "${provider}"`);
@@ -71,19 +68,26 @@ export async function POST(request: Request) {
       });
     }
 
-    // Insert log to database for notifications audit
+    // Insert log to message_notifications database for audit
     try {
-      const { data: latestMsg } = await supabase
-        .from("student_messages")
-        .select("id")
-        .eq("student_id", studentId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      let finalMessageId = messageId;
+      if (!finalMessageId) {
+        const { data: latestMsg } = await supabase
+          .from("student_messages")
+          .select("id")
+          .eq("student_id", studentId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (latestMsg) {
+        if (latestMsg) {
+          finalMessageId = latestMsg.id;
+        }
+      }
+
+      if (finalMessageId) {
         await supabase.from("message_notifications").insert([{
-          message_id: latestMsg.id,
+          message_id: finalMessageId,
           notification_type: "email",
           recipient_email: recipientEmail,
           status: emailResult?.success ? "sent" : "failed",
@@ -94,9 +98,18 @@ export async function POST(request: Request) {
       console.error("Failed to insert message notification log:", dbErr);
     }
 
+    if (!emailResult?.success) {
+      return NextResponse.json({
+        success: false,
+        error: emailResult?.error || "Email delivery failed",
+        emailResult
+      });
+    }
+
     return NextResponse.json({ success: true, emailResult });
   } catch (error: any) {
     console.error("API send-chat-notification failed:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
