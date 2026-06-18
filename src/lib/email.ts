@@ -484,3 +484,259 @@ export async function sendMeetingReminderEmail({
     html,
   });
 }
+
+// ── Career & Placement Training Email Functions ──────────────────────────────────
+
+export async function sendCareerLeadNotification({
+  leadName,
+  leadEmail,
+  leadPhone,
+  serviceTitle,
+  adminEmail,
+}: {
+  leadName: string;
+  leadEmail: string;
+  leadPhone: string;
+  serviceTitle: string;
+  adminEmail: string;
+}) {
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 12px; background-color: #ffffff;">
+      <h2 style="color: #0f172a; margin-bottom: 8px;">💼 New Career Service Lead</h2>
+      <p style="color: #475569; font-size: 14px;">A student has requested enrollment in a Training & Placement service.</p>
+      
+      <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #f1f5f9; margin: 20px 0; font-size: 14px; color: #334155;">
+        <p style="margin: 0 0 8px 0;"><strong>Student Name:</strong> ${leadName}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Student Email:</strong> ${leadEmail}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Student Phone:</strong> ${leadPhone || "N/A"}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Requested Service:</strong> ${serviceTitle}</p>
+        <p style="margin: 0;"><strong>Timestamp:</strong> ${new Date().toLocaleString()}</p>
+      </div>
+      
+      <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+      <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">Annex Career Platform lead system.</p>
+    </div>
+  `;
+
+  return sendEmail({
+    to: adminEmail,
+    subject: `💼 New Lead: ${leadName} - ${serviceTitle}`,
+    html,
+  });
+}
+
+export async function sendCareerPortalActivationEmail({
+  studentEmail,
+  studentName,
+  serviceTitle,
+  password,
+}: {
+  studentEmail: string;
+  studentName: string;
+  serviceTitle: string;
+  password: string;
+}) {
+  const portalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/career-portal`;
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 12px; background-color: #ffffff;">
+      <h2 style="color: #0f172a; margin-bottom: 8px;">🎉 Career Portal Access Activated!</h2>
+      <p style="color: #475569; font-size: 14px;">Hello ${studentName},</p>
+      <p style="color: #475569; font-size: 14px;">Your enrollment request for <strong>${serviceTitle}</strong> has been approved. You can now access your Career Portal to view tasks, upload files, and message your consultant.</p>
+      
+      <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #f1f5f9; margin: 20px 0; font-size: 14px; color: #334155; font-family: monospace;">
+        <p style="margin: 0 0 8px 0;"><strong>Portal URL:</strong> <a href="${portalUrl}">${portalUrl}</a></p>
+        <p style="margin: 0 0 8px 0;"><strong>Username / Email:</strong> ${studentEmail}</p>
+        <p style="margin: 0;"><strong>Temporary Password:</strong> ${password}</p>
+      </div>
+      
+      <p style="color: #475569; font-size: 13px;">Please log in and update your details. We look forward to working on your career journey!</p>
+      
+      <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+      <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">Annex Career Platform onboarding.</p>
+    </div>
+  `;
+
+  return sendEmail({
+    to: studentEmail,
+    subject: `🎉 Access Activated: Annex Career Services`,
+    html,
+  });
+}
+
+export async function sendCareerTaskAssignedEmail({
+  studentEmail,
+  studentName,
+  taskTitle,
+  dueDate,
+  consultantName,
+}: {
+  studentEmail: string;
+  studentName: string;
+  taskTitle: string;
+  dueDate?: string;
+  consultantName: string;
+}) {
+  const portalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/career-portal`;
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 12px; background-color: #ffffff;">
+      <h2 style="color: #0f172a; margin-bottom: 8px;">📝 New Task Assigned</h2>
+      <p style="color: #475569; font-size: 14px;">Hello ${studentName},</p>
+      <p style="color: #475569; font-size: 14px;">A new task has been assigned to you by your consultant, <strong>${consultantName}</strong>.</p>
+      
+      <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #f1f5f9; margin: 20px 0; font-size: 14px; color: #334155;">
+        <p style="margin: 0 0 8px 0;"><strong>Task Title:</strong> ${taskTitle}</p>
+        <p style="margin: 0;"><strong>Due Date:</strong> ${dueDate || "No deadline set"}</p>
+      </div>
+      
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${portalUrl}" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">View in Career Portal</a>
+      </div>
+      
+      <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+      <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">Annex Career Platform notifications.</p>
+    </div>
+  `;
+
+  return sendEmail({
+    to: studentEmail,
+    subject: `📝 New Task Assigned: ${taskTitle}`,
+    html,
+  });
+}
+
+export async function sendCareerTaskCompletedEmail({
+  consultantEmail,
+  studentName,
+  taskTitle,
+}: {
+  consultantEmail: string;
+  studentName: string;
+  taskTitle: string;
+}) {
+  const portalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/admin`;
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 12px; background-color: #ffffff;">
+      <h2 style="color: #0f172a; margin-bottom: 8px;">✅ Task Submitted / Completed</h2>
+      <p style="color: #475569; font-size: 14px;">Hello,</p>
+      <p style="color: #475569; font-size: 14px;">The student <strong>${studentName}</strong> has completed/submitted the following task for your review.</p>
+      
+      <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #f1f5f9; margin: 20px 0; font-size: 14px; color: #334155;">
+        <p style="margin: 0;"><strong>Task Title:</strong> ${taskTitle}</p>
+      </div>
+      
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${portalUrl}" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Open Admin Dashboard</a>
+      </div>
+      
+      <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+      <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">Annex Career Platform notifications.</p>
+    </div>
+  `;
+
+  return sendEmail({
+    to: consultantEmail,
+    subject: `✅ Task Completed: ${studentName} - ${taskTitle}`,
+    html,
+  });
+}
+
+export async function sendCareerMeetingScheduledEmail({
+  studentEmail,
+  studentName,
+  meetingTitle,
+  meetingDate,
+  meetingTime,
+  meetingLink,
+  consultantName,
+  meetingType,
+  duration,
+}: {
+  studentEmail: string;
+  studentName: string;
+  meetingTitle: string;
+  meetingDate: string;
+  meetingTime: string;
+  meetingLink?: string;
+  consultantName: string;
+  meetingType: string;
+  duration: number;
+}) {
+  const portalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/career-portal`;
+  const linkBlock = meetingLink
+    ? `<div style="text-align: center; margin: 20px 0;">
+        <a href="${meetingLink}" style="display: inline-block; background-color: #059669; color: #ffffff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Join Meeting</a>
+      </div>`
+    : "";
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 12px; background-color: #ffffff;">
+      <h2 style="color: #0f172a; margin-bottom: 8px;">📅 New Career Session Scheduled</h2>
+      <p style="color: #475569; font-size: 14px;">Hello ${studentName},</p>
+      <p style="color: #475569; font-size: 14px;">A new meeting has been scheduled for you by your career consultant.</p>
+      
+      <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #f1f5f9; margin: 20px 0; font-size: 14px; color: #334155;">
+        <p style="margin: 0 0 8px 0;"><strong>Meeting:</strong> ${meetingTitle}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Date:</strong> ${meetingDate}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Time:</strong> ${meetingTime}</p>
+        <p style="margin: 0 0 8px 0;"><strong>Duration:</strong> ${duration} minutes</p>
+        <p style="margin: 0 0 8px 0;"><strong>Type:</strong> ${meetingType}</p>
+        <p style="margin: 0;"><strong>Consultant:</strong> ${consultantName}</p>
+      </div>
+      
+      ${linkBlock}
+      
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${portalUrl}" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Access Career Portal</a>
+      </div>
+      
+      <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+      <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">Annex Career Platform notifications.</p>
+    </div>
+  `;
+
+  return sendEmail({
+    to: studentEmail,
+    subject: `📅 New Meeting Scheduled - ${meetingTitle}`,
+    html,
+  });
+}
+
+export async function sendCareerMessageEmail({
+  recipientEmail,
+  senderName,
+  messageContent,
+  isStudent,
+}: {
+  recipientEmail: string;
+  senderName: string;
+  messageContent: string;
+  isStudent: boolean;
+}) {
+  const portalUrl = isStudent
+    ? `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/admin`
+    : `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/career-portal`;
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 12px; background-color: #ffffff;">
+      <h2 style="color: #0f172a; margin-bottom: 8px;">✉️ New Career Chat Message</h2>
+      <p style="color: #475569; font-size: 14px;">You have received a new message from <strong>${senderName}</strong> on the career consultancy portal.</p>
+      
+      <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #f1f5f9; margin: 20px 0; font-size: 14px; color: #334155;">
+        <p style="margin: 0; white-space: pre-wrap; font-style: italic; color: #0f172a; background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">${messageContent}</p>
+      </div>
+      
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${portalUrl}" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">Reply in Portal</a>
+      </div>
+      
+      <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
+      <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">This is an automated notification from the Annex Career Platform system.</p>
+    </div>
+  `;
+
+  return sendEmail({
+    to: recipientEmail,
+    subject: `✉️ New Message from ${senderName}`,
+    html,
+  });
+}

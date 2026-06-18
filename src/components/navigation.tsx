@@ -148,34 +148,28 @@ export function Navigation() {
               })}
             </nav>
 
-            <div className="hidden xl:flex items-center gap-4 shrink-0">
-
+            <div className="hidden xl:flex items-center gap-2.5 shrink-0">
               <Link href="/student-login">
-
                 <Button
-
                   size="sm"
-
-                  className="bg-gradient-to-r from-gold to-yellow-500 text-primary font-semibold shadow-md"
-
+                  className="bg-gradient-to-r from-gold to-yellow-500 text-primary font-semibold shadow-md text-xs px-3 py-1.5"
                 >
-
                   🎓 Student Portal
-
                 </Button>
-
               </Link>
-
+              <Link href="/career-portal">
+                <Button
+                  size="sm"
+                  className="bg-slate-900 hover:bg-slate-800 text-white font-semibold shadow-md text-xs px-3 py-1.5"
+                >
+                  💼 Career Portal
+                </Button>
+              </Link>
               <Link href="/contact">
-
-                <Button size="sm">
-
+                <Button size="sm" className="text-xs px-3 py-1.5">
                   Book Consultation
-
                 </Button>
-
               </Link>
-
             </div>
 
             {/* Mobile Toggle Button */}
@@ -247,15 +241,20 @@ export function Navigation() {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: navLinks.length * 0.05 }}
-              className="flex flex-col gap-3 border-t border-hairline pt-6 mt-6"
+              className="flex flex-col gap-2.5 border-t border-hairline pt-6 mt-6"
             >
               <Link href="/student-login" className="w-full">
-                <Button variant="outline" className="w-full text-center">
-                  Student Login
+                <Button variant="outline" className="w-full text-center text-xs py-2">
+                  Student Portal Login
+                </Button>
+              </Link>
+              <Link href="/career-portal" className="w-full">
+                <Button variant="outline" className="w-full text-center text-xs py-2 bg-slate-900 text-white border-none hover:bg-slate-800">
+                  Career Portal Login
                 </Button>
               </Link>
               <Link href="/contact" className="w-full">
-                <Button variant="primary" className="w-full text-center">
+                <Button variant="primary" className="w-full text-center text-xs py-2">
                   Book Consultation
                 </Button>
               </Link>

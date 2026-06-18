@@ -532,3 +532,123 @@ CREATE INDEX IF NOT EXISTS idx_email_logs_recipient ON public.email_logs(recipie
 CREATE INDEX IF NOT EXISTS idx_email_logs_status ON public.email_logs(status);
 CREATE INDEX IF NOT EXISTS idx_email_logs_created_at ON public.email_logs(created_at DESC);
 
+
+----------------------------------------------------
+-- 11. Training & Placement System Tables
+----------------------------------------------------
+
+-- A. Career Services Table
+CREATE TABLE IF NOT EXISTS public.training_services (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    price NUMERIC NOT NULL,
+    features JSONB DEFAULT '[]'::jsonb,
+    status TEXT DEFAULT 'Active',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.training_services ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public select training_services" ON public.training_services FOR SELECT USING (true);
+CREATE POLICY "Allow public write training_services" ON public.training_services FOR ALL USING (true) WITH CHECK (true);
+
+-- B. Career Students purchased leads/accounts table
+CREATE TABLE IF NOT EXISTS public.training_students (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    service_id UUID REFERENCES public.training_services(id) ON DELETE RESTRICT,
+    student_name TEXT NOT NULL,
+    student_email TEXT NOT NULL,
+    student_phone TEXT,
+    purchase_date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    assigned_consultant_id UUID REFERENCES public.counselors(id) ON DELETE SET NULL,
+    status TEXT DEFAULT 'Pending', -- 'Pending', 'Active', 'Completed', 'Cancelled'
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    auth_user_id UUID UNIQUE
+);
+
+-- Enable RLS
+ALTER TABLE public.training_students ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public select training_students" ON public.training_students FOR SELECT USING (true);
+CREATE POLICY "Allow public write training_students" ON public.training_students FOR ALL USING (true) WITH CHECK (true);
+
+-- C. Career Student tasks table
+CREATE TABLE IF NOT EXISTS public.training_tasks (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    student_id UUID REFERENCES public.training_students(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT,
+    status TEXT DEFAULT 'Pending', -- 'Pending', 'In Progress', 'Completed', 'Under Review'
+    due_date TIMESTAMP WITH TIME ZONE,
+    feedback TEXT,
+    file_url TEXT,
+    file_name TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.training_tasks ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public select training_tasks" ON public.training_tasks FOR SELECT USING (true);
+CREATE POLICY "Allow public write training_tasks" ON public.training_tasks FOR ALL USING (true) WITH CHECK (true);
+
+-- D. Career Student documents table
+CREATE TABLE IF NOT EXISTS public.training_documents (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    student_id UUID REFERENCES public.training_students(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    file_url TEXT NOT NULL,
+    uploaded_by TEXT NOT NULL, -- 'student' or 'admin'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.training_documents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public select training_documents" ON public.training_documents FOR SELECT USING (true);
+CREATE POLICY "Allow public write training_documents" ON public.training_documents FOR ALL USING (true) WITH CHECK (true);
+
+-- E. Link meetings to training students
+ALTER TABLE public.meetings ADD COLUMN IF NOT EXISTS training_student_id UUID REFERENCES public.training_students(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_meetings_training_student_id ON public.meetings(training_student_id);
+
+-- F. Career chat messaging table
+CREATE TABLE IF NOT EXISTS public.training_messages (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    student_id UUID REFERENCES public.training_students(id) ON DELETE CASCADE,
+    sender_type TEXT NOT NULL, -- 'student', 'admin', 'counselor'
+    message TEXT NOT NULL,
+    attachment_url TEXT,
+    attachment_name TEXT,
+    status TEXT DEFAULT 'sent',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.training_messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public select training_messages" ON public.training_messages FOR SELECT USING (true);
+CREATE POLICY "Allow public write training_messages" ON public.training_messages FOR ALL USING (true) WITH CHECK (true);
+
+-- G. Career chat conversations tracker
+CREATE TABLE IF NOT EXISTS public.training_conversations (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    student_id UUID REFERENCES public.training_students(id) ON DELETE CASCADE UNIQUE,
+    last_message TEXT,
+    last_sender_type TEXT,
+    last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    unread_count_admin INTEGER DEFAULT 0,
+    unread_count_student INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.training_conversations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public select training_conversations" ON public.training_conversations FOR SELECT USING (true);
+CREATE POLICY "Allow public write training_conversations" ON public.training_conversations FOR ALL USING (true) WITH CHECK (true);
+
+-- Replication tables for realtime
+-- ALTER PUBLICATION supabase_realtime ADD TABLE public.training_messages;
+-- ALTER PUBLICATION supabase_realtime ADD TABLE public.training_conversations;
+-- ALTER PUBLICATION supabase_realtime ADD TABLE public.training_tasks;
+-- ALTER PUBLICATION supabase_realtime ADD TABLE public.training_students;
+
+

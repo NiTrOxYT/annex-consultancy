@@ -14,11 +14,13 @@ const footerLinks = {
     { label: "Success Stories", href: "/success-stories" },
     { label: "Latest Blog", href: "/blog" },
     { label: "Contact & Offices", href: "/contact" },
+    { label: "Career Student Portal", href: "/career-portal" },
   ],
   services: [
     { label: "Study Abroad Programs", href: "/study-abroad" },
     { label: "Study in India Programs", href: "/study-in-india" },
     { label: "Test Preparation", href: "/test-preparation" },
+    { label: "Training & Placement", href: "/training-placement" },
   ],
   legal: [
     { label: "Privacy Policy", href: "/privacy-policy" },
