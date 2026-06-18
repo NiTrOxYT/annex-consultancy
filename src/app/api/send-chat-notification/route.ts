@@ -10,10 +10,8 @@ export async function POST(request: Request) {
     if (action === "health") {
       const { activeProvider } = getEmailConfigStatus();
       let provider = "Mocked (Local Console)";
-      if (activeProvider === "brevo") {
-        provider = "Brevo";
-      } else if (activeProvider === "resend") {
-        provider = "Resend";
+      if (activeProvider === "brevo-smtp") {
+        provider = "Brevo SMTP";
       }
       console.log(`[Diagnostic] Health check: email provider is configured as "${provider}"`);
       return NextResponse.json({ success: true, provider });

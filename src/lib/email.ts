@@ -1,42 +1,92 @@
 import { supabase } from "@/lib/supabase";
+import nodemailer from "nodemailer";
 
 export function getEmailConfigStatus() {
-  const hasBrevo = !!process.env.BREVO_API_KEY;
-  const hasResend = !!process.env.RESEND_API_KEY;
+  const host = process.env.BREVO_SMTP_HOST;
+  const port = process.env.BREVO_SMTP_PORT;
+  const user = process.env.BREVO_SMTP_USER;
+  const pass = process.env.BREVO_SMTP_PASS;
   const emailFrom = process.env.EMAIL_FROM || "notifications@annexconsultancy.com";
+
+  const isSmtpConfigured = !!(host && port && user && pass);
   
-  let activeProvider: "brevo" | "resend" | "mock" = "mock";
+  let activeProvider: "brevo-smtp" | "mock" = "mock";
   let reason = "";
   
-  if (hasBrevo) {
-    activeProvider = "brevo";
-    reason = "Brevo API key is configured and active.";
-  } else if (hasResend) {
-    activeProvider = "resend";
-    reason = "BREVO_API_KEY is missing. Falling back to RESEND_API_KEY.";
+  if (isSmtpConfigured) {
+    activeProvider = "brevo-smtp";
+    reason = "Brevo SMTP is configured and active.";
   } else {
     activeProvider = "mock";
-    reason = "Both BREVO_API_KEY and RESEND_API_KEY are missing. Falling back to local console Mock Mode.";
+    const missing = [];
+    if (!host) missing.push("BREVO_SMTP_HOST");
+    if (!port) missing.push("BREVO_SMTP_PORT");
+    if (!user) missing.push("BREVO_SMTP_USER");
+    if (!pass) missing.push("BREVO_SMTP_PASS");
+    reason = `SMTP is not fully configured (missing: ${missing.join(", ")}). Falling back to local console Mock Mode.`;
   }
   
   return {
-    hasBrevoApiKey: hasBrevo,
-    hasResendApiKey: hasResend,
+    hasBrevoSmtpHost: !!host,
+    hasBrevoSmtpPort: !!port,
+    hasBrevoSmtpUser: !!user,
+    hasBrevoSmtpPass: !!pass,
+    smtpPort: port || "587",
     emailFrom,
     activeProvider,
     reason,
   };
 }
 
-// Global initialization logs
-const { hasBrevoApiKey, hasResendApiKey, emailFrom, activeProvider, reason } = getEmailConfigStatus();
-console.log("[EMAIL CONFIG]");
-console.log(`BREVO_API_KEY: ${hasBrevoApiKey ? "detected" : "missing"}`);
-console.log(`RESEND_API_KEY: ${hasResendApiKey ? "detected" : "missing"}`);
-console.log(`EMAIL_FROM: ${emailFrom}`);
-console.log(`ACTIVE_PROVIDER: ${activeProvider}`);
-if (reason) {
-  console.log(`REASON: ${reason}`);
+let transporter: nodemailer.Transporter | null = null;
+let smtpConnected = false;
+
+const config = getEmailConfigStatus();
+
+if (config.activeProvider === "brevo-smtp") {
+  const host = process.env.BREVO_SMTP_HOST!;
+  const port = Number(process.env.BREVO_SMTP_PORT) || 587;
+  const user = process.env.BREVO_SMTP_USER!;
+  const pass = process.env.BREVO_SMTP_PASS!;
+
+  transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: {
+      user,
+      pass,
+    },
+  });
+
+  transporter.verify()
+    .then(() => {
+      smtpConnected = true;
+      console.log(`[EMAIL SMTP VERIFICATION] SUCCESS - SMTP connection verified successfully for user: ${user}`);
+    })
+    .catch((err: any) => {
+      smtpConnected = false;
+      console.error(`[EMAIL SMTP VERIFICATION] FAILED - SMTP connection verification failed: ${err.message}`);
+    });
+} else {
+  console.log(`[EMAIL SMTP VERIFICATION] N/A - Mock Mode active due to missing configuration.`);
+}
+
+console.log("[EMAIL CONFIG STARTUP]");
+console.log(`ACTUAL_SENDER_EMAIL: ${config.emailFrom}`);
+console.log(`ACTIVE_PROVIDER: ${config.activeProvider}`);
+console.log(`SMTP_VERIFICATION_STATUS: ${config.activeProvider === "brevo-smtp" ? "initiated" : "N/A - Mock Mode"}`);
+
+export async function verifySmtpConnection(): Promise<boolean> {
+  if (!transporter) return false;
+  try {
+    await transporter.verify();
+    smtpConnected = true;
+    return true;
+  } catch (err: any) {
+    smtpConnected = false;
+    return false;
+  }
 }
 
 export async function sendEmail({
@@ -59,147 +109,40 @@ export async function sendEmail({
     console.log("-------------------------------------------------------");
     console.log(`[Diagnostic] Email sent successfully (MOCKED) to: ${to}`);
 
+    const messageId = `mock-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
     // Log in DB under Mock Mode
     try {
       await supabase.from("email_logs").insert([{
         recipient_email: to,
         subject,
         status: "delivered",
-        message_id: `mock-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        message_id: messageId,
         error_details: "Mock Mode - No real transmission occurred"
       }]);
     } catch (dbErr: any) {
       console.error("[Diagnostic] Failed to log mock email to DB:", dbErr.message);
     }
 
-    return { success: true, mocked: true, messageId: `mock-${Date.now()}` };
+    return { success: true, mocked: true, messageId, rawBody: "Mock Mode - No real transmission occurred" };
   }
 
-  if (activeProvider === "brevo") {
-    const brevoKey = process.env.BREVO_API_KEY;
-    try {
-      const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
-        headers: {
-          "api-key": brevoKey!,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          sender: { email: emailFrom, name: "Annex Consultancy Portal" },
-          to: [{ email: to }],
-          subject,
-          htmlContent: html,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[Diagnostic] Brevo email delivery failed!
-Recipient: ${to}
-Subject: "${subject}"
-Status: ${response.status} ${response.statusText}
-Error Body: ${errorText}`);
-
-        // Log failure in DB
-        try {
-          await supabase.from("email_logs").insert([{
-            recipient_email: to,
-            subject,
-            status: "failed",
-            error_details: `Brevo API Error (${response.status}): ${errorText}`
-          }]);
-        } catch (dbErr: any) {
-          console.error("[Diagnostic] Failed to log failed email to DB:", dbErr.message);
-        }
-
-        return { success: false, error: `Brevo API Error (${response.status}): ${errorText}`, rawBody: errorText };
-      }
-
-      const data = await response.json();
-      console.log(`[Diagnostic] Brevo email delivery successful!
-Recipient: ${to}
-Subject: "${subject}"
-Status: ${response.status}
-MessageId: ${data.messageId || "N/A"}`);
-
-      // Log success in DB
-      try {
-        await supabase.from("email_logs").insert([{
-          recipient_email: to,
-          subject,
-          status: "sent",
-          message_id: data.messageId || null
-        }]);
-      } catch (dbErr: any) {
-        console.error("[Diagnostic] Failed to log sent email to DB:", dbErr.message);
-      }
-
-      return { success: true, messageId: data.messageId, rawBody: JSON.stringify(data) };
-    } catch (error: any) {
-      console.error(`[Diagnostic] Email sending threw exception to: ${to}. Error:`, error.message);
-
-      // Log exception in DB
-      try {
-        await supabase.from("email_logs").insert([{
-          recipient_email: to,
-          subject,
-          status: "failed",
-          error_details: error.message
-        }]);
-      } catch (dbErr: any) {
-        console.error("[Diagnostic] Failed to log exception email to DB:", dbErr.message);
-      }
-
-      return { success: false, error: error.message };
-    }
-  }
-
-  // Else must be resend provider
-  const resendKey = process.env.RESEND_API_KEY;
   try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${resendKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: `Annex Consultancy Portal <${emailFrom}>`,
-        to: [to],
-        subject,
-        html,
-      }),
+    if (!transporter) {
+      throw new Error("SMTP transporter not initialized");
+    }
+
+    const info = await transporter.sendMail({
+      from: `Annex Consultancy Portal <${emailFrom}>`,
+      to,
+      subject,
+      html,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[Diagnostic] Resend email delivery failed!
+    console.log(`[Diagnostic] Brevo SMTP email delivery successful!
 Recipient: ${to}
 Subject: "${subject}"
-Status: ${response.status} ${response.statusText}
-Error Body: ${errorText}`);
-
-      // Log failure in DB
-      try {
-        await supabase.from("email_logs").insert([{
-          recipient_email: to,
-          subject,
-          status: "failed",
-          error_details: `Resend API Error (${response.status}): ${errorText}`
-        }]);
-      } catch (dbErr: any) {
-        console.error("[Diagnostic] Failed to log failed email to DB:", dbErr.message);
-      }
-
-      return { success: false, error: `Resend API Error (${response.status}): ${errorText}`, rawBody: errorText };
-    }
-
-    const data = await response.json();
-    console.log(`[Diagnostic] Resend email delivery successful!
-Recipient: ${to}
-Subject: "${subject}"
-Status: ${response.status}
-MessageId: ${data.id || "N/A"}`);
+MessageId: ${info.messageId || "N/A"}`);
 
     // Log success in DB
     try {
@@ -207,15 +150,15 @@ MessageId: ${data.id || "N/A"}`);
         recipient_email: to,
         subject,
         status: "sent",
-        message_id: data.id || null
+        message_id: info.messageId || null
       }]);
     } catch (dbErr: any) {
       console.error("[Diagnostic] Failed to log sent email to DB:", dbErr.message);
     }
 
-    return { success: true, messageId: data.id, rawBody: JSON.stringify(data) };
+    return { success: true, messageId: info.messageId, rawBody: JSON.stringify(info) };
   } catch (error: any) {
-    console.error(`[Diagnostic] Email sending threw exception to: ${to}. Error:`, error.message);
+    console.error(`[Diagnostic] SMTP email sending threw exception to: ${to}. Error:`, error.message);
 
     // Log exception in DB
     try {
@@ -229,7 +172,7 @@ MessageId: ${data.id || "N/A"}`);
       console.error("[Diagnostic] Failed to log exception email to DB:", dbErr.message);
     }
 
-    return { success: false, error: error.message };
+    return { success: false, error: error.message, rawBody: error.message };
   }
 }
 

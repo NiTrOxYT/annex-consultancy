@@ -130,10 +130,13 @@ export default function AdminDashboard() {
     responseBody?: string;
   } | null>(null);
   const [emailConfig, setEmailConfig] = React.useState<{
-    hasBrevoApiKey: boolean;
-    hasResendApiKey: boolean;
+    hasBrevoSmtpHost: boolean;
+    hasBrevoSmtpPort: boolean;
+    hasBrevoSmtpUser: boolean;
+    hasBrevoSmtpPass: boolean;
+    smtpPort: string;
     emailFrom: string;
-    activeProvider: "brevo" | "resend" | "mock";
+    activeProvider: "brevo-smtp" | "mock";
     reason: string;
   } | null>(null);
 
@@ -242,7 +245,7 @@ export default function AdminDashboard() {
     supabase: "checking", // "connected" | "failed" | "checking"
     realtime: "checking", // "connected" | "failed" | "checking"
     email: "checking",    // "connected" | "failed" | "checking"
-    emailProviderName: "", // "Resend", "Brevo", or "Mocked (Local Console)"
+    emailProviderName: "", // "Brevo SMTP" or "Mocked (Local Console)"
     storage: "checking",   // "connected" | "failed" | "checking"
   });
 
@@ -4273,13 +4276,11 @@ export default function AdminDashboard() {
                       <span className="font-semibold text-slate-500">Active Provider</span>
                       {emailConfig ? (
                         <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase border ${
-                          emailConfig.activeProvider === "brevo"
+                          emailConfig.activeProvider === "brevo-smtp"
                             ? "bg-blue-50 text-blue-700 border-blue-200"
-                            : emailConfig.activeProvider === "resend"
-                            ? "bg-indigo-50 text-indigo-700 border-indigo-200"
                             : "bg-amber-50 text-amber-700 border-amber-200"
                         }`}>
-                          {emailConfig.activeProvider}
+                          {emailConfig.activeProvider === "brevo-smtp" ? "Brevo SMTP" : "Mock Mode"}
                         </span>
                       ) : (
                         <span className="text-slate-400 font-medium">Checking...</span>
@@ -4294,12 +4295,12 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="flex justify-between items-center py-2 border-b border-hairline">
-                      <span className="font-semibold text-slate-500">Brevo Key Detected</span>
+                      <span className="font-semibold text-slate-500">SMTP Host</span>
                       {emailConfig ? (
-                        emailConfig.hasBrevoApiKey ? (
-                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] uppercase">Yes</span>
+                        emailConfig.hasBrevoSmtpHost ? (
+                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] uppercase font-mono-data">Configured</span>
                         ) : (
-                          <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded-full font-bold text-[10px] uppercase">No</span>
+                          <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded-full font-bold text-[10px] uppercase font-mono-data">Missing</span>
                         )
                       ) : (
                         <span className="text-slate-400">Checking...</span>
@@ -4307,12 +4308,36 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="flex justify-between items-center py-2 border-b border-hairline">
-                      <span className="font-semibold text-slate-500">Resend Key Detected</span>
+                      <span className="font-semibold text-slate-500">SMTP Port</span>
                       {emailConfig ? (
-                        emailConfig.hasResendApiKey ? (
-                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] uppercase">Yes</span>
+                        <span className="font-mono-data font-bold text-slate-600">
+                          {emailConfig.smtpPort}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">Checking...</span>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between items-center py-2 border-b border-hairline">
+                      <span className="font-semibold text-slate-500">SMTP User</span>
+                      {emailConfig ? (
+                        emailConfig.hasBrevoSmtpUser ? (
+                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] uppercase font-mono-data">Configured</span>
                         ) : (
-                          <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded-full font-bold text-[10px] uppercase">No</span>
+                          <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded-full font-bold text-[10px] uppercase font-mono-data">Missing</span>
+                        )
+                      ) : (
+                        <span className="text-slate-400">Checking...</span>
+                      )}
+                    </div>
+
+                    <div className="flex justify-between items-center py-2 border-b border-hairline">
+                      <span className="font-semibold text-slate-500">SMTP Password</span>
+                      {emailConfig ? (
+                        emailConfig.hasBrevoSmtpPass ? (
+                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] uppercase font-mono-data">Configured</span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded-full font-bold text-[10px] uppercase font-mono-data">Missing</span>
                         )
                       ) : (
                         <span className="text-slate-400">Checking...</span>
