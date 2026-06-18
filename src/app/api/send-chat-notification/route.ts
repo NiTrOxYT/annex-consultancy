@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { sendStudentMessageEmail, sendCounselorMessageEmail } from "@/lib/email";
+import { sendStudentMessageEmail, sendCounselorMessageEmail, getEmailConfigStatus } from "@/lib/email";
 
 export async function POST(request: Request) {
   try {
@@ -8,10 +8,12 @@ export async function POST(request: Request) {
     const { action, senderType, studentId, messageContent, counselorName, messageId } = body;
 
     if (action === "health") {
-      const brevoKey = process.env.BREVO_API_KEY;
+      const { activeProvider } = getEmailConfigStatus();
       let provider = "Mocked (Local Console)";
-      if (brevoKey) {
+      if (activeProvider === "brevo") {
         provider = "Brevo";
+      } else if (activeProvider === "resend") {
+        provider = "Resend";
       }
       console.log(`[Diagnostic] Health check: email provider is configured as "${provider}"`);
       return NextResponse.json({ success: true, provider });

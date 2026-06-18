@@ -124,7 +124,18 @@ export default function AdminDashboard() {
   const [emailLogs, setEmailLogs] = React.useState<any[]>([]);
   const [testEmailAddress, setTestEmailAddress] = React.useState("");
   const [sendingTestEmail, setSendingTestEmail] = React.useState(false);
-  const [testEmailResult, setTestEmailResult] = React.useState<{ success: boolean; message?: string } | null>(null);
+  const [testEmailResult, setTestEmailResult] = React.useState<{ 
+    success: boolean; 
+    message?: string; 
+    responseBody?: string;
+  } | null>(null);
+  const [emailConfig, setEmailConfig] = React.useState<{
+    hasBrevoApiKey: boolean;
+    hasResendApiKey: boolean;
+    emailFrom: string;
+    activeProvider: "brevo" | "resend" | "mock";
+    reason: string;
+  } | null>(null);
 
   // Student Portal Tab states
   const [students, setStudents] = React.useState<any[]>([]);
@@ -706,6 +717,17 @@ export default function AdminDashboard() {
     } catch (err: any) {
       console.error("Error loading email logs:", err.message);
     }
+
+    // 9. Fetch Email Config Status
+    try {
+      const res = await fetch("/api/email-status");
+      if (res.ok) {
+        const configData = await res.json();
+        setEmailConfig(configData);
+      }
+    } catch (err: any) {
+      console.error("Error loading email config status:", err.message);
+    }
     
     setLoading(false);
   }, [fetchConversations]);
@@ -1164,16 +1186,28 @@ export default function AdminDashboard() {
       });
 
       const result = await response.json();
+      
+      let prettyResponse = "";
+      if (result.responseBody) {
+        try {
+          prettyResponse = JSON.stringify(JSON.parse(result.responseBody), null, 2);
+        } catch {
+          prettyResponse = result.responseBody;
+        }
+      }
+
       if (!response.ok || !result.success) {
         setTestEmailResult({
           success: false,
-          message: result.error || "Failed to dispatch test email"
+          message: result.error || "Failed to dispatch test email",
+          responseBody: prettyResponse || undefined
         });
         showToast("⚠️ Send test email failed! Check status details below.");
       } else {
         setTestEmailResult({
           success: true,
-          message: `Email sent successfully! MessageId: ${result.messageId}`
+          message: `Email sent successfully! MessageId: ${result.messageId}`,
+          responseBody: prettyResponse || undefined
         });
         showToast("✉️ Test email dispatched successfully.");
         fetchAllData(); // Refresh logs
@@ -4230,37 +4264,103 @@ export default function AdminDashboard() {
                   <CardHeader>
                     <CardTitle className="text-sm font-bold flex items-center gap-2">
                       <Gear size={16} className="text-primary" />
-                      Configuration Status
+                      Email System Status
                     </CardTitle>
-                    <CardDescription className="text-[11px]">Active environment variables & mailing parameters</CardDescription>
+                    <CardDescription className="text-[11px]">Server-side diagnostics for transactional notifications</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4 text-xs">
                     <div className="flex justify-between items-center py-2 border-b border-hairline">
-                      <span className="font-semibold text-slate-500">Mailing Provider</span>
-                      <span className="font-bold text-primary">Brevo API</span>
-                    </div>
-                    <div className="flex justify-between items-center py-2 border-b border-hairline">
-                      <span className="font-semibold text-slate-500">BREVO_API_KEY</span>
-                      {process.env.BREVO_API_KEY ? (
-                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] uppercase">Configured</span>
+                      <span className="font-semibold text-slate-500">Active Provider</span>
+                      {emailConfig ? (
+                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase border ${
+                          emailConfig.activeProvider === "brevo"
+                            ? "bg-blue-50 text-blue-700 border-blue-200"
+                            : emailConfig.activeProvider === "resend"
+                            ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                            : "bg-amber-50 text-amber-700 border-amber-200"
+                        }`}>
+                          {emailConfig.activeProvider}
+                        </span>
                       ) : (
-                        <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full font-bold text-[10px] uppercase">Mock Mode (Local)</span>
+                        <span className="text-slate-400 font-medium">Checking...</span>
                       )}
                     </div>
+                    
                     <div className="flex justify-between items-center py-2 border-b border-hairline">
-                      <span className="font-semibold text-slate-500">EMAIL_FROM (Sender)</span>
+                      <span className="font-semibold text-slate-500">Sender Email</span>
                       <span className="font-mono-data text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-hairline/50">
-                        {process.env.EMAIL_FROM || "notifications@annexconsultancy.com"}
+                        {emailConfig ? emailConfig.emailFrom : "Checking..."}
                       </span>
                     </div>
+
                     <div className="flex justify-between items-center py-2 border-b border-hairline">
-                      <span className="font-semibold text-slate-500">Supabase DB Logger</span>
-                      {emailLogsTableExists === false ? (
-                        <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded-full font-bold text-[10px] uppercase">Migration Missing</span>
+                      <span className="font-semibold text-slate-500">Brevo Key Detected</span>
+                      {emailConfig ? (
+                        emailConfig.hasBrevoApiKey ? (
+                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] uppercase">Yes</span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded-full font-bold text-[10px] uppercase">No</span>
+                        )
                       ) : (
-                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] uppercase">Active Logs Table</span>
+                        <span className="text-slate-400">Checking...</span>
                       )}
                     </div>
+
+                    <div className="flex justify-between items-center py-2 border-b border-hairline">
+                      <span className="font-semibold text-slate-500">Resend Key Detected</span>
+                      {emailConfig ? (
+                        emailConfig.hasResendApiKey ? (
+                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-bold text-[10px] uppercase">Yes</span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded-full font-bold text-[10px] uppercase">No</span>
+                        )
+                      ) : (
+                        <span className="text-slate-400">Checking...</span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 py-2 border-b border-hairline">
+                      <span className="font-semibold text-slate-500 block">Last Email Attempt</span>
+                      {emailLogs && emailLogs.length > 0 ? (
+                        <div className="bg-slate-50 border border-hairline/50 rounded-lg p-2.5 space-y-1">
+                          <div className="flex justify-between items-center">
+                            <span className="font-mono-data text-slate-700 break-all pr-2 max-w-[150px] overflow-hidden text-ellipsis whitespace-nowrap">
+                              {emailLogs[0].recipient_email}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                              emailLogs[0].status === "sent" || emailLogs[0].status === "delivered"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-red-50 text-red-700"
+                            }`}>
+                              {emailLogs[0].status}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis">
+                            Subject: {emailLogs[0].subject}
+                          </div>
+                          <div className="text-[9px] text-slate-400 font-medium">
+                            {new Date(emailLogs[0].created_at).toLocaleString()}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 block font-medium">No attempts recorded</span>
+                      )}
+                    </div>
+
+                    {emailConfig && emailConfig.activeProvider === "mock" && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1 mt-2">
+                        <div className="flex items-center gap-1.5 text-amber-800 font-bold text-xs">
+                          <WarningCircle size={14} />
+                          <span>Mock Mode Activated</span>
+                        </div>
+                        <p className="text-[10px] text-amber-700 leading-relaxed font-medium">
+                          {emailConfig.reason}
+                        </p>
+                        <p className="text-[9px] text-amber-600/90 leading-tight">
+                          Mails are logged locally to the console and DB, but not sent over the network.
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -4310,6 +4410,14 @@ export default function AdminDashboard() {
                         }`}>
                           <p className="font-bold mb-1">{testEmailResult.success ? "Success" : "Error Details"}</p>
                           <p className="break-words whitespace-pre-wrap font-mono-data text-[10px] bg-white/50 p-2 rounded border border-hairline/25">{testEmailResult.message}</p>
+                          {testEmailResult.responseBody && (
+                            <div className="mt-2 space-y-1">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Raw Provider Response</span>
+                              <pre className="text-[9px] font-mono-data bg-white/80 p-2 rounded border border-hairline/30 overflow-x-auto text-slate-700 max-h-[150px]">
+                                {testEmailResult.responseBody}
+                              </pre>
+                            </div>
+                          )}
                         </div>
                       )}
                     </form>

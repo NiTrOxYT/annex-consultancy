@@ -1,13 +1,43 @@
 import { supabase } from "@/lib/supabase";
 
-const brevoKey = process.env.BREVO_API_KEY;
-const fromEmail = process.env.EMAIL_FROM || "notifications@annexconsultancy.com";
-const isBrevoConfigured = !!brevoKey;
+export function getEmailConfigStatus() {
+  const hasBrevo = !!process.env.BREVO_API_KEY;
+  const hasResend = !!process.env.RESEND_API_KEY;
+  const emailFrom = process.env.EMAIL_FROM || "notifications@annexconsultancy.com";
+  
+  let activeProvider: "brevo" | "resend" | "mock" = "mock";
+  let reason = "";
+  
+  if (hasBrevo) {
+    activeProvider = "brevo";
+    reason = "Brevo API key is configured and active.";
+  } else if (hasResend) {
+    activeProvider = "resend";
+    reason = "BREVO_API_KEY is missing. Falling back to RESEND_API_KEY.";
+  } else {
+    activeProvider = "mock";
+    reason = "Both BREVO_API_KEY and RESEND_API_KEY are missing. Falling back to local console Mock Mode.";
+  }
+  
+  return {
+    hasBrevoApiKey: hasBrevo,
+    hasResendApiKey: hasResend,
+    emailFrom,
+    activeProvider,
+    reason,
+  };
+}
 
-console.log("[Diagnostic] Email System Initialization:");
-console.log(`[Diagnostic] BREVO_API_KEY detected: ${isBrevoConfigured ? "YES" : "NO"}`);
-console.log(`[Diagnostic] EMAIL_FROM: ${fromEmail}`);
-console.log(`[Diagnostic] Email Mode: ${isBrevoConfigured ? "Brevo API Mode" : "Mock/Log Mode"}`);
+// Global initialization logs
+const { hasBrevoApiKey, hasResendApiKey, emailFrom, activeProvider, reason } = getEmailConfigStatus();
+console.log("[EMAIL CONFIG]");
+console.log(`BREVO_API_KEY: ${hasBrevoApiKey ? "detected" : "missing"}`);
+console.log(`RESEND_API_KEY: ${hasResendApiKey ? "detected" : "missing"}`);
+console.log(`EMAIL_FROM: ${emailFrom}`);
+console.log(`ACTIVE_PROVIDER: ${activeProvider}`);
+if (reason) {
+  console.log(`REASON: ${reason}`);
+}
 
 export async function sendEmail({
   to,
@@ -18,9 +48,10 @@ export async function sendEmail({
   subject: string;
   html: string;
 }) {
-  console.log(`[Diagnostic] Attempting email delivery to: ${to}, Subject: "${subject}"`);
+  const { activeProvider, emailFrom } = getEmailConfigStatus();
+  console.log(`[Diagnostic] Attempting email delivery to: ${to}, Subject: "${subject}", Provider: ${activeProvider}`);
 
-  if (!isBrevoConfigured) {
+  if (activeProvider === "mock") {
     console.log("---------- LOCAL EMAIL NOTIFICATION (MOCKED) ----------");
     console.log(`To: ${to}`);
     console.log(`Subject: ${subject}`);
@@ -44,24 +75,105 @@ export async function sendEmail({
     return { success: true, mocked: true, messageId: `mock-${Date.now()}` };
   }
 
+  if (activeProvider === "brevo") {
+    const brevoKey = process.env.BREVO_API_KEY;
+    try {
+      const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "api-key": brevoKey!,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sender: { email: emailFrom, name: "Annex Consultancy Portal" },
+          to: [{ email: to }],
+          subject,
+          htmlContent: html,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[Diagnostic] Brevo email delivery failed!
+Recipient: ${to}
+Subject: "${subject}"
+Status: ${response.status} ${response.statusText}
+Error Body: ${errorText}`);
+
+        // Log failure in DB
+        try {
+          await supabase.from("email_logs").insert([{
+            recipient_email: to,
+            subject,
+            status: "failed",
+            error_details: `Brevo API Error (${response.status}): ${errorText}`
+          }]);
+        } catch (dbErr: any) {
+          console.error("[Diagnostic] Failed to log failed email to DB:", dbErr.message);
+        }
+
+        return { success: false, error: `Brevo API Error (${response.status}): ${errorText}`, rawBody: errorText };
+      }
+
+      const data = await response.json();
+      console.log(`[Diagnostic] Brevo email delivery successful!
+Recipient: ${to}
+Subject: "${subject}"
+Status: ${response.status}
+MessageId: ${data.messageId || "N/A"}`);
+
+      // Log success in DB
+      try {
+        await supabase.from("email_logs").insert([{
+          recipient_email: to,
+          subject,
+          status: "sent",
+          message_id: data.messageId || null
+        }]);
+      } catch (dbErr: any) {
+        console.error("[Diagnostic] Failed to log sent email to DB:", dbErr.message);
+      }
+
+      return { success: true, messageId: data.messageId, rawBody: JSON.stringify(data) };
+    } catch (error: any) {
+      console.error(`[Diagnostic] Email sending threw exception to: ${to}. Error:`, error.message);
+
+      // Log exception in DB
+      try {
+        await supabase.from("email_logs").insert([{
+          recipient_email: to,
+          subject,
+          status: "failed",
+          error_details: error.message
+        }]);
+      } catch (dbErr: any) {
+        console.error("[Diagnostic] Failed to log exception email to DB:", dbErr.message);
+      }
+
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Else must be resend provider
+  const resendKey = process.env.RESEND_API_KEY;
   try {
-    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
-        "api-key": brevoKey!,
+        "Authorization": `Bearer ${resendKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        sender: { email: fromEmail, name: "Annex Consultancy Portal" },
-        to: [{ email: to }],
+        from: `Annex Consultancy Portal <${emailFrom}>`,
+        to: [to],
         subject,
-        htmlContent: html,
+        html,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[Diagnostic] Brevo email delivery failed!
+      console.error(`[Diagnostic] Resend email delivery failed!
 Recipient: ${to}
 Subject: "${subject}"
 Status: ${response.status} ${response.statusText}
@@ -73,21 +185,21 @@ Error Body: ${errorText}`);
           recipient_email: to,
           subject,
           status: "failed",
-          error_details: `Brevo API Error (${response.status}): ${errorText}`
+          error_details: `Resend API Error (${response.status}): ${errorText}`
         }]);
       } catch (dbErr: any) {
         console.error("[Diagnostic] Failed to log failed email to DB:", dbErr.message);
       }
 
-      return { success: false, error: `Brevo API Error (${response.status}): ${errorText}` };
+      return { success: false, error: `Resend API Error (${response.status}): ${errorText}`, rawBody: errorText };
     }
 
     const data = await response.json();
-    console.log(`[Diagnostic] Brevo email delivery successful!
+    console.log(`[Diagnostic] Resend email delivery successful!
 Recipient: ${to}
 Subject: "${subject}"
 Status: ${response.status}
-MessageId: ${data.messageId || "N/A"}`);
+MessageId: ${data.id || "N/A"}`);
 
     // Log success in DB
     try {
@@ -95,13 +207,13 @@ MessageId: ${data.messageId || "N/A"}`);
         recipient_email: to,
         subject,
         status: "sent",
-        message_id: data.messageId || null
+        message_id: data.id || null
       }]);
     } catch (dbErr: any) {
       console.error("[Diagnostic] Failed to log sent email to DB:", dbErr.message);
     }
 
-    return { success: true, messageId: data.messageId };
+    return { success: true, messageId: data.id, rawBody: JSON.stringify(data) };
   } catch (error: any) {
     console.error(`[Diagnostic] Email sending threw exception to: ${to}. Error:`, error.message);
 

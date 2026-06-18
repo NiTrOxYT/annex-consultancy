@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sendEmail } from "@/lib/email";
+import { sendEmail, getEmailConfigStatus } from "@/lib/email";
 
 export async function POST(request: Request) {
   try {
@@ -10,14 +10,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing recipient 'email' field in request body" }, { status: 400 });
     }
 
+    const config = getEmailConfigStatus();
+
     const testHtml = `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 12px; background-color: #ffffff;">
         <h2 style="color: #0f172a; margin-bottom: 8px;">🧪 Annex System Test Email</h2>
-        <p style="color: #475569; font-size: 14px;">This is a test notification verifying that the Brevo Transactional Email API is working correctly.</p>
+        <p style="color: #475569; font-size: 14px;">This is a test notification verifying that the Annex Consultancy Mailing Engine is working correctly.</p>
         <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #f1f5f9; margin: 20px 0; font-size: 14px; color: #334155;">
           <p style="margin: 0 0 8px 0;"><strong>Recipient:</strong> ${email}</p>
           <p style="margin: 0 0 8px 0;"><strong>Timestamp:</strong> ${new Date().toLocaleString()}</p>
-          <p style="margin: 0;"><strong>Active Mode:</strong> ${process.env.BREVO_API_KEY ? "Brevo API Mode" : "Mock Mode (Local Log)"}</p>
+          <p style="margin: 0;"><strong>Active Provider:</strong> ${config.activeProvider.toUpperCase()}</p>
         </div>
         <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 24px 0;" />
         <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">Annex Consultancy Diagnostic Tool</p>
@@ -33,7 +35,8 @@ export async function POST(request: Request) {
     if (!emailResult.success) {
       return NextResponse.json({
         success: false,
-        error: emailResult.error || "Failed to dispatch test email"
+        error: emailResult.error || "Failed to dispatch test email",
+        responseBody: emailResult.rawBody || null
       }, { status: 500 });
     }
 
@@ -41,7 +44,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       messageId: emailResult.messageId || "mock-id",
-      mocked: !!(emailResult as any).mocked
+      mocked: !!(emailResult as any).mocked,
+      responseBody: emailResult.rawBody || null
     });
   } catch (err: any) {
     console.error("API test-email failed:", err);
