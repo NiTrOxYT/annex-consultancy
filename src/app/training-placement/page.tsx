@@ -23,6 +23,9 @@ import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SectionReveal } from "@/components/section-reveal";
+import { AnimatedCounter } from "@/components/animated-counter";
 import { supabase } from "@/lib/supabase";
 
 interface Service {
@@ -422,290 +425,331 @@ export default function TrainingPlacementPage() {
         </section>
 
         {/* Real-time stats section */}
-        <section className="py-12 border-t border-b border-hairline bg-subtle-gray/30">
-          <div className="max-w-7xl mx-auto px-6 lg:px-8">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-left">
-              <div>
-                <p className="font-mono-data text-3xl font-bold text-primary">92%</p>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Placement Success</p>
-              </div>
-              <div>
-                <p className="font-mono-data text-3xl font-bold text-primary">1,200+</p>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Careers Upgraded</p>
-              </div>
-              <div>
-                <p className="font-mono-data text-3xl font-bold text-primary">15+</p>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Industry Advisors</p>
-              </div>
-              <div>
-                <p className="font-mono-data text-3xl font-bold text-primary">₹2.4M</p>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Avg. Salary Bump</p>
+        <SectionReveal>
+          <section className="py-12 border-t border-b border-hairline bg-subtle-gray/30">
+            <div className="max-w-7xl mx-auto px-6 lg:px-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-left">
+                <div>
+                  <p className="font-mono-data text-3xl font-bold text-primary">
+                    <AnimatedCounter value={92} suffix="%" />
+                  </p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Placement Success</p>
+                </div>
+                <div>
+                  <p className="font-mono-data text-3xl font-bold text-primary">
+                    <AnimatedCounter value={1200} suffix="+" />
+                  </p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Careers Upgraded</p>
+                </div>
+                <div>
+                  <p className="font-mono-data text-3xl font-bold text-primary">
+                    <AnimatedCounter value={15} suffix="+" />
+                  </p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Industry Advisors</p>
+                </div>
+                <div>
+                  <p className="font-mono-data text-3xl font-bold text-primary">₹2.4M</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Avg. Salary Bump</p>
+                </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </SectionReveal>
 
         {/* Dynamic Services Cards */}
-        <section id="services" className="py-24 bg-white">
-          <div className="max-w-7xl mx-auto px-6 lg:px-8">
-            <div className="text-center max-w-3xl mx-auto mb-16">
-              <h2 className="font-display font-bold text-3xl md:text-4xl text-primary tracking-tight mb-4">
-                Tailored micro career services.
-              </h2>
-              <p className="text-sm text-slate-500">
-                Choose the exact services you need. Select an option to register as a lead and activate your dashboard.
-              </p>
-            </div>
-
-            {loading ? (
-              <div className="flex justify-center items-center h-48">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        <SectionReveal>
+          <section id="services" className="py-24 bg-white">
+            <div className="max-w-7xl mx-auto px-6 lg:px-8">
+              <div className="text-center max-w-3xl mx-auto mb-16">
+                <h2 className="font-display font-bold text-3xl md:text-4xl text-primary tracking-tight mb-4">
+                  Tailored micro career services.
+                </h2>
+                <p className="text-sm text-slate-500">
+                  Choose the exact services you need. Select an option to register as a lead and activate your dashboard.
+                </p>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {services.map((service, idx) => (
-                  <motion.div
-                    key={service.id || idx}
-                    initial={{ opacity: 0, y: 15 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.5, delay: idx * 0.05 }}
-                    className="flex flex-col h-full bg-white border border-hairline/80 hover:border-primary/20 p-8 rounded-2xl hover:shadow-lg transition-all duration-300 group text-left"
-                  >
-                    <div className="mb-6 flex-grow">
-                      <div className="flex justify-between items-start mb-4">
-                        <h3 className="font-display font-bold text-xl text-primary leading-tight group-hover:text-gold transition-colors">
-                          {service.title}
-                        </h3>
-                        <span className="font-mono-data text-lg font-bold text-primary bg-subtle-gray px-3 py-1 rounded-lg">
-                          ₹{service.price}
-                        </span>
-                      </div>
-                      <p className="text-sm text-slate-500 leading-relaxed mb-6">
-                        {service.description}
-                      </p>
-                      
-                      <div className="border-t border-hairline pt-6">
-                        <p className="text-xs font-semibold uppercase text-slate-400 tracking-wider mb-3">What is included:</p>
-                        <ul className="space-y-2.5">
-                          {service.features.map((feature, fIdx) => (
-                            <li key={fIdx} className="flex items-start gap-2 text-xs text-slate-600">
-                              <Checks size={14} className="text-emerald-500 shrink-0 mt-0.5" />
-                              <span>{feature}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
 
-                    <Button
-                      variant="primary"
-                      className="w-full mt-6"
-                      onClick={() => openEnrollmentModal(service)}
-                    >
-                      Enroll Now
-                    </Button>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Meet Our Career Experts Section */}
-        <section className="py-24 bg-white border-t border-hairline">
-          <div className="max-w-7xl mx-auto px-6 lg:px-8">
-            <div className="text-center max-w-3xl mx-auto mb-16">
-              <h2 className="font-display font-bold text-3xl md:text-4xl text-primary tracking-tight mb-4 animate-fade-in">
-                Meet Our Career Experts
-              </h2>
-              <p className="text-sm text-slate-500 max-w-[60ch] mx-auto leading-relaxed">
-                Learn from industry veterans dedicated to optimizing your professional roadmap, resume, and placement success.
-              </p>
-            </div>
-
-            {loadingExperts ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 justify-center">
-                {[...Array(4)].map((_, idx) => (
-                  <div key={idx} className="bg-subtle-gray border border-hairline/80 p-1.5 rounded-[1.5rem] h-[340px] animate-pulse">
-                    <div className="bg-white border border-hairline/40 p-8 rounded-[calc(1.5rem-0.375rem)] h-full flex flex-col items-center justify-between">
-                      <div className="w-24 h-24 rounded-full bg-slate-100 mb-6 shrink-0" />
-                      <div className="h-6 w-32 bg-slate-150 rounded mb-3 shrink-0" />
-                      <div className="h-4 w-24 bg-slate-150 rounded mb-4 shrink-0" />
-                      <div className="h-3 w-40 bg-slate-150 rounded mb-2 shrink-0" />
-                      <div className="h-3 w-36 bg-slate-150 rounded mb-auto shrink-0" />
-                      <div className="h-8 w-8 rounded-full bg-slate-150 mt-4 shrink-0" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : experts.length === 0 ? (
-              <div className="text-center py-12 text-slate-400 bg-subtle-gray/30 rounded-2xl border border-hairline/60 max-w-md mx-auto">
-                <Users size={48} className="mx-auto mb-3 opacity-40 text-primary" />
-                <p className="text-sm font-semibold text-slate-500">No career experts listed at the moment.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 justify-center">
-                {experts.map((expert, idx) => (
-                  <motion.a
-                    key={expert.id}
-                    href={expert.linkedin_url || undefined}
-                    target={expert.linkedin_url ? "_blank" : undefined}
-                    rel={expert.linkedin_url ? "noopener noreferrer" : undefined}
-                    onClick={(e) => {
-                      if (!expert.linkedin_url) {
-                        e.preventDefault();
-                      }
-                    }}
-                    initial={{ opacity: 0, y: 15 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.5, delay: idx * 0.05 }}
-                    className={`group flex ${expert.linkedin_url ? "cursor-pointer" : "cursor-default"}`}
-                  >
-                    <div className="bg-subtle-gray border border-hairline/80 p-1.5 rounded-[1.5rem] w-full transition-all duration-300 group-hover:border-primary/20 group-hover:shadow-lg">
-                      <div className="bg-white border border-hairline/40 p-6 md:p-8 rounded-[calc(1.5rem-0.375rem)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.8),0_2px_8px_rgba(15,23,42,0.01)] h-full flex flex-col items-center text-center relative overflow-hidden">
-                        <div className="absolute inset-0 rounded-[calc(1.5rem-0.375rem)] bg-gradient-to-b from-primary/[0.01] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-
-                        {/* Circular profile image with fallback */}
-                        <div className="relative w-24 h-24 rounded-full overflow-hidden mb-6 border-2 border-hairline group-hover:border-gold transition-colors duration-300 shrink-0">
-                          {expert.photo_url ? (
-                            <img
-                              src={expert.photo_url}
-                              alt={expert.name}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback') as HTMLElement;
-                                if (fallback) fallback.style.display = 'flex';
-                              }}
-                            />
-                          ) : null}
-                          <div
-                            className="avatar-fallback w-full h-full bg-slate-100 flex items-center justify-center text-primary font-bold text-2xl"
-                            style={{ display: expert.photo_url ? 'none' : 'flex' }}
-                          >
-                            {expert.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+              {loading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {[1, 2, 3].map((n) => (
+                    <div key={n} className="flex flex-col h-full bg-white border border-hairline/80 p-8 rounded-2xl min-h-[350px]">
+                      <div className="mb-6 flex-grow">
+                        <div className="flex justify-between items-start mb-4">
+                          <Skeleton className="w-40 h-6 bg-slate-100" />
+                          <Skeleton className="w-16 h-8 bg-slate-100 rounded-lg" />
+                        </div>
+                        <Skeleton className="w-full h-4 mb-2 bg-slate-100" />
+                        <Skeleton className="w-3/4 h-4 mb-6 bg-slate-100" />
+                        <div className="border-t border-hairline pt-6">
+                          <Skeleton className="w-28 h-3.5 mb-3 bg-slate-100" />
+                          <div className="space-y-2.5">
+                            {[1, 2, 3, 4].map((i) => (
+                              <div key={i} className="flex items-center gap-2">
+                                <Skeleton className="w-3.5 h-3.5 rounded-full bg-slate-100 shrink-0" />
+                                <Skeleton className="w-4/5 h-3.5 bg-slate-100" />
+                              </div>
+                            ))}
                           </div>
                         </div>
-
-                        <h3 className="font-display font-bold text-lg text-primary mb-1 group-hover:text-gold transition-colors duration-300">
-                          {expert.name}
-                        </h3>
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
-                          {expert.designation}
+                      </div>
+                      <Skeleton className="w-full h-11 bg-slate-100 rounded-full mt-6" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {services.map((service, idx) => (
+                    <motion.div
+                      key={service.id || idx}
+                      initial={{ opacity: 0, y: 15 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.5, delay: idx * 0.05 }}
+                      className="flex flex-col h-full bg-white border border-hairline/80 hover:border-primary/20 p-8 rounded-2xl hover:shadow-lg transition-all duration-300 group text-left"
+                    >
+                      <div className="mb-6 flex-grow">
+                        <div className="flex justify-between items-start mb-4">
+                          <h3 className="font-display font-bold text-xl text-primary leading-tight group-hover:text-gold transition-colors">
+                            {service.title}
+                          </h3>
+                          <span className="font-mono-data text-lg font-bold text-primary bg-subtle-gray px-3 py-1 rounded-lg">
+                            ₹{service.price}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-500 leading-relaxed mb-6">
+                          {service.description}
                         </p>
-                        <p className="text-sm text-slate-500 leading-relaxed max-w-[24ch]">
-                          {expert.expertise}
-                        </p>
+                        
+                        <div className="border-t border-hairline pt-6">
+                          <p className="text-xs font-semibold uppercase text-slate-400 tracking-wider mb-3">What is included:</p>
+                          <ul className="space-y-2.5">
+                            {service.features.map((feature, fIdx) => (
+                              <li key={fIdx} className="flex items-start gap-2 text-xs text-slate-600">
+                                <Checks size={14} className="text-emerald-500 shrink-0 mt-0.5" />
+                                <span>{feature}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
 
-                        {expert.linkedin_url && (
-                          <div className="mt-auto pt-6 text-slate-400 group-hover:text-primary transition-colors duration-300">
-                            <div className="w-8 h-8 rounded-full border border-hairline flex items-center justify-center group-hover:border-primary transition-all duration-300 bg-subtle-gray/30 group-hover:bg-primary/5">
-                              <LinkedinLogo size={16} weight="fill" />
-                            </div>
-                          </div>
-                        )}
+                      <Button
+                        variant="primary"
+                        className="w-full mt-6"
+                        onClick={() => openEnrollmentModal(service)}
+                      >
+                        Enroll Now
+                      </Button>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        </SectionReveal>
+
+        {/* Meet Our Career Experts Section */}
+        <SectionReveal>
+          <section className="py-24 bg-white border-t border-hairline">
+            <div className="max-w-7xl mx-auto px-6 lg:px-8">
+              <div className="text-center max-w-3xl mx-auto mb-16">
+                <h2 className="font-display font-bold text-3xl md:text-4xl text-primary tracking-tight mb-4 animate-fade-in">
+                  Meet Our Career Experts
+                </h2>
+                <p className="text-sm text-slate-500 max-w-[60ch] mx-auto leading-relaxed">
+                  Learn from industry veterans dedicated to optimizing your professional roadmap, resume, and placement success.
+                </p>
+              </div>
+
+              {loadingExperts ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 justify-center">
+                  {[1, 2, 3, 4].map((n) => (
+                    <div key={n} className="bg-subtle-gray border border-hairline/80 p-1.5 rounded-[1.5rem] h-[340px]">
+                      <div className="bg-white border border-hairline/40 p-8 rounded-[calc(1.5rem-0.375rem)] h-full flex flex-col items-center justify-between">
+                        <Skeleton className="w-24 h-24 rounded-full bg-slate-100 mb-6 shrink-0" />
+                        <Skeleton className="h-6 w-32 bg-slate-100 mb-3 shrink-0" />
+                        <Skeleton className="h-4 w-24 bg-slate-100 mb-4 shrink-0" />
+                        <Skeleton className="h-3.5 w-40 bg-slate-100 mb-2 shrink-0" />
+                        <Skeleton className="h-3.5 w-36 bg-slate-100 mb-auto shrink-0" />
+                        <Skeleton className="h-8 w-8 rounded-full bg-slate-100 mt-4 shrink-0" />
                       </div>
                     </div>
-                  </motion.a>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
+                  ))}
+                </div>
+              ) : experts.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 bg-subtle-gray/30 rounded-2xl border border-hairline/60 max-w-md mx-auto">
+                  <Users size={48} className="mx-auto mb-3 opacity-40 text-primary" />
+                  <p className="text-sm font-semibold text-slate-500">No career experts listed at the moment.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 justify-center">
+                  {experts.map((expert, idx) => (
+                    <motion.a
+                      key={expert.id}
+                      href={expert.linkedin_url || undefined}
+                      target={expert.linkedin_url ? "_blank" : undefined}
+                      rel={expert.linkedin_url ? "noopener noreferrer" : undefined}
+                      onClick={(e) => {
+                        if (!expert.linkedin_url) {
+                          e.preventDefault();
+                        }
+                      }}
+                      initial={{ opacity: 0, y: 15 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.5, delay: idx * 0.05 }}
+                      className={`group flex ${expert.linkedin_url ? "cursor-pointer" : "cursor-default"}`}
+                    >
+                      <div className="bg-subtle-gray border border-hairline/80 p-1.5 rounded-[1.5rem] w-full transition-all duration-300 group-hover:border-primary/20 group-hover:shadow-lg">
+                        <div className="bg-white border border-hairline/40 p-6 md:p-8 rounded-[calc(1.5rem-0.375rem)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.8),0_2px_8px_rgba(15,23,42,0.01)] h-full flex flex-col items-center text-center relative overflow-hidden">
+                          <div className="absolute inset-0 rounded-[calc(1.5rem-0.375rem)] bg-gradient-to-b from-primary/[0.01] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+
+                          {/* Circular profile image with fallback */}
+                          <div className="relative w-24 h-24 rounded-full overflow-hidden mb-6 border-2 border-hairline group-hover:border-gold transition-colors duration-300 shrink-0">
+                            {expert.photo_url ? (
+                              <img
+                                src={expert.photo_url}
+                                alt={expert.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const fallback = e.currentTarget.parentElement?.querySelector('.avatar-fallback') as HTMLElement;
+                                  if (fallback) fallback.style.display = 'flex';
+                                }}
+                              />
+                            ) : null}
+                            <div
+                              className="avatar-fallback w-full h-full bg-slate-100 flex items-center justify-center text-primary font-bold text-2xl"
+                              style={{ display: expert.photo_url ? 'none' : 'flex' }}
+                            >
+                              {expert.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                            </div>
+                          </div>
+
+                          <h3 className="font-display font-bold text-lg text-primary mb-1 group-hover:text-gold transition-colors duration-300">
+                            {expert.name}
+                          </h3>
+                          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
+                            {expert.designation}
+                          </p>
+                          <p className="text-sm text-slate-500 leading-relaxed max-w-[24ch]">
+                            {expert.expertise}
+                          </p>
+
+                          {expert.linkedin_url && (
+                            <div className="mt-auto pt-6 text-slate-400 group-hover:text-primary transition-colors duration-300">
+                              <div className="w-8 h-8 rounded-full border border-hairline flex items-center justify-center group-hover:border-primary transition-all duration-300 bg-subtle-gray/30 group-hover:bg-primary/5">
+                                <LinkedinLogo size={16} weight="fill" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </motion.a>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        </SectionReveal>
 
         {/* Advantage / Benefits Section */}
-        <section className="py-24 border-t border-hairline bg-subtle-gray/20">
-          <div className="max-w-7xl mx-auto px-6 lg:px-8">
-            <div className="text-center max-w-3xl mx-auto mb-16">
-              <h2 className="font-display font-bold text-3xl md:text-4xl text-primary tracking-tight mb-4">
-                Structured placement methodology.
-              </h2>
-              <p className="text-sm text-slate-500">
-                How we guide you from lead registration to career success.
-              </p>
+        <SectionReveal>
+          <section className="py-24 border-t border-hairline bg-subtle-gray/20">
+            <div className="max-w-7xl mx-auto px-6 lg:px-8">
+              <div className="text-center max-w-3xl mx-auto mb-16">
+                <h2 className="font-display font-bold text-3xl md:text-4xl text-primary tracking-tight mb-4">
+                  Structured placement methodology.
+                </h2>
+                <p className="text-sm text-slate-500">
+                  How we guide you from lead registration to career success.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
+                <Card hoverable className="p-8">
+                  <div className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-6">
+                    <Target size={20} weight="bold" />
+                  </div>
+                  <CardTitle className="text-lg mb-2">1. Registration & Assessment</CardTitle>
+                  <CardDescription>
+                    Apply online and complete your lead profile. Your consultant reviews your current credentials and assigns personalized goals.
+                  </CardDescription>
+                </Card>
+
+                <Card hoverable className="p-8">
+                  <div className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-6">
+                    <Users size={20} weight="bold" />
+                  </div>
+                  <CardTitle className="text-lg mb-2">2. Mentorship & Prep Checklists</CardTitle>
+                  <CardDescription>
+                    Log in to your portal to access specialized assignments, complete resume updates, schedule mock interviews, and message your advisor in real-time.
+                  </CardDescription>
+                </Card>
+
+                <Card hoverable className="p-8">
+                  <div className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-6">
+                    <ChartLineUp size={20} weight="bold" />
+                  </div>
+                  <CardTitle className="text-lg mb-2">3. Referral & Placements</CardTitle>
+                  <CardDescription>
+                    Leverage Annex partners and corporate networks. We push optimized resumes directly to top hiring managers to guarantee interviews.
+                  </CardDescription>
+                </Card>
+              </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
-              <Card className="p-8">
-                <div className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-6">
-                  <Target size={20} weight="bold" />
-                </div>
-                <CardTitle className="text-lg mb-2">1. Registration & Assessment</CardTitle>
-                <CardDescription>
-                  Apply online and complete your lead profile. Your consultant reviews your current credentials and assigns personalized goals.
-                </CardDescription>
-              </Card>
-
-              <Card className="p-8">
-                <div className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-6">
-                  <Users size={20} weight="bold" />
-                </div>
-                <CardTitle className="text-lg mb-2">2. Mentorship & Prep Checklists</CardTitle>
-                <CardDescription>
-                  Log in to your portal to access specialized assignments, complete resume updates, schedule mock interviews, and message your advisor in real-time.
-                </CardDescription>
-              </Card>
-
-              <Card className="p-8">
-                <div className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-6">
-                  <ChartLineUp size={20} weight="bold" />
-                </div>
-                <CardTitle className="text-lg mb-2">3. Referral & Placements</CardTitle>
-                <CardDescription>
-                  Leverage Annex partners and corporate networks. We push optimized resumes directly to top hiring managers to guarantee interviews.
-                </CardDescription>
-              </Card>
-            </div>
-          </div>
-        </section>
+          </section>
+        </SectionReveal>
 
         {/* Testimonials */}
-        <section className="py-24 bg-white">
-          <div className="max-w-7xl mx-auto px-6 lg:px-8">
-            <h2 className="font-display font-bold text-3xl md:text-4xl text-primary tracking-tight mb-16 text-center">
-              Student success stories.
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
-              {testimonials.map((test, i) => (
-                <div key={i} className="border-l-2 border-gold/40 pl-6 py-2">
-                  <p className="text-base text-slate-700 italic leading-relaxed mb-4">
-                    &ldquo;{test.quote}&rdquo;
-                  </p>
-                  <div>
-                    <h5 className="font-display font-bold text-sm text-primary">{test.name}</h5>
-                    <p className="text-xs text-slate-400 font-semibold">{test.role}</p>
-                    <span className="inline-block bg-subtle-gray text-primary text-[10px] uppercase font-bold px-2 py-0.5 rounded mt-2 border border-hairline">
-                      {test.service}
-                    </span>
+        <SectionReveal>
+          <section className="py-24 bg-white">
+            <div className="max-w-7xl mx-auto px-6 lg:px-8">
+              <h2 className="font-display font-bold text-3xl md:text-4xl text-primary tracking-tight mb-16 text-center">
+                Student success stories.
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
+                {testimonials.map((test, i) => (
+                  <div key={i} className="border-l-2 border-gold/40 pl-6 py-2">
+                    <p className="text-base text-slate-700 italic leading-relaxed mb-4">
+                      &ldquo;{test.quote}&rdquo;
+                    </p>
+                    <div>
+                      <h5 className="font-display font-bold text-sm text-primary">{test.name}</h5>
+                      <p className="text-xs text-slate-400 font-semibold">{test.role}</p>
+                      <span className="inline-block bg-subtle-gray text-primary text-[10px] uppercase font-bold px-2 py-0.5 rounded mt-2 border border-hairline">
+                        {test.service}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </SectionReveal>
 
         {/* FAQs */}
-        <section className="py-24 border-t border-hairline bg-subtle-gray/10">
-          <div className="max-w-4xl mx-auto px-6 text-left">
-            <h2 className="font-display font-bold text-3xl text-primary tracking-tight mb-12 text-center">
-              Frequently asked questions.
-            </h2>
-            <div className="space-y-6">
-              {faqs.map((faq, i) => (
-                <div key={i} className="bg-white border border-hairline/80 p-6 rounded-2xl">
-                  <h4 className="font-display font-bold text-base text-primary mb-2">
-                    {faq.question}
-                  </h4>
-                  <p className="text-sm text-slate-500 leading-relaxed">
-                    {faq.answer}
-                  </p>
-                </div>
-              ))}
+        <SectionReveal>
+          <section className="py-24 border-t border-hairline bg-subtle-gray/10">
+            <div className="max-w-4xl mx-auto px-6 text-left">
+              <h2 className="font-display font-bold text-3xl text-primary tracking-tight mb-12 text-center">
+                Frequently asked questions.
+              </h2>
+              <div className="space-y-6">
+                {faqs.map((faq, i) => (
+                  <div key={i} className="bg-white border border-hairline/80 p-6 rounded-2xl">
+                    <h4 className="font-display font-bold text-base text-primary mb-2">
+                      {faq.question}
+                    </h4>
+                    <p className="text-sm text-slate-500 leading-relaxed">
+                      {faq.answer}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </SectionReveal>
       </main>
 
       {/* Modal for Enrollment */}

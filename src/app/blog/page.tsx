@@ -5,6 +5,8 @@ import { Sparkle, Calendar, User, ArrowLeft, SpinnerGap } from "@phosphor-icons/
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SectionReveal } from "@/components/section-reveal";
 import { supabase } from "@/lib/supabase";
 
 interface BlogPost {
@@ -101,23 +103,41 @@ export default function Blog() {
       <main className="flex-grow pt-32 pb-24 bg-white text-left">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           
-          <div className="max-w-3xl mb-16">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-subtle-gray border border-hairline/80 text-[10px] uppercase tracking-[0.2em] font-semibold text-primary mb-6">
-              <Sparkle size={12} className="text-gold" weight="fill" />
-              Annex Journal
+          <SectionReveal>
+            <div className="max-w-3xl mb-16">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-subtle-gray border border-hairline/80 text-[10px] uppercase tracking-[0.2em] font-semibold text-primary mb-6">
+                <Sparkle size={12} className="text-gold" weight="fill" />
+                Annex Journal
+              </div>
+              <h1 className="font-display font-bold text-4xl md:text-5xl text-primary tracking-tighter leading-none mb-6">
+                Insights & admissions guides.
+              </h1>
+              <p className="text-base md:text-lg text-slate-500 leading-relaxed">
+                Read up-to-date analysis from our advisors detailing global admissions, visa policy changes, and study abroad steps.
+              </p>
             </div>
-            <h1 className="font-display font-bold text-4xl md:text-5xl text-primary tracking-tighter leading-none mb-6">
-              Insights & admissions guides.
-            </h1>
-            <p className="text-base md:text-lg text-slate-500 leading-relaxed">
-              Read up-to-date analysis from our advisors detailing global admissions, visa policy changes, and study abroad steps.
-            </p>
-          </div>
+          </SectionReveal>
 
           {loading ? (
-            <div className="text-center py-20 text-slate-400 text-xs font-semibold">
-              <SpinnerGap className="animate-spin mx-auto mb-2 text-primary" size={24} />
-              Loading articles...
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((n) => (
+                <Card key={n} className="flex flex-col justify-between min-h-[300px]">
+                  <div className="mb-6">
+                    <Skeleton className="w-24 h-4 mb-3 bg-slate-100" />
+                    <Skeleton className="w-full h-6 mb-2 bg-slate-100" />
+                    <Skeleton className="w-2/3 h-6 mb-4 bg-slate-100" />
+                    <Skeleton className="w-full h-4 mb-2 bg-slate-100" />
+                    <Skeleton className="w-5/6 h-4 mb-2 bg-slate-100" />
+                  </div>
+                  <div className="border-t border-hairline pt-4 mt-auto">
+                    <div className="flex justify-between items-center mb-4">
+                      <Skeleton className="w-24 h-3.5 bg-slate-100" />
+                      <Skeleton className="w-28 h-3.5 bg-slate-100" />
+                    </div>
+                    <Skeleton className="w-20 h-4 bg-slate-100" />
+                  </div>
+                </Card>
+              ))}
             </div>
           ) : !selectedPost ? (
             posts.length === 0 ? (
@@ -126,66 +146,70 @@ export default function Blog() {
               </div>
             ) : (
               /* Post Listings Grid */
-              <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {posts.map((post) => (
-                  <Card key={post.slug} className="flex flex-col justify-between min-h-[300px]">
-                    <div className="mb-6">
-                      <span className="text-xs font-mono-data text-gold font-bold uppercase tracking-wider block mb-2">
-                        {post.category}
-                      </span>
-                      <CardTitle className="text-xl mb-3 hover:text-gold transition-colors cursor-pointer" onClick={() => setSelectedPost(post)}>
-                        {post.title}
-                      </CardTitle>
-                      <CardDescription className="mb-4">
-                        {post.excerpt}
-                      </CardDescription>
-                    </div>
-
-                    <div className="border-t border-hairline pt-4 mt-auto">
-                      <div className="flex justify-between items-center text-[10px] font-mono-data text-slate-400 font-semibold mb-4">
-                        <span className="flex items-center gap-1"><Calendar size={12} /> {post.date}</span>
-                        <span className="flex items-center gap-1"><User size={12} /> BY: {post.author.toUpperCase()}</span>
+              <SectionReveal delay={0.1}>
+                <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {posts.map((post) => (
+                    <Card key={post.slug} hoverable className="flex flex-col justify-between min-h-[300px]">
+                      <div className="mb-6">
+                        <span className="text-xs font-mono-data text-gold font-bold uppercase tracking-wider block mb-2">
+                          {post.category}
+                        </span>
+                        <CardTitle className="text-xl mb-3 hover:text-gold transition-colors cursor-pointer" onClick={() => setSelectedPost(post)}>
+                          {post.title}
+                        </CardTitle>
+                        <CardDescription className="mb-4">
+                          {post.excerpt}
+                        </CardDescription>
                       </div>
-                      <button
-                        onClick={() => setSelectedPost(post)}
-                        className="text-xs font-bold uppercase tracking-wider text-primary hover:text-gold transition-colors cursor-pointer"
-                      >
-                        Read Article &rarr;
-                      </button>
-                    </div>
-                  </Card>
-                ))}
-              </section>
+
+                      <div className="border-t border-hairline pt-4 mt-auto">
+                        <div className="flex justify-between items-center text-[10px] font-mono-data text-slate-400 font-semibold mb-4">
+                          <span className="flex items-center gap-1"><Calendar size={12} /> {post.date}</span>
+                          <span className="flex items-center gap-1"><User size={12} /> BY: {post.author.toUpperCase()}</span>
+                        </div>
+                        <button
+                          onClick={() => setSelectedPost(post)}
+                          className="text-xs font-bold uppercase tracking-wider text-primary hover:text-gold transition-colors cursor-pointer"
+                        >
+                          Read Article &rarr;
+                        </button>
+                      </div>
+                    </Card>
+                  ))}
+                </section>
+              </SectionReveal>
             )
           ) : (
             /* Selected Post Reader View */
-            <article className="max-w-3xl mx-auto border border-hairline bg-subtle-gray/10 p-8 md:p-12 rounded-[2rem]">
-              <button
-                onClick={() => setSelectedPost(null)}
-                className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-primary transition-colors mb-8 cursor-pointer"
-              >
-                <ArrowLeft size={12} /> Back to Journal
-              </button>
+            <SectionReveal>
+              <article className="max-w-3xl mx-auto border border-hairline bg-subtle-gray/10 p-8 md:p-12 rounded-[2rem]">
+                <button
+                  onClick={() => setSelectedPost(null)}
+                  className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-primary transition-colors mb-8 cursor-pointer"
+                >
+                  <ArrowLeft size={12} /> Back to Journal
+                </button>
 
-              <span className="text-xs font-mono-data text-gold font-bold uppercase tracking-wider block mb-2">
-                {selectedPost.category}
-              </span>
-              <h2 className="font-display font-bold text-2xl md:text-3xl text-primary tracking-tight leading-snug mb-4">
-                {selectedPost.title}
-              </h2>
+                <span className="text-xs font-mono-data text-gold font-bold uppercase tracking-wider block mb-2">
+                  {selectedPost.category}
+                </span>
+                <h2 className="font-display font-bold text-2xl md:text-3xl text-primary tracking-tight leading-snug mb-4">
+                  {selectedPost.title}
+                </h2>
 
-              <div className="flex gap-6 items-center text-xs font-mono-data text-slate-400 font-semibold mb-8 border-b border-hairline pb-4">
-                <span className="flex items-center gap-1"><Calendar size={12} /> {selectedPost.date}</span>
-                <span className="flex items-center gap-1"><User size={12} /> AUTHOR: {selectedPost.author.toUpperCase()}</span>
-              </div>
+                <div className="flex gap-6 items-center text-xs font-mono-data text-slate-400 font-semibold mb-8 border-b border-hairline pb-4">
+                  <span className="flex items-center gap-1"><Calendar size={12} /> {selectedPost.date}</span>
+                  <span className="flex items-center gap-1"><User size={12} /> AUTHOR: {selectedPost.author.toUpperCase()}</span>
+                </div>
 
-              <div className="text-sm text-slate-600 leading-relaxed space-y-4 max-w-[65ch]">
-                <p className="whitespace-pre-wrap">{selectedPost.content}</p>
-                <p>
-                  For personalized queries and profiling, speak with our certified advisors. We audit student academic transcripts and outline exact pathways for global admissions.
-                </p>
-              </div>
-            </article>
+                <div className="text-sm text-slate-600 leading-relaxed space-y-4 max-w-[65ch]">
+                  <p className="whitespace-pre-wrap">{selectedPost.content}</p>
+                  <p>
+                    For personalized queries and profiling, speak with our certified advisors. We audit student academic transcripts and outline exact pathways for global admissions.
+                  </p>
+                </div>
+              </article>
+            </SectionReveal>
           )}
 
         </div>

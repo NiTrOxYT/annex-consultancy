@@ -11,6 +11,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface University {
   id: string;
@@ -615,9 +616,30 @@ export function TopCollegesSection({ country }: TopCollegesSectionProps) {
 
         {/* Main Grid View */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="bg-slate-50 border border-hairline p-6 rounded-[1.5rem] min-h-[300px]" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map((n) => (
+              <Card key={n} className="flex flex-col justify-between min-h-[340px]">
+                <div className="mb-6">
+                  {/* Top Badges Row */}
+                  <div className="flex justify-between items-start gap-4 mb-6">
+                    <Skeleton className="w-12 h-12 rounded-xl bg-slate-100" />
+                    <div className="flex flex-col items-end gap-1.5">
+                      <Skeleton className="w-20 h-5 rounded-full bg-slate-100" />
+                      <Skeleton className="w-12 h-4 bg-slate-100" />
+                    </div>
+                  </div>
+                  {/* Title & Location */}
+                  <Skeleton className="w-3/4 h-6 mb-2 bg-slate-100" />
+                  <Skeleton className="w-1/2 h-4 mb-6 bg-slate-100" />
+                  {/* Details block / dead text */}
+                  <div className="space-y-2">
+                    <Skeleton className="w-full h-3.5 bg-slate-100" />
+                    <Skeleton className="w-5/6 h-3.5 bg-slate-100" />
+                    <Skeleton className="w-2/3 h-3.5 bg-slate-100" />
+                  </div>
+                </div>
+                <Skeleton className="w-full h-11 bg-slate-100 rounded-full mt-auto" />
+              </Card>
             ))}
           </div>
         ) : displayUnis.length === 0 ? (

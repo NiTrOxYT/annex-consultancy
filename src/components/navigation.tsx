@@ -48,33 +48,53 @@ export function Navigation() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = React.useState(false);
   const [activeDropdown, setActiveDropdown] = React.useState<string | null>(null);
+  const [isScrolled, setIsScrolled] = React.useState(false);
 
   React.useEffect(() => {
     setIsOpen(false);
     setActiveDropdown(null);
   }, [pathname]);
 
+  React.useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
     <>
       {/* Floating Glass Pill Navigation Bar */}
-      <header className="fixed top-0 inset-x-0 z-40 px-4 pt-6 pointer-events-none">
+      <header className={cn(
+        "fixed top-0 inset-x-0 z-40 px-4 transition-all duration-300 pointer-events-none",
+        isScrolled ? "pt-2" : "pt-6"
+      )}>
         <div className="max-w-[1700px] mx-auto pointer-events-auto">
           {/* Main floating pill */}
-          <div className="w-full flex items-center bg-white/70 backdrop-blur-xl border border-hairline/80 px-8 py-3.5 rounded-full shadow-[0_8px_32px_rgba(15,23,42,0.04)]">
+          <div className={cn(
+            "w-full flex items-center border border-hairline/80 px-8 rounded-full transition-all duration-300",
+            isScrolled
+              ? "bg-white/95 backdrop-blur-2xl py-2.5 shadow-[0_12px_36px_rgba(15,23,42,0.08)] border-slate-200/90"
+              : "bg-white/70 backdrop-blur-xl py-3.5 shadow-[0_8px_32px_rgba(15,23,42,0.04)]"
+          )}>
 
             {/* Logo */}
-
             <div className="shrink-0">
-
               <Link href="/" className="flex items-center group">
                 <AnnexLogo size={38} showText={true} />
               </Link>
-
             </div>
 
             {/* Desktop Menu */}
             <nav className="hidden xl:flex flex-1 justify-center items-center gap-8 2xl:gap-10 px-6">
               {navLinks.map((link) => {
+                const isDropdownActive = link.dropdown?.some(sub => pathname === sub.href) || false;
+                const isActive = link.dropdown 
+                  ? isDropdownActive
+                  : (pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href + "/")));
+
                 if (link.dropdown) {
                   return (
                     <div
@@ -83,9 +103,25 @@ export function Navigation() {
                       onMouseEnter={() => setActiveDropdown(link.label)}
                       onMouseLeave={() => setActiveDropdown(null)}
                     >
-                      <button className="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-primary transition-colors cursor-pointer">
+                      <button className={cn(
+                        "flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer relative py-1 group/btn",
+                        isActive ? "text-primary font-semibold" : "text-slate-600 hover:text-primary"
+                      )}>
                         {link.label}
                         <CaretDown size={14} className="text-slate-400 group-hover:rotate-180 transition-transform duration-200" />
+                        
+                        {/* Hover line if not active */}
+                        {!isActive && (
+                          <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary/20 scale-x-0 group-hover/btn:scale-x-100 transition-transform duration-300 origin-center" />
+                        )}
+                        {/* Active indicator */}
+                        {isActive && (
+                          <motion.div
+                            layoutId="activeNavLine"
+                            className="absolute bottom-0 left-0 right-0 h-[2px] bg-gold"
+                            transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                          />
+                        )}
                       </button>
 
                       <AnimatePresence>
@@ -123,11 +159,23 @@ export function Navigation() {
                     key={link.label}
                     href={link.href}
                     className={cn(
-                      "text-sm font-medium text-slate-600 hover:text-primary transition-colors",
-                      pathname === link.href && "text-primary"
+                      "text-sm font-medium transition-colors relative py-1 group",
+                      isActive ? "text-primary font-semibold" : "text-slate-600 hover:text-primary"
                     )}
                   >
                     {link.label}
+                    {/* Hover line if not active */}
+                    {!isActive && (
+                      <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary/20 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-center" />
+                    )}
+                    {/* Active indicator */}
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeNavLine"
+                        className="absolute bottom-0 left-0 right-0 h-[2px] bg-gold"
+                        transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                      />
+                    )}
                   </Link>
                 );
               })}
@@ -159,17 +207,11 @@ export function Navigation() {
 
             {/* Mobile Toggle Button */}
             <button
-
               onClick={() => setIsOpen(!isOpen)}
-
               className="xl:hidden ml-auto p-2 rounded-full hover:bg-subtle-gray"
-
             >
-
               {isOpen ? <X size={20} /> : <List size={20} />}
-
             </button>
-
           </div>
         </div>
       </header>
@@ -203,7 +245,7 @@ export function Navigation() {
                           <Link
                             key={sub.label}
                             href={sub.href}
-                            className="text-base font-semibold text-slate-600 hover:text-primary"
+                            className="text-base font-semibold text-slate-600 hover:text-primary py-2.5 flex items-center min-h-[44px] w-full"
                           >
                             {sub.label}
                           </Link>
@@ -213,7 +255,7 @@ export function Navigation() {
                   ) : (
                     <Link
                       href={link.href}
-                      className="text-xl font-bold font-display tracking-tight text-slate-700 hover:text-primary"
+                      className="text-xl font-bold font-display tracking-tight text-slate-700 hover:text-primary py-2.5 flex items-center min-h-[44px] w-full"
                     >
                       {link.label}
                     </Link>
@@ -229,17 +271,17 @@ export function Navigation() {
               className="flex flex-col gap-2.5 border-t border-hairline pt-6 mt-6"
             >
               <Link href="/student-login" className="w-full">
-                <Button variant="outline" className="w-full text-center text-xs py-2">
+                <Button variant="outline" size="md" className="w-full text-center">
                   Student Portal Login
                 </Button>
               </Link>
               <Link href="/career-portal" className="w-full">
-                <Button variant="outline" className="w-full text-center text-xs py-2 bg-slate-900 text-white border-none hover:bg-slate-800">
+                <Button variant="outline" size="md" className="w-full text-center bg-slate-900 text-white border-none hover:bg-slate-800">
                   Career Portal Login
                 </Button>
               </Link>
               <Link href="/contact" className="w-full">
-                <Button variant="primary" className="w-full text-center text-xs py-2">
+                <Button variant="primary" size="md" className="w-full text-center">
                   Book Consultation
                 </Button>
               </Link>

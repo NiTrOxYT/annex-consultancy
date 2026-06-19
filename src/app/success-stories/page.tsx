@@ -5,6 +5,8 @@ import { Sparkle, GraduationCap, CheckCircle, SpinnerGap } from "@phosphor-icons
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SectionReveal } from "@/components/section-reveal";
 import { supabase } from "@/lib/supabase";
 
 interface SuccessStudent {
@@ -135,26 +137,45 @@ export default function SuccessStories() {
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           
           {/* Header */}
-          <div className="max-w-3xl mb-16">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-subtle-gray border border-hairline/80 text-[10px] uppercase tracking-[0.2em] font-semibold text-primary mb-6">
-              <Sparkle size={12} className="text-gold" weight="fill" />
-              Visa Approvals
+          <SectionReveal>
+            <div className="max-w-3xl mb-16">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-subtle-gray border border-hairline/80 text-[10px] uppercase tracking-[0.2em] font-semibold text-primary mb-6">
+                <Sparkle size={12} className="text-gold" weight="fill" />
+                Visa Approvals
+              </div>
+              <h1 className="font-display font-bold text-4xl md:text-5xl text-primary tracking-tighter leading-none mb-6">
+                Placed by Annex.
+              </h1>
+              <p className="text-base md:text-lg text-slate-500 leading-relaxed max-w-[55ch]">
+                Discover placement achievements and feedback from students who successfully transitioned to leading global campuses.
+              </p>
             </div>
-            <h1 className="font-display font-bold text-4xl md:text-5xl text-primary tracking-tighter leading-none mb-6">
-              Placed by Annex.
-            </h1>
-            <p className="text-base md:text-lg text-slate-500 leading-relaxed max-w-[55ch]">
-              Discover placement achievements and feedback from students who successfully transitioned to leading global campuses.
-            </p>
-          </div>
+          </SectionReveal>
 
           {loading ? (
-            <div className="text-center py-20 text-slate-400 text-xs font-semibold">
-              <SpinnerGap className="animate-spin mx-auto mb-2 text-primary" size={24} />
-              Loading stories...
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((n) => (
+                <Card key={n} className="flex flex-col justify-between min-h-[320px]">
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <Skeleton className="w-9 h-9 rounded-full bg-slate-100" />
+                      <Skeleton className="w-28 h-5 rounded-full bg-slate-100" />
+                    </div>
+                    <Skeleton className="w-48 h-6 mb-2 bg-slate-100" />
+                    <Skeleton className="w-64 h-4 mb-4 bg-slate-100" />
+                    <Skeleton className="w-full h-4 mb-2 bg-slate-100" />
+                    <Skeleton className="w-full h-4 mb-2 bg-slate-100" />
+                    <Skeleton className="w-4/5 h-4 mb-2 bg-slate-100" />
+                  </div>
+                  <div className="border-t border-hairline pt-4 flex justify-between items-center mt-auto">
+                    <Skeleton className="w-32 h-3.5 bg-slate-100" />
+                    <Skeleton className="w-12 h-3.5 bg-slate-100" />
+                  </div>
+                </Card>
+              ))}
             </div>
           ) : (
-            <>
+            <SectionReveal delay={0.1}>
               {/* Filtering Buttons */}
               <div className="flex flex-wrap gap-2.5 mb-12">
                 {filterCountries.map((country) => (
@@ -180,7 +201,7 @@ export default function SuccessStories() {
                 /* Placements Grid */
                 <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredStudents.map((student, idx) => (
-                    <Card key={`${student.name}-${idx}`} className="flex flex-col justify-between min-h-[320px]">
+                    <Card key={`${student.name}-${idx}`} hoverable className="flex flex-col justify-between min-h-[320px]">
                       <div className="mb-6">
                         <div className="flex items-center justify-between mb-4">
                           <div className="w-9 h-9 rounded-full bg-primary/5 flex items-center justify-center text-primary">
@@ -206,7 +227,7 @@ export default function SuccessStories() {
                   ))}
                 </section>
               )}
-            </>
+            </SectionReveal>
           )}
 
         </div>
