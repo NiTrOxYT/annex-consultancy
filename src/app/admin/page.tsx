@@ -13,6 +13,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle, CardDescription, CardHeader, CardContent } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
+import { AnnexLogo } from "@/components/branding/annex-logo";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-url.supabase.co";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key";
@@ -2799,8 +2800,8 @@ export default function AdminDashboard() {
       <main className="min-h-[100dvh] flex items-center justify-center bg-subtle-gray/30 px-6 py-12">
         <Card className="max-w-md w-full p-8 bg-white">
           <div className="flex flex-col items-center text-center mb-8">
-            <div className="w-12 h-12 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-4">
-              <ShieldCheck size={24} weight="bold" />
+            <div className="w-12 h-12 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-4 p-2">
+              <AnnexLogo size={32} showText={false} />
             </div>
             <CardTitle className="text-xl">Annex Admin Portal</CardTitle>
             <CardDescription className="mt-1">Enter your admin access credentials below.</CardDescription>
@@ -2852,8 +2853,8 @@ export default function AdminDashboard() {
       <header className="border-b border-hairline px-6 py-4 flex flex-col sm:flex-row gap-4 items-center justify-between bg-white sticky top-0 z-30 shadow-[0_1px_3px_rgba(15,23,42,0.02)]">
         <div className="flex flex-wrap items-center gap-4 md:gap-6">
           <div className="flex items-center gap-2">
-            <ShieldCheck size={24} className="text-primary" weight="fill" />
-            <span className="font-display font-bold text-lg text-primary tracking-tight">ANNEX ADMIN</span>
+            <AnnexLogo size={32} showText={true} />
+            <span className="font-display font-bold text-lg text-slate-400 tracking-tight">ADMIN</span>
           </div>
           
           <nav className="flex gap-1 sm:gap-2">

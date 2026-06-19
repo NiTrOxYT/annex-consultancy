@@ -1,12 +1,12 @@
 import Link from "next/link";
 import {
-  GraduationCap,
   FacebookLogo,
   InstagramLogo,
   YoutubeLogo,
   WhatsappLogo,
   MapPin,
 } from "@phosphor-icons/react/dist/ssr";
+import { AnnexLogo } from "@/components/branding/annex-logo";
 
 const footerLinks = {
   consultancy: [
@@ -38,11 +38,8 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
           {/* Logo & Info */}
           <div className="flex flex-col gap-4">
-            <Link href="/" className="flex items-center gap-2">
-              <GraduationCap size={28} className="text-primary" weight="fill" />
-              <span className="font-display font-bold text-xl tracking-tight text-primary">
-                ANNEX
-              </span>
+            <Link href="/" className="flex items-center">
+              <AnnexLogo size={42} showText={true} />
             </Link>
             <p className="text-xs text-slate-500 leading-relaxed max-w-[30ch]">
               Annex Education Consultancy provides international and domestic placement services, empowering students to secure admission at top global institutions.

@@ -39,6 +39,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle, CardDescription, CardHeader, CardContent } from "@/components/ui/card";
+import { AnnexLogo } from "@/components/branding/annex-logo";
 
 // Auth / Login Sub-component
 function CareerPortalLogin({
@@ -70,10 +71,12 @@ function CareerPortalLogin({
       });
 
       if (authError) {
+        console.error(`[Career Login]\nEmail: ${email}\nAuth Success: false\nAuth User ID: null\nProfile Found: false\nProfile Table: training_students\nProfile ID: null\nFailure Reason: ${authError.message}`);
         throw new Error(authError.message);
       }
 
       if (!authData.user) {
+        console.error(`[Career Login]\nEmail: ${email}\nAuth Success: false\nAuth User ID: null\nProfile Found: false\nProfile Table: training_students\nProfile ID: null\nFailure Reason: Login failed. User profile not retrieved.`);
         throw new Error("Login failed. User profile not retrieved.");
       }
 
@@ -89,17 +92,21 @@ function CareerPortalLogin({
       if (dbError) {
         await supabase.auth.signOut();
         if (dbError.code === "PGRST116") {
+          console.error(`[Career Login]\nEmail: ${email}\nAuth Success: true\nAuth User ID: ${userId}\nProfile Found: false\nProfile Table: training_students\nProfile ID: null\nFailure Reason: This account is not configured as a Career Portal profile.`);
           throw new Error("This account is not configured as a Career Portal profile. Please contact Admin.");
         } else {
+          console.error(`[Career Login]\nEmail: ${email}\nAuth Success: true\nAuth User ID: ${userId}\nProfile Found: false\nProfile Table: training_students\nProfile ID: null\nFailure Reason: ${dbError.message}`);
           throw new Error(`Unable to fetch your profile: ${dbError.message}`);
         }
       }
 
       if (student.status !== "Active" && student.status !== "Completed") {
         await supabase.auth.signOut();
+        console.error(`[Career Login]\nEmail: ${email}\nAuth Success: true\nAuth User ID: ${userId}\nProfile Found: true\nProfile Table: training_students\nProfile ID: ${student.id}\nFailure Reason: Your portal access is currently ${student.status}.`);
         throw new Error(`Your portal access is currently ${student.status}. Please contact support.`);
       }
 
+      console.log(`[Career Login]\nEmail: ${email}\nAuth Success: true\nAuth User ID: ${userId}\nProfile Found: true\nProfile Table: training_students\nProfile ID: ${student.id}\nFailure Reason: none`);
       onLoginSuccess(student.id, email);
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred.");
@@ -110,8 +117,8 @@ function CareerPortalLogin({
   return (
     <div className="max-w-md w-full px-6">
       <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-subtle-gray border border-hairline/80 text-primary mb-4">
-          <BriefcaseIcon size={28} className="text-primary" />
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-subtle-gray border border-hairline/80 text-primary mb-4 p-2.5">
+          <AnnexLogo size={34} showText={false} />
         </div>
         <h1 className="font-display font-bold text-3xl text-primary tracking-tight mb-2">
           Career Portal
@@ -750,14 +757,11 @@ export default function CareerPortalPage() {
 
       {/* Left Sidebar Navigation */}
       <aside className={`w-full md:w-64 bg-white border-r border-hairline/80 flex flex-col shrink-0 ${isImpersonating ? "pt-12" : ""}`}>
-        <div className="p-6 border-b border-hairline/60 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white shrink-0">
-            <BriefcaseIcon size={20} className="text-white" />
+        <div className="p-6 border-b border-hairline/60">
+          <div className="flex items-center">
+            <AnnexLogo size={32} showText={true} />
           </div>
-          <div className="overflow-hidden">
-            <h2 className="font-display font-bold text-base text-primary truncate">ANNEX CAREERS</h2>
-            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Placement Portal</p>
-          </div>
+          <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-1.5 ml-10">Placement Portal</p>
         </div>
 
         <nav className="flex-grow p-4 space-y-1.5 overflow-y-auto">

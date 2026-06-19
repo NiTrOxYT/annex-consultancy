@@ -651,4 +651,37 @@ CREATE POLICY "Allow public write training_conversations" ON public.training_con
 -- ALTER PUBLICATION supabase_realtime ADD TABLE public.training_tasks;
 -- ALTER PUBLICATION supabase_realtime ADD TABLE public.training_students;
 
+-- 10. Safely check auth user details from public schema
+CREATE OR REPLACE FUNCTION public.check_auth_user_status(email_to_check TEXT)
+RETURNS TABLE (
+    user_id UUID,
+    email_confirmed BOOLEAN,
+    created_at TIMESTAMP WITH TIME ZONE
+)
+SECURITY DEFINER
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT id, (email_confirmed_at IS NOT NULL) AS email_confirmed, au.created_at
+    FROM auth.users au
+    WHERE au.email = email_to_check;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 11. Auto-confirm new auth user email signups immediately
+CREATE OR REPLACE FUNCTION public.auto_confirm_user_email()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.email_confirmed_at = now();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    BEFORE INSERT ON auth.users
+    FOR EACH ROW
+    EXECUTE FUNCTION public.auto_confirm_user_email();
+
+
 

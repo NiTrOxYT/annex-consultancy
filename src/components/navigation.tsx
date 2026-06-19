@@ -4,9 +4,10 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
-import { List, X, CaretDown, GraduationCap } from "@phosphor-icons/react";
+import { List, X, CaretDown } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { AnnexLogo } from "@/components/branding/annex-logo";
 
 const navLinks = [
   { label: "Home", href: "/" },
@@ -65,24 +66,8 @@ export function Navigation() {
 
             <div className="shrink-0">
 
-              <Link href="/" className="flex items-center gap-3 group">
-
-                <GraduationCap
-
-                  size={26}
-
-                  className="text-primary transition-transform duration-300 group-hover:rotate-12"
-
-                  weight="fill"
-
-                />
-
-                <span className="font-display font-bold text-lg tracking-tight text-primary">
-
-                  ANNEX
-
-                </span>
-
+              <Link href="/" className="flex items-center group">
+                <AnnexLogo size={38} showText={true} />
               </Link>
 
             </div>

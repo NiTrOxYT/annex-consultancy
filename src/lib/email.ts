@@ -99,13 +99,29 @@ export async function sendEmail({
   html: string;
 }) {
   const { activeProvider, emailFrom } = getEmailConfigStatus();
+
+  // Inject branding logo header in HTML body if standard container div matches
+  const logoUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://annex-consultancy.vercel.app"}/branding/annex-logo.png`;
+  const headerHtml = `
+    <div style="text-align: center; margin-bottom: 24px; border-bottom: 1px solid #f1f5f9; padding-bottom: 16px;">
+      <img src="${logoUrl}" alt="ANNEX Logo" style="width: 48px; height: 48px; vertical-align: middle; margin-right: 8px;" />
+      <span style="font-family: sans-serif; font-size: 20px; font-weight: bold; color: #0f172a; vertical-align: middle; letter-spacing: -0.5px; text-transform: uppercase;">ANNEX</span>
+    </div>
+  `;
+
+  let brandedHtml = html;
+  const containerPattern = /<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 12px; background-color: #ffffff;">/;
+  if (containerPattern.test(html)) {
+    brandedHtml = html.replace(containerPattern, (match) => match + headerHtml);
+  }
+
   console.log(`[Diagnostic] Attempting email delivery to: ${to}, Subject: "${subject}", Provider: ${activeProvider}`);
 
   if (activeProvider === "mock") {
     console.log("---------- LOCAL EMAIL NOTIFICATION (MOCKED) ----------");
     console.log(`To: ${to}`);
     console.log(`Subject: ${subject}`);
-    console.log(`Body: ${html}`);
+    console.log(`Body: ${brandedHtml}`);
     console.log("-------------------------------------------------------");
     console.log(`[Diagnostic] Email sent successfully (MOCKED) to: ${to}`);
 
@@ -136,7 +152,7 @@ export async function sendEmail({
       from: `Annex Consultancy Portal <${emailFrom}>`,
       to,
       subject,
-      html,
+      html: brandedHtml,
     });
 
     console.log(`[Diagnostic] Brevo SMTP email delivery successful!

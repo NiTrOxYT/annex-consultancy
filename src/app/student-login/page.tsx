@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Envelope, LockKey, ArrowRight, Warning, GraduationCap } from "@phosphor-icons/react";
+import { Envelope, LockKey, ArrowRight, Warning } from "@phosphor-icons/react";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle, CardDescription, CardHeader, CardContent } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
+import { AnnexLogo } from "@/components/branding/annex-logo";
 
 export default function StudentLogin() {
   const router = useRouter();
@@ -136,8 +137,8 @@ export default function StudentLogin() {
       <main className="flex-grow pt-32 pb-24 bg-white min-h-screen flex items-center justify-center">
         <div className="max-w-md w-full px-6">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-subtle-gray border border-hairline/80 text-primary mb-4">
-              <GraduationCap size={28} className="text-primary" weight="fill" />
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-subtle-gray border border-hairline/80 text-primary mb-4 p-2.5">
+              <AnnexLogo size={34} showText={false} />
             </div>
             <h1 className="font-display font-bold text-3xl text-primary tracking-tight mb-2">
               Student Portal

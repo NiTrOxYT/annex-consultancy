@@ -13,6 +13,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
+import { AnnexLogo } from "@/components/branding/annex-logo";
 import { Card, CardTitle, CardDescription, CardHeader, CardContent } from "@/components/ui/card";
 
 // Stages of application progress
@@ -778,14 +779,11 @@ export default function StudentDashboard() {
 
       {/* Sidebar Navigation */}
       <aside className={`w-full md:w-64 bg-white border-r border-hairline/80 flex flex-col shrink-0 ${isImpersonating ? "pt-12" : ""}`}>
-        <div className="p-6 border-b border-hairline/60 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white shrink-0">
-            <GraduationCap size={22} weight="fill" />
+        <div className="p-6 border-b border-hairline/60">
+          <div className="flex items-center">
+            <AnnexLogo size={32} showText={true} />
           </div>
-          <div className="overflow-hidden">
-            <h2 className="font-display font-bold text-base text-primary truncate">ANNEX</h2>
-            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Student Portal</p>
-          </div>
+          <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-1.5 ml-10">Student Portal</p>
         </div>
 
         {/* Tab Items */}
