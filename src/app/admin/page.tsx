@@ -112,7 +112,7 @@ export default function AdminDashboard() {
   const [checkingAuth, setCheckingAuth] = React.useState(true);
   
   // Dashboard Tabs
-  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat" | "counselors" | "settings" | "training">("bookings");
+  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat" | "counselors" | "settings" | "training" | "experts">("bookings");
 
   // Loaders & table existence flags
   const [loading, setLoading] = React.useState(false);
@@ -318,6 +318,22 @@ export default function AdminDashboard() {
   });
   const [savingCounselor, setSavingCounselor] = React.useState(false);
   const [uploadingCounselorAvatar, setUploadingCounselorAvatar] = React.useState(false);
+
+  // Career Experts Management States
+  const [experts, setExperts] = React.useState<any[]>([]);
+  const [isExpertModalOpen, setIsExpertModalOpen] = React.useState(false);
+  const [editingExpert, setEditingExpert] = React.useState<any | null>(null);
+  const [expertForm, setExpertForm] = React.useState({
+    name: "",
+    designation: "",
+    expertise: "",
+    photo_url: "",
+    linkedin_url: "",
+    display_order: 0,
+    is_active: true
+  });
+  const [savingExpert, setSavingExpert] = React.useState(false);
+  const [uploadingExpertPhoto, setUploadingExpertPhoto] = React.useState(false);
 
   // Messaging Center filter states
   const [chatCounselorFilter, setChatCounselorFilter] = React.useState("All");
@@ -814,6 +830,23 @@ export default function AdminDashboard() {
       setTrainingMeetings(meetingsData || []);
     } catch (err: any) {
       console.error("Error loading training data in fetchAllData:", err.message);
+    }
+
+    // 11. Fetch Career Experts
+    try {
+      const { data: expertsData, error: expertsError } = await supabase
+        .from("career_experts")
+        .select("*")
+        .order("display_order", { ascending: true });
+      if (expertsError) {
+        if (expertsError.code !== "42P01" && !expertsError.message.includes("does not exist")) {
+          throw expertsError;
+        }
+      } else {
+        setExperts(expertsData || []);
+      }
+    } catch (err: any) {
+      console.error("Error loading career experts:", err.message);
     }
     
     setLoading(false);
@@ -2137,6 +2170,139 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleSaveExpert = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!expertForm.name || !expertForm.designation) {
+      alert("Name and Designation are required.");
+      return;
+    }
+
+    setSavingExpert(true);
+    try {
+      if (editingExpert) {
+        // Update existing expert
+        const { error } = await supabase
+          .from("career_experts")
+          .update({
+            name: expertForm.name,
+            designation: expertForm.designation,
+            expertise: expertForm.expertise,
+            photo_url: expertForm.photo_url || null,
+            linkedin_url: expertForm.linkedin_url || null,
+            display_order: parseInt(expertForm.display_order as any) || 0,
+            is_active: expertForm.is_active
+          })
+          .eq("id", editingExpert.id);
+
+        if (error) throw error;
+        showToast("Career expert updated successfully");
+      } else {
+        // Create new expert
+        const { error } = await supabase
+          .from("career_experts")
+          .insert([{
+            name: expertForm.name,
+            designation: expertForm.designation,
+            expertise: expertForm.expertise,
+            photo_url: expertForm.photo_url || null,
+            linkedin_url: expertForm.linkedin_url || null,
+            display_order: parseInt(expertForm.display_order as any) || 0,
+            is_active: expertForm.is_active
+          }]);
+
+        if (error) throw error;
+        showToast("Career expert created successfully!");
+      }
+      setIsExpertModalOpen(false);
+      setEditingExpert(null);
+      setExpertForm({
+        name: "",
+        designation: "",
+        expertise: "",
+        photo_url: "",
+        linkedin_url: "",
+        display_order: 0,
+        is_active: true
+      });
+      await fetchAllData();
+    } catch (err: any) {
+      alert("Error saving expert: " + err.message);
+    } finally {
+      setSavingExpert(false);
+    }
+  };
+
+  const handleDeleteExpert = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this career expert? This action cannot be undone.")) return;
+    try {
+      const { error } = await supabase
+        .from("career_experts")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+      showToast("Career expert deleted successfully.");
+      await fetchAllData();
+    } catch (err: any) {
+      alert("Error deleting expert: " + err.message);
+    }
+  };
+
+  const handleExpertPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingExpertPhoto(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const randomName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      const filePath = `career_experts/photos/${randomName}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from("student-files")
+        .upload(filePath, file);
+      if (uploadErr) throw uploadErr;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("student-files")
+        .getPublicUrl(filePath);
+
+      setExpertForm(prev => ({ ...prev, photo_url: publicUrl }));
+      showToast("Photo uploaded successfully");
+    } catch (err: any) {
+      alert("Error uploading photo: " + err.message);
+    } finally {
+      setUploadingExpertPhoto(false);
+    }
+  };
+
+  const handleToggleExpertActive = async (expert: any) => {
+    try {
+      const { error } = await supabase
+        .from("career_experts")
+        .update({ is_active: !expert.is_active })
+        .eq("id", expert.id);
+      if (error) throw error;
+      showToast(`Expert status set to ${!expert.is_active ? "Active" : "Inactive"}`);
+      await fetchAllData();
+    } catch (err: any) {
+      alert("Failed to toggle status: " + err.message);
+    }
+  };
+
+  const handleUpdateExpertOrder = async (id: string, newOrder: number) => {
+    try {
+      const { error } = await supabase
+        .from("career_experts")
+        .update({ display_order: newOrder })
+        .eq("id", id);
+      if (error) throw error;
+      showToast("Display order updated.");
+      await fetchAllData();
+    } catch (err: any) {
+      alert("Failed to update order: " + err.message);
+    }
+  };
+
   const handleSendAdminChatReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!adminChatText.trim() && !adminChatFile || !activeChatStudentId) return;
@@ -2867,6 +3033,7 @@ export default function AdminDashboard() {
               { id: "universities", label: `Universities (${universities.length})` },
               { id: "blog", label: `Blog posts (${posts.length})` },
               { id: "stories", label: `Success stories (${stories.length})` },
+              { id: "experts", label: `Career Experts (${experts.length})` },
               { id: "settings", label: "Email Status" }
             ].map(tab => {
               const isActive = activeTab === tab.id;
@@ -5110,6 +5277,171 @@ export default function AdminDashboard() {
           </section>
         )}
 
+        {activeTab === "experts" && (
+          <section className="flex flex-col gap-6 animate-fade-in text-slate-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-display font-bold text-2xl text-primary">Career Experts Directory</h2>
+                <p className="text-xs text-slate-400 mt-1">Manage career consultants, experts, and display orders shown on the Training & Placement page.</p>
+              </div>
+              <Button 
+                onClick={() => {
+                  setEditingExpert(null);
+                  setExpertForm({
+                    name: "",
+                    designation: "",
+                    expertise: "",
+                    photo_url: "",
+                    linkedin_url: "",
+                    display_order: experts.length + 1,
+                    is_active: true
+                  });
+                  setIsExpertModalOpen(true);
+                }} 
+                variant="primary" 
+                size="sm" 
+                className="flex items-center gap-1"
+              >
+                <Plus size={14} /> Add Expert
+              </Button>
+            </div>
+
+            {/* Metrics cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              {[
+                { label: "Total Experts", value: experts.length, icon: <Users size={18} className="text-primary" weight="bold" />, bg: "bg-slate-50 border-slate-100" },
+                { label: "Active on Page", value: experts.filter(e => e.is_active).length, icon: <CheckCircle size={18} className="text-emerald-600" weight="bold" />, bg: "bg-emerald-50/20 border-emerald-100/60" },
+                { label: "Inactive Experts", value: experts.filter(e => !e.is_active).length, icon: <XCircle size={18} className="text-red-600" weight="bold" />, bg: "bg-red-50/20 border-red-100/60" }
+              ].map((stat, idx) => (
+                <div key={idx} className={`border rounded-2xl p-4 flex flex-col justify-between min-h-[90px] ${stat.bg}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500">{stat.label}</span>
+                    {stat.icon}
+                  </div>
+                  <span className="text-2xl font-bold font-mono-data text-primary mt-2">{stat.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Table */}
+            {experts.length === 0 ? (
+              <div className="text-center py-12 border border-dashed border-hairline rounded-2xl text-slate-400 text-xs font-semibold bg-white">
+                No experts registered. Click "Add Expert" to create one.
+              </div>
+            ) : (
+              <div className="border border-hairline rounded-2xl overflow-x-auto bg-white font-sans text-slate-700">
+                <table className="w-full text-left border-collapse text-xs min-w-[800px]">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-hairline text-slate-500 font-bold uppercase tracking-wider">
+                      <th className="p-4 w-[80px]">Order</th>
+                      <th className="p-4">Name</th>
+                      <th className="p-4">Designation</th>
+                      <th className="p-4">Area of Expertise</th>
+                      <th className="p-4">LinkedIn Profile</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-hairline">
+                    {experts.map(e => (
+                      <tr key={e.id} className="hover:bg-subtle-gray/30">
+                        <td className="p-4">
+                          <input 
+                            type="number" 
+                            defaultValue={e.display_order}
+                            onBlur={(event) => handleUpdateExpertOrder(e.id, parseInt(event.target.value) || 0)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                handleUpdateExpertOrder(e.id, parseInt((event.target as HTMLInputElement).value) || 0);
+                              }
+                            }}
+                            className="w-14 px-2 py-1 border border-hairline rounded text-center focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                          />
+                        </td>
+                        <td className="p-4 font-semibold text-primary">
+                          <div className="flex items-center gap-3">
+                            {e.photo_url ? (
+                              <img 
+                                src={e.photo_url} 
+                                alt={e.name} 
+                                className="w-8 h-8 rounded-full object-cover border border-hairline shadow-sm"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 border border-slate-200 flex items-center justify-center font-bold">
+                                {e.name.charAt(0)}
+                              </div>
+                            )}
+                            <div>
+                              <span className="text-xs font-bold text-primary block">{e.name}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4 text-slate-600 font-medium">{e.designation}</td>
+                        <td className="p-4 text-slate-500">{e.expertise}</td>
+                        <td className="p-4">
+                          {e.linkedin_url ? (
+                            <a 
+                              href={e.linkedin_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-primary hover:underline font-medium"
+                            >
+                              View Profile &rarr;
+                            </a>
+                          ) : (
+                            <span className="text-slate-400">Not set</span>
+                          )}
+                        </td>
+                        <td className="p-4">
+                          <button
+                            onClick={() => handleToggleExpertActive(e)}
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
+                              e.is_active
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100"
+                                : "bg-red-50 text-red-600 border-red-100 hover:bg-red-100"
+                            }`}
+                          >
+                            {e.is_active ? "Active" : "Inactive"}
+                          </button>
+                        </td>
+                        <td className="p-4 text-right flex justify-end gap-1.5 items-center">
+                          <Button 
+                            variant="secondary" 
+                            size="sm"
+                            onClick={() => {
+                              setEditingExpert(e);
+                              setExpertForm({
+                                name: e.name,
+                                designation: e.designation,
+                                expertise: e.expertise,
+                                photo_url: e.photo_url || "",
+                                linkedin_url: e.linkedin_url || "",
+                                display_order: e.display_order,
+                                is_active: e.is_active
+                              });
+                              setIsExpertModalOpen(true);
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button 
+                            variant="secondary" 
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleDeleteExpert(e.id)}
+                          >
+                            Delete
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
+
         {activeTab === "training" && (
           <section className="flex flex-col gap-6 animate-fade-in text-slate-700">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -6868,6 +7200,147 @@ export default function AdminDashboard() {
                   ) : "Save Record"}
                 </Button>
                 <Button type="button" onClick={() => setIsCounselorModalOpen(false)} variant="ghost" size="sm">Cancel</Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* 5c. ADD/EDIT CAREER EXPERT MODAL */}
+      {isExpertModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+          <Card className="max-w-md w-full p-6 relative bg-white shadow-2xl">
+            <button onClick={() => setIsExpertModalOpen(false)} className="absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer">
+              <X size={20} />
+            </button>
+            <div className="flex items-center gap-2 mb-6 border-b border-hairline pb-4 text-slate-700">
+              <User size={22} className="text-primary" />
+              <div>
+                <CardTitle className="text-lg">{editingExpert ? "Edit Career Expert" : "Add Career Expert"}</CardTitle>
+                <CardDescription className="text-xs">Setup name, designation, expertise and LinkedIn details for placement experts.</CardDescription>
+              </div>
+            </div>
+            <form onSubmit={handleSaveExpert} className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-1 text-xs text-slate-700">
+              
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Expert Name *</label>
+                <input 
+                  type="text" 
+                  value={expertForm.name} 
+                  onChange={(e) => setExpertForm({ ...expertForm, name: e.target.value })} 
+                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Designation *</label>
+                <input 
+                  type="text" 
+                  value={expertForm.designation} 
+                  onChange={(e) => setExpertForm({ ...expertForm, designation: e.target.value })} 
+                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                  placeholder="e.g. Senior Career Counselor"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Area of Expertise</label>
+                <input 
+                  type="text" 
+                  value={expertForm.expertise} 
+                  onChange={(e) => setExpertForm({ ...expertForm, expertise: e.target.value })} 
+                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                  placeholder="e.g. Study Abroad & Placement Guidance"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">LinkedIn URL</label>
+                <input 
+                  type="url" 
+                  value={expertForm.linkedin_url} 
+                  onChange={(e) => setExpertForm({ ...expertForm, linkedin_url: e.target.value })} 
+                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                  placeholder="https://linkedin.com/in/username"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Display Order</label>
+                <input 
+                  type="number" 
+                  value={expertForm.display_order} 
+                  onChange={(e) => setExpertForm({ ...expertForm, display_order: parseInt(e.target.value) || 0 })} 
+                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Profile Photo (Expert)</label>
+                <div className="flex items-center gap-3">
+                  {expertForm.photo_url ? (
+                    <img 
+                      src={expertForm.photo_url} 
+                      alt="Expert Preview" 
+                      className="w-10 h-10 rounded-full object-cover border border-hairline"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-400">
+                      ?
+                    </div>
+                  )}
+                  <div className="flex-grow">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleExpertPhotoUpload} 
+                      disabled={uploadingExpertPhoto}
+                      className="hidden" 
+                      id="expertPhotoFileInput"
+                    />
+                    <label 
+                      htmlFor="expertPhotoFileInput"
+                      className="px-3 py-2 border border-hairline rounded-xl hover:bg-slate-50 cursor-pointer flex items-center justify-center gap-1.5 font-bold uppercase tracking-wider text-[10px]"
+                    >
+                      {uploadingExpertPhoto ? (
+                        <>
+                          <SpinnerGap className="animate-spin text-slate-400" size={14} />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <UploadSimple size={14} />
+                          Upload Photo
+                        </>
+                      )}
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 mt-2">
+                <input 
+                  type="checkbox" 
+                  id="expertActive" 
+                  checked={expertForm.is_active} 
+                  onChange={(e) => setExpertForm({ ...expertForm, is_active: e.target.checked })} 
+                  className="w-4 h-4 text-primary cursor-pointer border-hairline rounded"
+                />
+                <label htmlFor="expertActive" className="text-xs font-bold text-primary uppercase tracking-wider cursor-pointer">Active Expert (Show on Page)</label>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-hairline pt-4 mt-2">
+                <Button type="submit" variant="primary" size="sm" disabled={savingExpert}>
+                  {savingExpert ? (
+                    <>
+                      <SpinnerGap className="animate-spin" size={14} />
+                      Saving...
+                    </>
+                  ) : "Save Record"}
+                </Button>
+                <Button type="button" onClick={() => setIsExpertModalOpen(false)} variant="ghost" size="sm">Cancel</Button>
               </div>
             </form>
           </Card>

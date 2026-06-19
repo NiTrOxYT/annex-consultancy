@@ -683,5 +683,23 @@ CREATE TRIGGER on_auth_user_created
     FOR EACH ROW
     EXECUTE FUNCTION public.auto_confirm_user_email();
 
+-- 12. Create career_experts table
+CREATE TABLE IF NOT EXISTS public.career_experts (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    name TEXT NOT NULL,
+    designation TEXT NOT NULL,
+    expertise TEXT NOT NULL,
+    photo_url TEXT,
+    linkedin_url TEXT,
+    display_order INTEGER DEFAULT 0 NOT NULL,
+    is_active BOOLEAN DEFAULT true NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.career_experts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public select career_experts" ON public.career_experts FOR SELECT USING (true);
+CREATE POLICY "Allow public write career_experts" ON public.career_experts FOR ALL USING (true) WITH CHECK (true);
+
+
 
 
