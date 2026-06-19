@@ -39,3 +39,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Security audit reports
+Audit-reports/
+
+# AI generated reports
+PHASE0_DEPENDENCY_REPORT.md
+SECURITY_FIX_PLAN.md
+
+# AI reports
+*_REPORT.md
+*_PLAN.md
+Audit-reports/
+
