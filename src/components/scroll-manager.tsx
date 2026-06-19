@@ -1,16 +1,28 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { usePathname } from "next/navigation";
 import Lenis from "lenis";
 import { ArrowUp } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "motion/react";
 
 export function ScrollManager() {
+  const pathname = usePathname();
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const lenisRef = useRef<Lenis | null>(null);
 
+  const isDashboard = pathname.startsWith("/student") || pathname.startsWith("/admin") || pathname.startsWith("/career-portal");
+
   useEffect(() => {
+    if (isDashboard) {
+      if (lenisRef.current) {
+        lenisRef.current.destroy();
+        lenisRef.current = null;
+      }
+      return;
+    }
+
     // Respect prefers-reduced-motion
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (prefersReducedMotion) return;
@@ -29,12 +41,13 @@ export function ScrollManager() {
 
     lenisRef.current = lenis;
 
+    let rafId: number;
     function raf(time: number) {
       lenis.raf(time);
-      requestAnimationFrame(raf);
+      rafId = requestAnimationFrame(raf);
     }
 
-    requestAnimationFrame(raf);
+    rafId = requestAnimationFrame(raf);
 
     // Scroll listener for scroll top button & progress indicator
     const handleScroll = () => {
@@ -56,11 +69,35 @@ export function ScrollManager() {
 
     window.addEventListener("scroll", handleScroll, { passive: true });
 
+    // Setup ResizeObserver to listen for DOM size changes and trigger resize
+    const resizeObserver = new ResizeObserver(() => {
+      lenis.resize();
+    });
+    
+    if (document.body) {
+      resizeObserver.observe(document.body);
+    }
+
     return () => {
       lenis.destroy();
+      lenisRef.current = null;
+      cancelAnimationFrame(rafId);
       window.removeEventListener("scroll", handleScroll);
+      resizeObserver.disconnect();
     };
-  }, []);
+  }, [isDashboard]);
+
+  // Recalculate and reset scroll/resize on page transition
+  useEffect(() => {
+    if (isDashboard || !lenisRef.current) return;
+
+    // Let the DOM repaint, then trigger resize and scroll to top/current hash
+    const timer = setTimeout(() => {
+      lenisRef.current?.resize();
+    }, 120);
+
+    return () => clearTimeout(timer);
+  }, [pathname, isDashboard]);
 
   const scrollToTop = () => {
     if (lenisRef.current) {
@@ -69,6 +106,8 @@ export function ScrollManager() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
+
+  if (isDashboard) return null;
 
   return (
     <>
