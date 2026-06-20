@@ -7,7 +7,7 @@ import {
   Download, MagnifyingGlass, Funnel, ArrowSquareOut, Globe, 
   Warning, WarningCircle, Check, X, SpinnerGap, GraduationCap, Star, Copy,
   User, Paperclip, PaperPlaneRight, Gear, UploadSimple, Lock, Clock, Checks,
-  ChatCircleDots, Briefcase
+  ChatCircleDots, Briefcase, Bell
 } from "@phosphor-icons/react";
 import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
@@ -112,7 +112,7 @@ export default function AdminDashboard() {
   const [checkingAuth, setCheckingAuth] = React.useState(true);
   
   // Dashboard Tabs
-  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat" | "counselors" | "settings" | "training" | "experts">("bookings");
+  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat" | "counselors" | "settings" | "training" | "experts" | "notifications">("bookings");
 
   // Loaders & table existence flags
   const [loading, setLoading] = React.useState(false);
@@ -120,6 +120,21 @@ export default function AdminDashboard() {
   const [postsTableExists, setPostsTableExists] = React.useState<boolean | null>(null);
   const [storiesTableExists, setStoriesTableExists] = React.useState<boolean | null>(null);
   const [emailLogsTableExists, setEmailLogsTableExists] = React.useState<boolean | null>(null);
+  const [notifHistoryTableExists, setNotifHistoryTableExists] = React.useState<boolean | null>(null);
+  const [systemSettingsTableExists, setSystemSettingsTableExists] = React.useState<boolean | null>(null);
+
+  // V1 Notification system states
+  const [notificationsEnabled, setNotificationsEnabled] = React.useState<boolean>(true);
+  const [notificationHistory, setNotificationHistory] = React.useState<any[]>([]);
+  const [notifHistorySearch, setNotifHistorySearch] = React.useState("");
+  const [notifHistoryTypeFilter, setNotifHistoryTypeFilter] = React.useState("All");
+  const [notifHistoryStatusFilter, setNotifHistoryStatusFilter] = React.useState("All");
+
+  // Selected student notification preferences
+  const [selectedStudentPrefs, setSelectedStudentPrefs] = React.useState<any | null>(null);
+  const [selectedStudentHistory, setSelectedStudentHistory] = React.useState<any[]>([]);
+  const [savingStudentPrefs, setSavingStudentPrefs] = React.useState(false);
+  const [triggeringNotif, setTriggeringNotif] = React.useState<string | null>(null);
 
   // Email diagnostics states
   const [emailLogs, setEmailLogs] = React.useState<any[]>([]);
@@ -163,7 +178,7 @@ export default function AdminDashboard() {
   const [chatCenterHasMore, setChatCenterHasMore] = React.useState(false);
 
   // Audit modal internal states
-  const [auditTab, setAuditTab] = React.useState<"progress" | "documents" | "offers" | "visa" | "chat" | "logs" | "meetings">("progress");
+  const [auditTab, setAuditTab] = React.useState<"progress" | "documents" | "offers" | "visa" | "chat" | "logs" | "meetings" | "notifications">("progress");
   const [auditTasks, setAuditTasks] = React.useState<any[]>([]);
   const [auditDocs, setAuditDocs] = React.useState<any[]>([]);
   const [auditOffers, setAuditOffers] = React.useState<any[]>([]);
@@ -263,7 +278,7 @@ export default function AdminDashboard() {
   // Student Detail Drawer
   const [selectedTrainingStudent, setSelectedTrainingStudent] = React.useState<any | null>(null);
   const [isTrainingDetailOpen, setIsTrainingDetailOpen] = React.useState(false);
-  const [trainingDetailTab, setTrainingDetailTab] = React.useState<"overview" | "tasks" | "documents" | "notes" | "meetings" | "chat">("overview");
+  const [trainingDetailTab, setTrainingDetailTab] = React.useState<"overview" | "tasks" | "documents" | "notes" | "meetings" | "chat" | "notifications">("overview");
   const [trainingDetailTasks, setTrainingDetailTasks] = React.useState<any[]>([]);
   const [trainingDetailDocs, setTrainingDetailDocs] = React.useState<any[]>([]);
   const [trainingDetailMeetings, setTrainingDetailMeetings] = React.useState<any[]>([]);
@@ -465,6 +480,10 @@ export default function AdminDashboard() {
       const persisted = sessionStorage.getItem("annex_admin_authenticated");
       if (persisted === "true") {
         setIsAuthenticated(true);
+        const storedPwd = sessionStorage.getItem("annex_admin_password");
+        if (storedPwd) {
+          document.cookie = `annex_admin_token=${encodeURIComponent(storedPwd)}; path=/; max-age=86400; SameSite=Strict`;
+        }
       }
     } catch (e) {
       console.error("Auth state loading error:", e);
@@ -516,6 +535,8 @@ export default function AdminDashboard() {
       setAuthError("");
       try {
         sessionStorage.setItem("annex_admin_authenticated", "true");
+        sessionStorage.setItem("annex_admin_password", password);
+        document.cookie = `annex_admin_token=${encodeURIComponent(password)}; path=/; max-age=86400; SameSite=Strict`;
       } catch (e) {
         console.error("Auth persistence failed:", e);
       }
@@ -529,6 +550,8 @@ export default function AdminDashboard() {
     setPassword("");
     try {
       sessionStorage.removeItem("annex_admin_authenticated");
+      sessionStorage.removeItem("annex_admin_password");
+      document.cookie = "annex_admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     } catch (e) {
       console.error("Sign out storage error:", e);
     }
@@ -801,6 +824,47 @@ export default function AdminDashboard() {
       }
     } catch (err: any) {
       console.error("Error loading email config status:", err.message);
+    }
+
+    // 9.5 Fetch Notification Global Settings and History Logs
+    try {
+      const { data: globalSetting, error: globalErr } = await supabase
+        .from("system_settings")
+        .select("value")
+        .eq("key", "notifications_enabled")
+        .maybeSingle();
+      if (globalErr) {
+        if (globalErr.code === "42P01" || globalErr.message.includes("does not exist")) {
+          setSystemSettingsTableExists(false);
+        } else {
+          throw globalErr;
+        }
+      } else {
+        setSystemSettingsTableExists(true);
+        setNotificationsEnabled(globalSetting ? globalSetting.value === "true" : true);
+      }
+    } catch (err: any) {
+      console.error("Error loading system settings:", err.message);
+    }
+
+    try {
+      const { data: allHist, error: histErr } = await supabase
+        .from("notification_history")
+        .select("*, students(name, email), training_students(student_name, student_email)")
+        .order("sent_at", { ascending: false })
+        .limit(200);
+      if (histErr) {
+        if (histErr.code === "42P01" || histErr.message.includes("does not exist")) {
+          setNotifHistoryTableExists(false);
+        } else {
+          throw histErr;
+        }
+      } else {
+        setNotifHistoryTableExists(true);
+        setNotificationHistory(allHist || []);
+      }
+    } catch (err: any) {
+      console.error("Error loading notification history:", err.message);
     }
     // 10. Fetch Training & Placement Data
     try {
@@ -1594,6 +1658,36 @@ export default function AdminDashboard() {
         .eq("student_id", id)
         .order("created_at", { ascending: true });
       setTrainingDetailMessages(c || []);
+
+      // Fetch selected training student notification preferences
+      try {
+        const { data: prefData } = await supabase
+          .from("notification_preferences")
+          .select("*")
+          .eq("training_student_id", id)
+          .maybeSingle();
+        
+        setSelectedStudentPrefs(prefData || {
+          missing_documents_enabled: true,
+          consultation_enabled: true,
+          visa_updates_enabled: true,
+          all_notifications_enabled: true
+        });
+      } catch (prefErr: any) {
+        console.error("Error loading training student preferences:", prefErr.message);
+      }
+
+      // Fetch selected training student notification history logs
+      try {
+        const { data: histData } = await supabase
+          .from("notification_history")
+          .select("*")
+          .eq("training_student_id", id)
+          .order("sent_at", { ascending: false });
+        setSelectedStudentHistory(histData || []);
+      } catch (histErr: any) {
+        console.error("Error loading training student notification history:", histErr.message);
+      }
     } catch (err: any) {
       console.error("Error loading detail candidate data:", err.message);
     }
@@ -2454,6 +2548,36 @@ export default function AdminDashboard() {
 
       const { data: mtgs } = await supabase.from("meetings").select("*, counselors(full_name)").eq("student_id", id).order("scheduled_at", { ascending: false });
       setAuditMeetings(mtgs || []);
+
+      // Fetch selected student notification preferences
+      try {
+        const { data: prefData } = await supabase
+          .from("notification_preferences")
+          .select("*")
+          .eq("student_id", id)
+          .maybeSingle();
+        
+        setSelectedStudentPrefs(prefData || {
+          missing_documents_enabled: true,
+          consultation_enabled: true,
+          visa_updates_enabled: true,
+          all_notifications_enabled: true
+        });
+      } catch (prefErr: any) {
+        console.error("Error loading student preferences:", prefErr.message);
+      }
+
+      // Fetch selected student notification history logs
+      try {
+        const { data: histData } = await supabase
+          .from("notification_history")
+          .select("*")
+          .eq("student_id", id)
+          .order("sent_at", { ascending: false });
+        setSelectedStudentHistory(histData || []);
+      } catch (histErr: any) {
+        console.error("Error loading student notification history:", histErr.message);
+      }
     } catch (err: any) {
       console.error("Error loading student audit details:", err.message);
     }
@@ -2645,6 +2769,26 @@ export default function AdminDashboard() {
         details: `New Stage: ${adminVisaStatus}. Details: ${adminVisaDetails}`
       });
 
+      // Trigger reactive visa update email notification
+      try {
+        await fetch("/api/send-student-notification", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            studentId: selectedStudent.id,
+            action: "visa-status-updated",
+            details: {
+              status: adminVisaStatus,
+              note: adminVisaDetails
+            }
+          })
+        });
+      } catch (notifErr: any) {
+        console.error("Failed to dispatch reactive visa email:", notifErr.message);
+      }
+
       showToast("Visa status timeline modified");
       await loadAuditDetails(selectedStudent.id);
     } catch (err: any) {
@@ -2653,7 +2797,119 @@ export default function AdminDashboard() {
       setUpdatingVisa(false);
     }
   };
+  const handleUpdateStudentPrefs = async (key: string, value: boolean, studentType: "standard" | "training") => {
+    const student = studentType === "standard" ? selectedStudent : selectedTrainingStudent;
+    if (!student) return;
+    setSavingStudentPrefs(true);
+    try {
+      const updatedPrefs: any = {
+        ...selectedStudentPrefs,
+        [key]: value,
+        updated_at: new Date().toISOString()
+      };
+      
+      if (studentType === "standard") {
+        updatedPrefs.student_id = student.id;
+      } else {
+        updatedPrefs.training_student_id = student.id;
+      }
 
+      let error;
+      if (selectedStudentPrefs?.id) {
+        const res = await supabase
+          .from("notification_preferences")
+          .update(updatedPrefs)
+          .eq("id", selectedStudentPrefs.id);
+        error = res.error;
+      } else {
+        const res = await supabase
+          .from("notification_preferences")
+          .insert([updatedPrefs])
+          .select()
+          .single();
+        error = res.error;
+        if (!error && res.data) {
+          setSelectedStudentPrefs(res.data);
+        }
+      }
+
+      if (error) throw error;
+      setSelectedStudentPrefs((prev: any) => ({ ...prev, [key]: value }));
+      showToast("Notification preferences updated successfully");
+    } catch (err: any) {
+      alert("Error updating notification preferences: " + err.message);
+    } finally {
+      setSavingStudentPrefs(false);
+    }
+  };
+
+  const handleToggleGlobalNotifications = async (enabled: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("system_settings")
+        .upsert([{ key: "notifications_enabled", value: String(enabled), updated_at: new Date().toISOString() }], { onConflict: "key" });
+      if (error) throw error;
+      setNotificationsEnabled(enabled);
+      showToast(`Global notifications ${enabled ? "enabled" : "disabled"}`);
+    } catch (err: any) {
+      alert("Error saving global settings: " + err.message);
+    }
+  };
+
+  const handleResendNotificationLog = async (log: any) => {
+    if (!log) return;
+    setTriggeringNotif(log.id);
+    try {
+      const studentId = log.student_id || log.training_student_id;
+      const isTraining = !!log.training_student_id;
+
+      let action = "";
+      let details: any = { manual: true };
+
+      if (log.notification_type === "missing_documents") {
+        action = "missing-documents-reminder";
+      } else if (log.notification_type === "consultation") {
+        action = "consultation-reminder";
+      } else if (log.notification_type === "visa_update") {
+        action = "visa-status-updated";
+        const statusMatch = log.subject.match(/Status:\s*(.+)$/);
+        const parsedStatus = statusMatch ? statusMatch[1] : "Application Started";
+        details = {
+          status: parsedStatus,
+          note: "Resending visa status update notification.",
+          manual: true
+        };
+      }
+
+      const payload: any = {
+        action,
+        details
+      };
+      if (isTraining) {
+        payload.trainingStudentId = studentId;
+      } else {
+        payload.studentId = studentId;
+      }
+
+      const res = await fetch("/api/send-student-notification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || "Failed to trigger resend");
+      }
+
+      showToast("Notification trigger executed successfully");
+      fetchAllData();
+    } catch (err: any) {
+      alert("Resend failed: " + err.message);
+    } finally {
+      setTriggeringNotif(null);
+    }
+  };
   const handleSendAdminReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!adminReplyText.trim() && !adminReplyFile || !selectedStudent) return;
@@ -3000,6 +3256,22 @@ export default function AdminDashboard() {
     );
   }
 
+  const filteredNotifHistory = notificationHistory.filter(log => {
+    const studentName = log.students?.name || log.training_students?.student_name || "";
+    const studentEmail = log.students?.email || log.training_students?.student_email || "";
+    const subject = log.subject || "";
+    
+    const matchesSearch = 
+      studentName.toLowerCase().includes(notifHistorySearch.toLowerCase()) ||
+      studentEmail.toLowerCase().includes(notifHistorySearch.toLowerCase()) ||
+      subject.toLowerCase().includes(notifHistorySearch.toLowerCase());
+      
+    const matchesType = notifHistoryTypeFilter === "All" || log.notification_type === notifHistoryTypeFilter;
+    const matchesStatus = notifHistoryStatusFilter === "All" || log.status === notifHistoryStatusFilter;
+    
+    return matchesSearch && matchesType && matchesStatus;
+  });
+
   return (
     <main className="min-h-[100dvh] bg-white text-left flex flex-col relative">
       {/* Toast Notification */}
@@ -3034,6 +3306,7 @@ export default function AdminDashboard() {
               { id: "blog", label: `Blog posts (${posts.length})` },
               { id: "stories", label: `Success stories (${stories.length})` },
               { id: "experts", label: `Career Experts (${experts.length})` },
+              { id: "notifications", label: "Notifications" },
               { id: "settings", label: "Email Status" }
             ].map(tab => {
               const isActive = activeTab === tab.id;
@@ -5277,6 +5550,253 @@ export default function AdminDashboard() {
           </section>
         )}
 
+        {activeTab === "notifications" && (
+          <section className="flex flex-col gap-8 animate-fade-in text-slate-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-display font-bold text-2xl text-primary leading-tight">Notification Control Center</h2>
+                <p className="text-xs text-slate-400 mt-1">Monitor, filter, and manually trigger automated student emails for documents, consultations, and visa status changes.</p>
+              </div>
+              <Button variant="secondary" size="sm" onClick={fetchAllData} className="flex items-center gap-1.5">
+                <SpinnerGap className={loading ? "animate-spin" : ""} size={14} /> Refresh Center
+              </Button>
+            </div>
+
+            {/* Notification Statistics */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              {[
+                { 
+                  label: "Total Reminders", 
+                  value: notificationHistory.length, 
+                  icon: <Bell size={18} className="text-primary" weight="bold" />, 
+                  bg: "bg-slate-50 border-slate-100" 
+                },
+                { 
+                  label: "Documents Alerted", 
+                  value: notificationHistory.filter(n => n.notification_type === "missing_documents").length, 
+                  icon: <FileText size={18} className="text-yellow-600" weight="bold" />, 
+                  bg: "bg-yellow-50/20 border-yellow-100/60" 
+                },
+                { 
+                  label: "Meetings Alerted", 
+                  value: notificationHistory.filter(n => n.notification_type === "consultation").length, 
+                  icon: <Calendar size={18} className="text-blue-600" weight="bold" />, 
+                  bg: "bg-blue-50/20 border-blue-100/60" 
+                },
+                { 
+                  label: "Visa Updates Sent", 
+                  value: notificationHistory.filter(n => n.notification_type === "visa_update").length, 
+                  icon: <Globe size={18} className="text-purple-600" weight="bold" />, 
+                  bg: "bg-purple-50/20 border-purple-100/60" 
+                },
+                { 
+                  label: "Delivery Failures", 
+                  value: notificationHistory.filter(n => n.status === "failed").length, 
+                  icon: <WarningCircle size={18} className="text-red-600" weight="bold" />, 
+                  bg: "bg-red-50/20 border-red-100/60" 
+                }
+              ].map((stat, idx) => (
+                <div key={idx} className={`border rounded-2xl p-4 flex flex-col justify-between min-h-[90px] ${stat.bg}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500">{stat.label}</span>
+                    {stat.icon}
+                  </div>
+                  <span className="text-2xl font-bold font-mono-data text-primary mt-2">{stat.value}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Left Column: Global Toggle */}
+              <div className="lg:col-span-1 space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                      <Gear size={16} className="text-primary" />
+                      Global Dispatch Switch
+                    </CardTitle>
+                    <CardDescription className="text-[11px]">Control the master toggle of the Vercel Cron trigger.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex justify-between items-center py-2.5">
+                      <div className="space-y-0.5">
+                        <span className="font-semibold text-xs text-slate-700 block">Automated Dispatcher</span>
+                        <span className="text-[10px] text-slate-400 block font-medium">Temporarily silence or resume all crons</span>
+                      </div>
+                      
+                      {systemSettingsTableExists === false ? (
+                        <span className="text-[10px] font-bold text-red-500 uppercase bg-red-50 border border-red-200 px-2.5 py-1 rounded-full">Missing Table</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleGlobalNotifications(!notificationsEnabled)}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            notificationsEnabled ? "bg-primary" : "bg-slate-200"
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              notificationsEnabled ? "translate-x-5" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className={`p-4 rounded-xl border text-xs leading-relaxed ${
+                      notificationsEnabled 
+                        ? "bg-emerald-50 text-emerald-800 border-emerald-100" 
+                        : "bg-amber-50 text-amber-800 border-amber-100"
+                    }`}>
+                      <p className="font-bold mb-1">Status: {notificationsEnabled ? "Active & Listening" : "Paused / Disabled"}</p>
+                      <p className="text-[10px] opacity-80 leading-normal">
+                        {notificationsEnabled 
+                          ? "Vercel Cron triggers will evaluate and dispatch student emails automatically under standard 24-hour limits."
+                          : "All cron execution checks will immediately terminate upon starting. No emails will be sent automatically. Manual resends will still function."}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Right Column: Historical Logs */}
+              <div className="lg:col-span-2 space-y-6">
+                <Card className="h-full flex flex-col">
+                  <CardHeader>
+                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                      <Clock size={16} className="text-primary" />
+                      Notifications History Logs
+                    </CardTitle>
+                    <CardDescription className="text-[11px]">Real-time history logs of reminders sent to university placement and career candidate portals.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-grow p-0 flex flex-col">
+                    
+                    {/* Search & Filter Bar */}
+                    <div className="p-4 border-b border-hairline bg-slate-50/50 flex flex-col md:flex-row gap-3">
+                      <div className="relative flex-grow">
+                        <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                        <input
+                          type="text"
+                          placeholder="Search candidate name, email, or subject..."
+                          value={notifHistorySearch}
+                          onChange={(e) => setNotifHistorySearch(e.target.value)}
+                          className="w-full pl-9 pr-4 py-2 border border-hairline rounded-xl text-xs bg-white text-slate-800 focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <select
+                          value={notifHistoryTypeFilter}
+                          onChange={(e) => setNotifHistoryTypeFilter(e.target.value)}
+                          className="px-3 py-2 border border-hairline rounded-xl text-xs bg-white text-slate-600 focus:outline-none"
+                        >
+                          <option value="All">All Types</option>
+                          <option value="missing_documents">Documents</option>
+                          <option value="consultation">Consultation</option>
+                          <option value="visa_update">Visa updates</option>
+                        </select>
+
+                        <select
+                          value={notifHistoryStatusFilter}
+                          onChange={(e) => setNotifHistoryStatusFilter(e.target.value)}
+                          className="px-3 py-2 border border-hairline rounded-xl text-xs bg-white text-slate-600 focus:outline-none"
+                        >
+                          <option value="All">All Statuses</option>
+                          <option value="sent">Sent</option>
+                          <option value="failed">Failed</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Table View */}
+                    {notifHistoryTableExists === false ? (
+                      <div className="p-8 text-center text-slate-500 space-y-3 flex-grow flex flex-col justify-center items-center">
+                        <WarningCircle size={40} className="text-amber-500 animate-pulse" />
+                        <h4 className="font-bold text-sm text-slate-700">Notification Tables Not Found</h4>
+                        <p className="text-xs text-slate-400 max-w-md mx-auto">
+                          The notification logger could not fetch history logs because the notification tables do not exist in Supabase yet. Run the SQL schema script inside the database dashboard.
+                        </p>
+                      </div>
+                    ) : filteredNotifHistory.length === 0 ? (
+                      <div className="py-16 text-center text-slate-400 text-xs flex-grow flex flex-col justify-center items-center">
+                        <Bell size={40} className="text-slate-300 mb-2" />
+                        <span>No notification logs match your query parameters.</span>
+                      </div>
+                    ) : (
+                      <div className="max-h-[500px] overflow-y-auto">
+                        <table className="w-full text-left text-xs text-slate-600 divide-y divide-hairline">
+                          <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400 sticky top-0 z-10">
+                            <tr>
+                              <th className="px-4 py-3">Status</th>
+                              <th className="px-4 py-3">Recipient</th>
+                              <th className="px-4 py-3">Type</th>
+                              <th className="px-4 py-3">Details / Errors</th>
+                              <th className="px-4 py-3">Date</th>
+                              <th className="px-4 py-3 text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-hairline bg-white">
+                            {filteredNotifHistory.map((log) => {
+                              const studentName = log.students?.name || log.training_students?.student_name || "Unknown student";
+                              const studentEmail = log.students?.email || log.training_students?.student_email || "N/A";
+                              const isSending = triggeringNotif === log.id;
+
+                              return (
+                                <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
+                                  <td className="px-4 py-3">
+                                    <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                                      log.status === "sent" 
+                                        ? "bg-emerald-50 text-emerald-600 border-emerald-200" 
+                                        : "bg-red-50 text-red-600 border-red-200"
+                                    }`}>
+                                      {log.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="font-semibold text-slate-700">{studentName}</div>
+                                    <div className="text-[10px] text-slate-400 font-mono-data">{studentEmail}</div>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded text-[9px] font-bold uppercase tracking-wider">
+                                      {log.notification_type === "missing_documents" ? "Docs" : log.notification_type === "consultation" ? "Meeting" : "Visa"}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 max-w-[200px] truncate" title={log.subject}>
+                                    {log.error_message ? (
+                                      <span className="text-red-500 font-medium block overflow-hidden text-ellipsis">{log.error_message}</span>
+                                    ) : (
+                                      <span className="text-slate-500 block overflow-hidden text-ellipsis">{log.subject}</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 text-slate-400 text-[10px]">
+                                    {new Date(log.sent_at).toLocaleDateString()}
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <Button
+                                      onClick={() => handleResendNotificationLog(log)}
+                                      disabled={isSending}
+                                      variant="secondary"
+                                      size="sm"
+                                      className="py-1 px-2.5 text-[10px] font-bold"
+                                    >
+                                      {isSending ? <SpinnerGap className="animate-spin" size={10} /> : "Resend"}
+                                    </Button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </section>
+        )}
+
         {activeTab === "experts" && (
           <section className="flex flex-col gap-6 animate-fade-in text-slate-700">
             <div className="flex items-center justify-between">
@@ -5982,7 +6502,8 @@ export default function AdminDashboard() {
                 { id: "documents", label: "Documents Collection" },
                 { id: "notes", label: "Advisor Notes" },
                 { id: "meetings", label: "Meetings Schedule" },
-                { id: "chat", label: "Advisor Chat" }
+                { id: "chat", label: "Advisor Chat" },
+                { id: "notifications", label: "Notifications" }
               ].map(subTab => (
                 <button 
                   key={subTab.id}
@@ -6416,6 +6937,207 @@ export default function AdminDashboard() {
                         {sendingCareerChat ? <SpinnerGap size={14} className="animate-spin" /> : "Send"}
                       </button>
                     </form>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB VIEW: STUDENT NOTIFICATIONS PREFERENCES */}
+              {trainingDetailTab === "notifications" && (
+                <div className="space-y-6 text-left">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    
+                    {/* Left: Preferences Card */}
+                    <div className="md:col-span-1 space-y-4">
+                      <Card className="p-5">
+                        <h4 className="font-bold text-sm text-primary mb-4 border-b border-hairline pb-2">Student Preferences</h4>
+                        
+                        {selectedStudentPrefs ? (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-0.5">
+                                <span className="font-semibold text-xs text-slate-700 block">All Notifications</span>
+                                <span className="text-[10px] text-slate-400 block font-medium">Master toggle for this student</span>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={selectedStudentPrefs.all_notifications_enabled}
+                                onChange={(e) => handleUpdateStudentPrefs("all_notifications_enabled", e.target.checked, "training")}
+                                disabled={savingStudentPrefs}
+                                className="h-4.5 w-4.5 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer border bg-white"
+                              />
+                            </div>
+
+                            <hr className="border-hairline" />
+
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-0.5">
+                                <span className="font-semibold text-xs text-slate-700 block">Missing Documents Alert</span>
+                                <span className="text-[10px] text-slate-400 block font-medium">Email reminders on missing/rejected files</span>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={selectedStudentPrefs.missing_documents_enabled}
+                                onChange={(e) => handleUpdateStudentPrefs("missing_documents_enabled", e.target.checked, "training")}
+                                disabled={!selectedStudentPrefs.all_notifications_enabled || savingStudentPrefs}
+                                className="h-4.5 w-4.5 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer border bg-white"
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-0.5">
+                                <span className="font-semibold text-xs text-slate-700 block">Consultation Reminders</span>
+                                <span className="text-[10px] text-slate-400 block font-medium">Email reminders on meetings scheduled</span>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={selectedStudentPrefs.consultation_enabled}
+                                onChange={(e) => handleUpdateStudentPrefs("consultation_enabled", e.target.checked, "training")}
+                                disabled={!selectedStudentPrefs.all_notifications_enabled || savingStudentPrefs}
+                                className="h-4.5 w-4.5 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer border bg-white"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="py-4 text-center text-slate-400">Loading student preferences...</div>
+                        )}
+                      </Card>
+
+                      {/* Manual Dispatch Center */}
+                      <Card className="p-5 space-y-4">
+                        <h4 className="font-bold text-sm text-primary border-b border-hairline pb-2">Manual Dispatch Triggers</h4>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-medium mb-1.5 uppercase tracking-wider">Document Checklist Alert</p>
+                            <Button
+                              onClick={async () => {
+                                setTriggeringNotif("manual-docs");
+                                try {
+                                  const res = await fetch("/api/send-student-notification", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                      trainingStudentId: selectedTrainingStudent.id,
+                                      action: "missing-documents-reminder",
+                                      details: { manual: true }
+                                    })
+                                  });
+                                  const result = await res.json();
+                                  if (!res.ok || !result.success) throw new Error(result.error || "Delivery failed");
+                                  showToast("Manual document reminder sent successfully!");
+                                  await loadTrainingDetailData(selectedTrainingStudent.id);
+                                } catch (err: any) {
+                                  alert("Failed to send reminder: " + err.message);
+                                } finally {
+                                  setTriggeringNotif(null);
+                                }
+                              }}
+                              disabled={triggeringNotif === "manual-docs"}
+                              variant="secondary"
+                              className="w-full text-xs animate-pulse-once"
+                            >
+                              {triggeringNotif === "manual-docs" ? <SpinnerGap className="animate-spin" size={14} /> : "Send Missing Docs Reminder"}
+                            </Button>
+                          </div>
+
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-medium mb-1.5 uppercase tracking-wider">Meetings Consultation Alert</p>
+                            {trainingDetailMeetings.filter(m => m.status === "Scheduled" || m.status === "Rescheduled").length === 0 ? (
+                              <p className="text-[10px] text-slate-400 italic">No upcoming meetings scheduled.</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {trainingDetailMeetings.filter(m => m.status === "Scheduled" || m.status === "Rescheduled").slice(0, 2).map(m => (
+                                  <Button
+                                    key={m.id}
+                                    onClick={async () => {
+                                      setTriggeringNotif(`manual-meet-${m.id}`);
+                                      try {
+                                        const res = await fetch("/api/send-student-notification", {
+                                          method: "POST",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({
+                                            trainingStudentId: selectedTrainingStudent.id,
+                                            action: "consultation-reminder",
+                                            details: { meetingId: m.id, manual: true }
+                                          })
+                                        });
+                                        const result = await res.json();
+                                        if (!res.ok || !result.success) throw new Error(result.error || "Delivery failed");
+                                        showToast(`Manual reminder for "${m.title}" sent successfully!`);
+                                        await loadTrainingDetailData(selectedTrainingStudent.id);
+                                      } catch (err: any) {
+                                        alert("Failed to send meeting reminder: " + err.message);
+                                      } finally {
+                                        setTriggeringNotif(null);
+                                      }
+                                    }}
+                                    disabled={triggeringNotif === `manual-meet-${m.id}`}
+                                    variant="secondary"
+                                    className="w-full text-left text-xs truncate block"
+                                    title={`Send reminder for ${m.title}`}
+                                  >
+                                    {triggeringNotif === `manual-meet-${m.id}` ? <SpinnerGap className="animate-spin" size={10} /> : `Remind: "${m.title.substring(0, 15)}..."`}
+                                  </Button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    </div>
+
+                    {/* Right: History Logs List */}
+                    <div className="md:col-span-2 space-y-4">
+                      <Card className="p-5">
+                        <h4 className="font-bold text-sm text-primary mb-4 border-b border-hairline pb-2">Student Notification Logs</h4>
+                        
+                        {selectedStudentHistory.length === 0 ? (
+                          <p className="text-slate-400 py-12 text-center border border-dashed border-hairline bg-slate-50/50 rounded-2xl">
+                            No notifications dispatched to this student profile yet.
+                          </p>
+                        ) : (
+                          <div className="max-h-[350px] overflow-y-auto border border-hairline rounded-xl">
+                            <table className="w-full text-left text-xs divide-y divide-hairline text-slate-700 bg-white">
+                              <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400 sticky top-0 z-10">
+                                <tr>
+                                  <th className="px-3.5 py-2.5">Status</th>
+                                  <th className="px-3.5 py-2.5">Type</th>
+                                  <th className="px-3.5 py-2.5">Subject</th>
+                                  <th className="px-3.5 py-2.5">Date</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-hairline text-slate-600">
+                                {selectedStudentHistory.map((h) => (
+                                  <tr key={h.id} className="hover:bg-slate-50/50 transition-colors">
+                                    <td className="px-3.5 py-2.5">
+                                      <span className={`inline-block text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full border ${
+                                        h.status === "sent" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-red-50 text-red-600 border-red-100"
+                                      }`}>
+                                        {h.status}
+                                      </span>
+                                    </td>
+                                    <td className="px-3.5 py-2.5 font-bold uppercase text-[9px] tracking-wide text-slate-400">
+                                      {h.notification_type === "missing_documents" ? "Docs" : h.notification_type === "consultation" ? "Meeting" : "Visa"}
+                                    </td>
+                                    <td className="px-3.5 py-2.5 max-w-[180px] truncate" title={h.subject}>
+                                      {h.error_message ? (
+                                        <span className="text-red-500 font-medium block truncate">{h.error_message}</span>
+                                      ) : (
+                                        <span className="truncate block">{h.subject}</span>
+                                      )}
+                                    </td>
+                                    <td className="px-3.5 py-2.5 text-[10px] text-slate-400 font-medium">
+                                      {new Date(h.sent_at).toLocaleDateString()}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </Card>
+                    </div>
+
                   </div>
                 </div>
               )}
@@ -7378,7 +8100,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Modal Internal Navigation */}
-            <div className="px-5 border-b border-hairline flex gap-4 text-xs font-bold uppercase tracking-wider text-slate-400 py-3 bg-white">
+            <div className="px-5 border-b border-hairline flex flex-wrap gap-4 text-xs font-bold uppercase tracking-wider text-slate-400 py-3 bg-white">
               {[
                 { id: "progress", label: "Tasks & Progress" },
                 { id: "documents", label: "Documents Collection" },
@@ -7386,7 +8108,8 @@ export default function AdminDashboard() {
                 { id: "visa", label: "Visa Timeline" },
                 { id: "chat", label: "Counselor Chat" },
                 { id: "logs", label: "Activity Logs" },
-                { id: "meetings", label: "Schedule Meetings" }
+                { id: "meetings", label: "Schedule Meetings" },
+                { id: "notifications", label: "Notifications" }
               ].map(subTab => (
                 <button 
                   key={subTab.id}
@@ -8291,6 +9014,221 @@ export default function AdminDashboard() {
                         })}
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB H: STUDENT NOTIFICATIONS PREFERENCES */}
+              {auditTab === "notifications" && (
+                <div className="space-y-6 text-left">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    
+                    {/* Left: Preferences Card */}
+                    <div className="md:col-span-1 space-y-4">
+                      <Card className="p-5">
+                        <h4 className="font-bold text-sm text-primary mb-4 border-b border-hairline pb-2">Student Preferences</h4>
+                        
+                        {selectedStudentPrefs ? (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-0.5">
+                                <span className="font-semibold text-xs text-slate-700 block">All Notifications</span>
+                                <span className="text-[10px] text-slate-400 block font-medium">Master toggle for this student</span>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={selectedStudentPrefs.all_notifications_enabled}
+                                onChange={(e) => handleUpdateStudentPrefs("all_notifications_enabled", e.target.checked, "standard")}
+                                disabled={savingStudentPrefs}
+                                className="h-4.5 w-4.5 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer border bg-white"
+                              />
+                            </div>
+
+                            <hr className="border-hairline" />
+
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-0.5">
+                                <span className="font-semibold text-xs text-slate-700 block">Missing Documents Alert</span>
+                                <span className="text-[10px] text-slate-400 block font-medium">Email reminders on missing/rejected files</span>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={selectedStudentPrefs.missing_documents_enabled}
+                                onChange={(e) => handleUpdateStudentPrefs("missing_documents_enabled", e.target.checked, "standard")}
+                                disabled={!selectedStudentPrefs.all_notifications_enabled || savingStudentPrefs}
+                                className="h-4.5 w-4.5 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer border bg-white"
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-0.5">
+                                <span className="font-semibold text-xs text-slate-700 block">Consultation Reminders</span>
+                                <span className="text-[10px] text-slate-400 block font-medium">Email reminders on meetings scheduled</span>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={selectedStudentPrefs.consultation_enabled}
+                                onChange={(e) => handleUpdateStudentPrefs("consultation_enabled", e.target.checked, "standard")}
+                                disabled={!selectedStudentPrefs.all_notifications_enabled || savingStudentPrefs}
+                                className="h-4.5 w-4.5 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer border bg-white"
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-0.5">
+                                <span className="font-semibold text-xs text-slate-700 block">Visa Status Updates</span>
+                                <span className="text-[10px] text-slate-400 block font-medium">Reactive email updates on visa stages</span>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={selectedStudentPrefs.visa_updates_enabled}
+                                onChange={(e) => handleUpdateStudentPrefs("visa_updates_enabled", e.target.checked, "standard")}
+                                disabled={!selectedStudentPrefs.all_notifications_enabled || savingStudentPrefs}
+                                className="h-4.5 w-4.5 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer border bg-white"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="py-4 text-center text-slate-400">Loading student preferences...</div>
+                        )}
+                      </Card>
+
+                      {/* Manual Dispatch Center */}
+                      <Card className="p-5 space-y-4">
+                        <h4 className="font-bold text-sm text-primary border-b border-hairline pb-2">Manual Dispatch Triggers</h4>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-medium mb-1.5 uppercase tracking-wider">Document Checklist Alert</p>
+                            <Button
+                              onClick={async () => {
+                                setTriggeringNotif("manual-docs");
+                                try {
+                                  const res = await fetch("/api/send-student-notification", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                      studentId: selectedStudent.id,
+                                      action: "missing-documents-reminder",
+                                      details: { manual: true }
+                                    })
+                                  });
+                                  const result = await res.json();
+                                  if (!res.ok || !result.success) throw new Error(result.error || "Delivery failed");
+                                  showToast("Manual document reminder sent successfully!");
+                                  await loadAuditDetails(selectedStudent.id);
+                                } catch (err: any) {
+                                  alert("Failed to send reminder: " + err.message);
+                                } finally {
+                                  setTriggeringNotif(null);
+                                }
+                              }}
+                              disabled={triggeringNotif === "manual-docs"}
+                              variant="secondary"
+                              className="w-full text-xs animate-pulse-once"
+                            >
+                              {triggeringNotif === "manual-docs" ? <SpinnerGap className="animate-spin" size={14} /> : "Send Missing Docs Reminder"}
+                            </Button>
+                          </div>
+
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-medium mb-1.5 uppercase tracking-wider">Meetings Consultation Alert</p>
+                            {auditMeetings.filter(m => m.status === "Scheduled" || m.status === "Rescheduled").length === 0 ? (
+                              <p className="text-[10px] text-slate-400 italic">No upcoming meetings scheduled.</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {auditMeetings.filter(m => m.status === "Scheduled" || m.status === "Rescheduled").slice(0, 2).map(m => (
+                                  <Button
+                                    key={m.id}
+                                    onClick={async () => {
+                                      setTriggeringNotif(`manual-meet-${m.id}`);
+                                      try {
+                                        const res = await fetch("/api/send-student-notification", {
+                                          method: "POST",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({
+                                            studentId: selectedStudent.id,
+                                            action: "consultation-reminder",
+                                            details: { meetingId: m.id, manual: true }
+                                          })
+                                        });
+                                        const result = await res.json();
+                                        if (!res.ok || !result.success) throw new Error(result.error || "Delivery failed");
+                                        showToast(`Manual reminder for "${m.title}" sent successfully!`);
+                                        await loadAuditDetails(selectedStudent.id);
+                                      } catch (err: any) {
+                                        alert("Failed to send meeting reminder: " + err.message);
+                                      } finally {
+                                        setTriggeringNotif(null);
+                                      }
+                                    }}
+                                    disabled={triggeringNotif === `manual-meet-${m.id}`}
+                                    variant="secondary"
+                                    className="w-full text-left text-xs truncate block"
+                                    title={`Send reminder for ${m.title}`}
+                                  >
+                                    {triggeringNotif === `manual-meet-${m.id}` ? <SpinnerGap className="animate-spin" size={10} /> : `Remind: "${m.title.substring(0, 15)}..."`}
+                                  </Button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    </div>
+
+                    {/* Right: History Logs List */}
+                    <div className="md:col-span-2 space-y-4">
+                      <Card className="p-5">
+                        <h4 className="font-bold text-sm text-primary mb-4 border-b border-hairline pb-2">Student Notification Logs</h4>
+                        
+                        {selectedStudentHistory.length === 0 ? (
+                          <p className="text-slate-400 py-12 text-center border border-dashed border-hairline bg-slate-50/50 rounded-2xl">
+                            No notifications dispatched to this student profile yet.
+                          </p>
+                        ) : (
+                          <div className="max-h-[350px] overflow-y-auto border border-hairline rounded-xl">
+                            <table className="w-full text-left text-xs divide-y divide-hairline text-slate-700 bg-white">
+                              <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400 sticky top-0 z-10">
+                                <tr>
+                                  <th className="px-3.5 py-2.5">Status</th>
+                                  <th className="px-3.5 py-2.5">Type</th>
+                                  <th className="px-3.5 py-2.5">Subject</th>
+                                  <th className="px-3.5 py-2.5">Date</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-hairline text-slate-600">
+                                {selectedStudentHistory.map((h) => (
+                                  <tr key={h.id} className="hover:bg-slate-50/50 transition-colors">
+                                    <td className="px-3.5 py-2.5">
+                                      <span className={`inline-block text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full border ${
+                                        h.status === "sent" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-red-50 text-red-600 border-red-100"
+                                      }`}>
+                                        {h.status}
+                                      </span>
+                                    </td>
+                                    <td className="px-3.5 py-2.5 font-bold uppercase text-[9px] tracking-wide text-slate-400">
+                                      {h.notification_type === "missing_documents" ? "Docs" : h.notification_type === "consultation" ? "Meeting" : "Visa"}
+                                    </td>
+                                    <td className="px-3.5 py-2.5 max-w-[180px] truncate" title={h.subject}>
+                                      {h.error_message ? (
+                                        <span className="text-red-500 font-medium block truncate">{h.error_message}</span>
+                                      ) : (
+                                        <span className="truncate block">{h.subject}</span>
+                                      )}
+                                    </td>
+                                    <td className="px-3.5 py-2.5 text-[10px] text-slate-400 font-medium">
+                                      {new Date(h.sent_at).toLocaleDateString()}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </Card>
+                    </div>
+
                   </div>
                 </div>
               )}

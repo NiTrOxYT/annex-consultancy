@@ -1,6 +1,16 @@
 import { supabase } from "@/lib/supabase";
 import nodemailer from "nodemailer";
 
+export function escapeHtml(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export function getEmailConfigStatus() {
   const host = process.env.BREVO_SMTP_HOST;
   const port = process.env.BREVO_SMTP_PORT;
@@ -753,6 +763,189 @@ export async function sendCareerMessageEmail({
   return sendEmail({
     to: recipientEmail,
     subject: `✉️ New Message from ${senderName}`,
+    html,
+  });
+}
+
+export async function sendMissingDocumentsReminderEmail({
+  recipientEmail,
+  studentName,
+  missingDocs,
+  isTraining = false,
+}: {
+  recipientEmail: string;
+  studentName: string;
+  missingDocs: string[];
+  isTraining?: boolean;
+}) {
+  const portalUrl = isTraining
+    ? `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/career-portal`
+    : `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/student-login`;
+
+  const escapedName = escapeHtml(studentName);
+  const docsList = missingDocs.map(d => `<li style="margin-bottom: 8px;"><strong>${escapeHtml(d)}</strong></li>`).join("");
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
+      <div style="background-color: #0B1F3A; text-align: center; padding: 24px;">
+        <h1 style="color: #ffffff; font-size: 20px; font-weight: bold; letter-spacing: 0.1em; margin: 0; font-family: sans-serif;">ANNEX CONSULTANCY</h1>
+        <p style="color: #D4AF37; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; margin: 4px 0 0 0;">Global Education Counsel</p>
+      </div>
+      <div style="padding: 32px 24px; color: #0F172A; line-height: 1.6; font-size: 14px;">
+        <p>Dear <strong>${escapedName}</strong>,</p>
+        <p>This is a reminder that we require additional or corrected documents to proceed with your application. Please ensure the following documents are uploaded as soon as possible:</p>
+        
+        <ul style="background-color: #f8fafc; padding: 16px 16px 16px 36px; border-radius: 8px; border: 1px solid #f1f5f9; margin: 20px 0; color: #334155;">
+          ${docsList}
+        </ul>
+        
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${portalUrl}" style="display: inline-block; background-color: #0B1F3A; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+            Upload Documents
+          </a>
+        </div>
+        
+        <p>If you have any questions or face issues during upload, please message your counselor directly through the portal chat.</p>
+      </div>
+      <div style="background-color: #f1f5f9; text-align: center; padding: 20px; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
+        <p style="margin: 0;">© 2026 Annex Consultancy. All rights reserved.</p>
+        <p style="margin: 4px 0 0 0;">This is an automated notification regarding your pending application tasks.</p>
+      </div>
+    </div>
+  `;
+
+  return sendEmail({
+    to: recipientEmail,
+    subject: "⚠️ Action Required: Missing Documents for Your Application",
+    html,
+  });
+}
+
+export async function sendConsultationReminderEmail({
+  recipientEmail,
+  studentName,
+  meetingTitle,
+  scheduledAt,
+  meetingLink,
+  isTraining = false,
+}: {
+  recipientEmail: string;
+  studentName: string;
+  meetingTitle: string;
+  scheduledAt: string;
+  meetingLink?: string;
+  isTraining?: boolean;
+}) {
+  const portalUrl = isTraining
+    ? `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/career-portal`
+    : `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/student-login`;
+
+  const escapedName = escapeHtml(studentName);
+  const escapedTitle = escapeHtml(meetingTitle);
+  const escapedTime = escapeHtml(scheduledAt);
+  const cleanLink = meetingLink ? escapeHtml(meetingLink) : "";
+
+  let linkButton = "";
+  if (cleanLink && cleanLink.startsWith("http")) {
+    linkButton = `
+      <div style="text-align: center; margin: 24px 0 12px 0;">
+        <a href="${cleanLink}" style="display: inline-block; background-color: #D4AF37; color: #0F172A; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px;">
+          Join Meeting Now
+        </a>
+      </div>
+    `;
+  }
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
+      <div style="background-color: #0B1F3A; text-align: center; padding: 24px;">
+        <h1 style="color: #ffffff; font-size: 20px; font-weight: bold; letter-spacing: 0.1em; margin: 0; font-family: sans-serif;">ANNEX CONSULTANCY</h1>
+        <p style="color: #D4AF37; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; margin: 4px 0 0 0;">Global Education Counsel</p>
+      </div>
+      <div style="padding: 32px 24px; color: #0F172A; line-height: 1.6; font-size: 14px;">
+        <p>Dear <strong>${escapedName}</strong>,</p>
+        <p>This is a reminder for your upcoming consultation meeting scheduled with Annex:</p>
+        
+        <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #f1f5f9; margin: 20px 0; color: #334155;">
+          <p style="margin: 0 0 8px 0;"><strong>Meeting:</strong> ${escapedTitle}</p>
+          <p style="margin: 0;"><strong>Scheduled Time:</strong> ${escapedTime}</p>
+        </div>
+
+        ${linkButton}
+        
+        <div style="text-align: center; margin: 12px 0 32px 0;">
+          <a href="${portalUrl}" style="display: inline-block; background-color: #0B1F3A; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+            Access Student Portal
+          </a>
+        </div>
+        
+        <p>Please ensure you are prepared and have a stable internet connection. If you need to reschedule, contact your counselor through the chat portal.</p>
+      </div>
+      <div style="background-color: #f1f5f9; text-align: center; padding: 20px; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
+        <p style="margin: 0;">© 2026 Annex Consultancy. All rights reserved.</p>
+        <p style="margin: 4px 0 0 0;">This is an automated notification regarding your scheduled consultations.</p>
+      </div>
+    </div>
+  `;
+
+  return sendEmail({
+    to: recipientEmail,
+    subject: `🔔 Reminder: Upcoming Consultation - ${meetingTitle}`,
+    html,
+  });
+}
+
+export async function sendVisaStatusUpdateEmail({
+  recipientEmail,
+  studentName,
+  status,
+  details,
+}: {
+  recipientEmail: string;
+  studentName: string;
+  status: string;
+  details?: string;
+}) {
+  const portalUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/student-login`;
+
+  const escapedName = escapeHtml(studentName);
+  const escapedStatus = escapeHtml(status);
+  const escapedDetails = details ? escapeHtml(details) : "No notes provided.";
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
+      <div style="background-color: #0B1F3A; text-align: center; padding: 24px;">
+        <h1 style="color: #ffffff; font-size: 20px; font-weight: bold; letter-spacing: 0.1em; margin: 0; font-family: sans-serif;">ANNEX CONSULTANCY</h1>
+        <p style="color: #D4AF37; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; margin: 4px 0 0 0;">Global Education Counsel</p>
+      </div>
+      <div style="padding: 32px 24px; color: #0F172A; line-height: 1.6; font-size: 14px;">
+        <p>Dear <strong>${escapedName}</strong>,</p>
+        <p>There is a new update regarding your visa application status on the Annex Student Portal:</p>
+        
+        <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #f1f5f9; margin: 20px 0; color: #334155;">
+          <p style="margin: 0 0 12px 0;"><strong>Current Status:</strong> <span style="background-color: #D4AF37; color: #0f172a; padding: 4px 8px; border-radius: 4px; font-weight: bold;">${escapedStatus}</span></p>
+          <p style="margin: 0 0 4px 0;"><strong>Details/Update Notes:</strong></p>
+          <p style="margin: 0; background-color: #ffffff; border: 1px solid #e2e8f0; padding: 12px; border-radius: 6px; font-style: italic;">${escapedDetails}</p>
+        </div>
+        
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${portalUrl}" style="display: inline-block; background-color: #0B1F3A; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+            Access Student Portal
+          </a>
+        </div>
+        
+        <p>Please review these updates. If any additional documents are requested, you can upload them under the Documents tab inside your dashboard.</p>
+      </div>
+      <div style="background-color: #f1f5f9; text-align: center; padding: 20px; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
+        <p style="margin: 0;">© 2026 Annex Consultancy. All rights reserved.</p>
+        <p style="margin: 4px 0 0 0;">This is an automated notification regarding your visa application updates.</p>
+      </div>
+    </div>
+  `;
+
+  return sendEmail({
+    to: recipientEmail,
+    subject: `✈️ Visa Application Update - Status: ${status}`,
     html,
   });
 }

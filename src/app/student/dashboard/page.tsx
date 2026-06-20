@@ -48,7 +48,10 @@ export default function StudentDashboard() {
   const [isImpersonating, setIsImpersonating] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [studentData, setStudentData] = React.useState<any>(null);
-  const [activeTab, setActiveTab] = React.useState<"dashboard" | "documents" | "offers" | "visa" | "chat" | "appointments" | "profile">("dashboard");
+  const [activeTab, setActiveTab] = React.useState<"dashboard" | "documents" | "offers" | "visa" | "chat" | "appointments" | "profile" | "notifications">("dashboard");
+  const [studentPrefs, setStudentPrefs] = React.useState<any>(null);
+  const [notificationLogs, setNotificationLogs] = React.useState<any[]>([]);
+  const [savingPrefs, setSavingPrefs] = React.useState(false);
 
   // Dashboard Sub-states
   const [tasks, setTasks] = React.useState<any[]>([]);
@@ -375,6 +378,36 @@ export default function StudentDashboard() {
         .eq("student_id", id)
         .order("scheduled_at", { ascending: true });
       setMeetings(studentMeetings || []);
+
+      // 9. Fetch Notification preferences
+      try {
+        const { data: prefData } = await supabase
+          .from("notification_preferences")
+          .select("*")
+          .eq("student_id", id)
+          .maybeSingle();
+        
+        setStudentPrefs(prefData || {
+          missing_documents_enabled: true,
+          consultation_enabled: true,
+          visa_updates_enabled: true,
+          all_notifications_enabled: true
+        });
+      } catch (prefErr: any) {
+        console.error("Error loading notification preferences:", prefErr.message);
+      }
+
+      // 10. Fetch Notification email history logs
+      try {
+        const { data: histData } = await supabase
+          .from("notification_history")
+          .select("*")
+          .eq("student_id", id)
+          .order("sent_at", { ascending: false });
+        setNotificationLogs(histData || []);
+      } catch (histErr: any) {
+        console.error("Error loading notification history:", histErr.message);
+      }
     } catch (err: any) {
       console.error("Error loading student data:", err.message);
     }
@@ -737,6 +770,45 @@ export default function StudentDashboard() {
     }
   };
 
+  const handleUpdatePrefs = async (key: string, value: boolean) => {
+    if (!studentId) return;
+    setSavingPrefs(true);
+    try {
+      const updatedPrefs: any = {
+        ...studentPrefs,
+        [key]: value,
+        updated_at: new Date().toISOString()
+      };
+      updatedPrefs.student_id = studentId;
+
+      let error;
+      if (studentPrefs?.id) {
+        const res = await supabase
+          .from("notification_preferences")
+          .update(updatedPrefs)
+          .eq("id", studentPrefs.id);
+        error = res.error;
+      } else {
+        const res = await supabase
+          .from("notification_preferences")
+          .insert([updatedPrefs])
+          .select()
+          .single();
+        error = res.error;
+        if (!error && res.data) {
+          setStudentPrefs(res.data);
+        }
+      }
+
+      if (error) throw error;
+      setStudentPrefs((prev: any) => ({ ...prev, [key]: value }));
+    } catch (err: any) {
+      alert("Error updating notification preferences: " + err.message);
+    } finally {
+      setSavingPrefs(false);
+    }
+  };
+
   // Calculate overall progress percentage
   const currentStageIndex = studentData ? STAGES.indexOf(studentData.current_stage) : 0;
   const progressPercent = Math.round(((currentStageIndex + 1) / STAGES.length) * 100);
@@ -795,7 +867,8 @@ export default function StudentDashboard() {
             { id: "visa", label: "Visa Timeline", icon: Calendar },
             { id: "chat", label: "Counselor Chat", icon: ChatCircleDots },
             { id: "appointments", label: "Scheduled Meetings", icon: CalendarCheck },
-            { id: "profile", label: "My Profile", icon: Gear }
+            { id: "profile", label: "My Profile", icon: Gear },
+            { id: "notifications", label: "Notification Settings", icon: Bell }
           ].map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -2096,6 +2169,145 @@ export default function StudentDashboard() {
                 </Card>
               </div>
 
+            </div>
+          </div>
+        )}
+
+        {/* TAB 8: NOTIFICATION SETTINGS */}
+        {activeTab === "notifications" && (
+          <div className="space-y-8">
+            <div className="max-w-3xl">
+              <h1 className="font-display font-bold text-2xl md:text-3xl text-primary tracking-tight mb-2">
+                Notification Settings
+              </h1>
+              <p className="text-slate-500 text-sm">
+                Manage how you receive alerts and reminders for your application process.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* Preferences Toggles */}
+              <Card className="md:col-span-1">
+                <CardHeader>
+                  <CardTitle>Email Preferences</CardTitle>
+                  <CardDescription>Select the updates you want to receive via email</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {studentPrefs ? (
+                    <div className="space-y-5">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5 max-w-[80%]">
+                          <span className="font-semibold text-sm text-slate-700 block">All Notifications</span>
+                          <span className="text-xs text-slate-400 block font-medium">Master toggle for your alerts</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={studentPrefs.all_notifications_enabled}
+                          onChange={(e) => handleUpdatePrefs("all_notifications_enabled", e.target.checked)}
+                          disabled={savingPrefs}
+                          className="h-5 w-5 rounded border-slate-350 text-primary focus:ring-primary cursor-pointer border bg-white"
+                        />
+                      </div>
+
+                      <hr className="border-hairline" />
+
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5 max-w-[80%]">
+                          <span className="font-semibold text-sm text-slate-700 block">Missing Documents Alert</span>
+                          <span className="text-xs text-slate-400 block font-medium">Email reminders on missing/rejected files</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={studentPrefs.missing_documents_enabled}
+                          onChange={(e) => handleUpdatePrefs("missing_documents_enabled", e.target.checked)}
+                          disabled={!studentPrefs.all_notifications_enabled || savingPrefs}
+                          className="h-5 w-5 rounded border-slate-350 text-primary focus:ring-primary cursor-pointer border bg-white"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5 max-w-[80%]">
+                          <span className="font-semibold text-sm text-slate-700 block">Consultation Reminders</span>
+                          <span className="text-xs text-slate-400 block font-medium">Email reminders on scheduled meetings</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={studentPrefs.consultation_enabled}
+                          onChange={(e) => handleUpdatePrefs("consultation_enabled", e.target.checked)}
+                          disabled={!studentPrefs.all_notifications_enabled || savingPrefs}
+                          className="h-5 w-5 rounded border-slate-350 text-primary focus:ring-primary cursor-pointer border bg-white"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5 max-w-[80%]">
+                          <span className="font-semibold text-sm text-slate-700 block">Visa Status Updates</span>
+                          <span className="text-xs text-slate-400 block font-medium">Email updates on visa milestone changes</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={studentPrefs.visa_updates_enabled}
+                          onChange={(e) => handleUpdatePrefs("visa_updates_enabled", e.target.checked)}
+                          disabled={!studentPrefs.all_notifications_enabled || savingPrefs}
+                          className="h-5 w-5 rounded border-slate-350 text-primary focus:ring-primary cursor-pointer border bg-white"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-4 text-center text-slate-400">Loading your preferences...</div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Delivery logs */}
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle>Delivery History</CardTitle>
+                  <CardDescription>Log of automated emails dispatched to you</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {notificationLogs.length === 0 ? (
+                    <p className="text-slate-400 py-12 text-center border border-dashed border-hairline bg-slate-50/50 rounded-2xl">
+                      No automated email alerts sent to you yet.
+                    </p>
+                  ) : (
+                    <div className="max-h-[400px] overflow-y-auto border border-hairline rounded-xl">
+                      <table className="w-full text-left text-xs divide-y divide-hairline text-slate-700 bg-white">
+                        <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400 sticky top-0 z-10">
+                          <tr>
+                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3">Type</th>
+                            <th className="px-4 py-3">Subject</th>
+                            <th className="px-4 py-3">Date</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-hairline text-slate-600">
+                          {notificationLogs.map((log) => (
+                            <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-4 py-3.5">
+                                <span className={`inline-block text-[9px] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                                  log.status === "sent" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-red-50 text-red-600 border-red-100"
+                                }`}>
+                                  {log.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3.5 font-bold uppercase text-[9px] tracking-wide text-slate-400">
+                                {log.notification_type === "missing_documents" ? "Docs" : log.notification_type === "consultation" ? "Meeting" : "Visa"}
+                              </td>
+                              <td className="px-4 py-3.5 max-w-[250px] truncate" title={log.subject}>
+                                {log.subject}
+                              </td>
+                              <td className="px-4 py-3.5 text-[10px] text-slate-400 font-medium">
+                                {new Date(log.sent_at).toLocaleDateString()} at {new Date(log.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </div>
         )}

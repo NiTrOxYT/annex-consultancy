@@ -221,8 +221,11 @@ export default function CareerPortalPage() {
   const [loading, setLoading] = React.useState(true);
   const [studentData, setStudentData] = React.useState<any>(null);
   const [activeTab, setActiveTab] = React.useState<
-    "dashboard" | "tasks" | "documents" | "meetings" | "chat" | "profile"
+    "dashboard" | "tasks" | "documents" | "meetings" | "chat" | "profile" | "notifications"
   >("dashboard");
+  const [studentPrefs, setStudentPrefs] = React.useState<any>(null);
+  const [notificationLogs, setNotificationLogs] = React.useState<any[]>([]);
+  const [savingPrefs, setSavingPrefs] = React.useState(false);
 
   // Portal states
   const [tasks, setTasks] = React.useState<any[]>([]);
@@ -296,6 +299,36 @@ export default function CareerPortalPage() {
         .eq("student_id", id)
         .order("created_at", { ascending: true });
       setMessages(trainingMsgs || []);
+
+      // 6. Fetch Notification preferences
+      try {
+        const { data: prefData } = await supabase
+          .from("notification_preferences")
+          .select("*")
+          .eq("training_student_id", id)
+          .maybeSingle();
+        
+        setStudentPrefs(prefData || {
+          missing_documents_enabled: true,
+          consultation_enabled: true,
+          visa_updates_enabled: true,
+          all_notifications_enabled: true
+        });
+      } catch (prefErr: any) {
+        console.error("Error loading training student preferences:", prefErr.message);
+      }
+
+      // 7. Fetch Notification email history logs
+      try {
+        const { data: histData } = await supabase
+          .from("notification_history")
+          .select("*")
+          .eq("training_student_id", id)
+          .order("sent_at", { ascending: false });
+        setNotificationLogs(histData || []);
+      } catch (histErr: any) {
+        console.error("Error loading training student notification history:", histErr.message);
+      }
     } catch (err: any) {
       console.error("Error loading portal data:", err.message);
     }
@@ -709,6 +742,45 @@ export default function CareerPortalPage() {
     }
   };
 
+  const handleUpdatePrefs = async (key: string, value: boolean) => {
+    if (!studentId) return;
+    setSavingPrefs(true);
+    try {
+      const updatedPrefs: any = {
+        ...studentPrefs,
+        [key]: value,
+        updated_at: new Date().toISOString()
+      };
+      updatedPrefs.training_student_id = studentId;
+
+      let error;
+      if (studentPrefs?.id) {
+        const res = await supabase
+          .from("notification_preferences")
+          .update(updatedPrefs)
+          .eq("id", studentPrefs.id);
+        error = res.error;
+      } else {
+        const res = await supabase
+          .from("notification_preferences")
+          .insert([updatedPrefs])
+          .select()
+          .single();
+        error = res.error;
+        if (!error && res.data) {
+          setStudentPrefs(res.data);
+        }
+      }
+
+      if (error) throw error;
+      setStudentPrefs((prev: any) => ({ ...prev, [key]: value }));
+    } catch (err: any) {
+      alert("Error updating notification preferences: " + err.message);
+    } finally {
+      setSavingPrefs(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center">
@@ -772,6 +844,7 @@ export default function CareerPortalPage() {
             { id: "meetings", label: "Scheduled Meetings", icon: CalendarCheck },
             { id: "chat", label: "Advisor Chat", icon: ChatCircleDots },
             { id: "profile", label: "Candidate Profile", icon: Gear },
+            { id: "notifications", label: "Notification Settings", icon: Bell },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -1534,7 +1607,132 @@ export default function CareerPortalPage() {
             </div>
           )}
 
-        </div>
+          {/* TAB 7: NOTIFICATIONS */}
+          {activeTab === "notifications" && (
+            <div className="space-y-6">
+              <div>
+                <h1 className="font-display text-2xl text-primary font-bold">Notification Settings</h1>
+                <p className="text-sm text-slate-500 mt-1">Manage how you receive alerts and reminders for your career tasks.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Left Card: Preference checklist */}
+                <div className="md:col-span-1 space-y-4">
+                  <Card>
+                    <CardHeader className="text-left">
+                      <CardTitle>Email Preferences</CardTitle>
+                      <CardDescription>Select the updates you want to receive via email</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {studentPrefs ? (
+                        <div className="space-y-5">
+                          <div className="flex items-center justify-between text-left">
+                            <div className="space-y-0.5 max-w-[80%]">
+                              <span className="font-semibold text-sm text-slate-700 block">All Notifications</span>
+                              <span className="text-xs text-slate-400 block font-medium">Master toggle for your alerts</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={studentPrefs.all_notifications_enabled}
+                              onChange={(e) => handleUpdatePrefs("all_notifications_enabled", e.target.checked)}
+                              disabled={savingPrefs}
+                              className="h-5 w-5 rounded border-slate-350 text-primary focus:ring-primary cursor-pointer border bg-white"
+                            />
+                          </div>
+
+                          <hr className="border-hairline" />
+
+                          <div className="flex items-center justify-between text-left">
+                            <div className="space-y-0.5 max-w-[80%]">
+                              <span className="font-semibold text-sm text-slate-700 block">Missing Documents Alert</span>
+                              <span className="text-xs text-slate-400 block font-medium">Email reminders on missing/rejected files</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={studentPrefs.missing_documents_enabled}
+                              onChange={(e) => handleUpdatePrefs("missing_documents_enabled", e.target.checked)}
+                              disabled={!studentPrefs.all_notifications_enabled || savingPrefs}
+                              className="h-5 w-5 rounded border-slate-350 text-primary focus:ring-primary cursor-pointer border bg-white"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between text-left">
+                            <div className="space-y-0.5 max-w-[80%]">
+                              <span className="font-semibold text-sm text-slate-700 block">Consultation Reminders</span>
+                              <span className="text-xs text-slate-400 block font-medium">Email reminders on scheduled meetings</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={studentPrefs.consultation_enabled}
+                              onChange={(e) => handleUpdatePrefs("consultation_enabled", e.target.checked)}
+                              disabled={!studentPrefs.all_notifications_enabled || savingPrefs}
+                              className="h-5 w-5 rounded border-slate-350 text-primary focus:ring-primary cursor-pointer border bg-white"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="py-4 text-center text-slate-400">Loading your preferences...</div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Right Card: History table */}
+                <div className="md:col-span-2 space-y-4">
+                  <Card>
+                    <CardHeader className="text-left">
+                      <CardTitle>Delivery History</CardTitle>
+                      <CardDescription>Log of automated emails dispatched to you</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {notificationLogs.length === 0 ? (
+                        <p className="text-slate-400 py-12 text-center border border-dashed border-hairline bg-slate-50/50 rounded-2xl">
+                          No automated email alerts sent to you yet.
+                        </p>
+                      ) : (
+                        <div className="max-h-[400px] overflow-y-auto border border-hairline rounded-xl">
+                          <table className="w-full text-left text-xs divide-y divide-hairline text-slate-700 bg-white">
+                            <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400 sticky top-0 z-10">
+                              <tr>
+                                <th className="px-4 py-3">Status</th>
+                                <th className="px-4 py-3">Type</th>
+                                <th className="px-4 py-3">Subject</th>
+                                <th className="px-4 py-3">Date</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-hairline text-slate-600">
+                              {notificationLogs.map((log) => (
+                                <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
+                                  <td className="px-4 py-3.5">
+                                    <span className={`inline-block text-[9px] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                                      log.status === "sent" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-red-50 text-red-600 border-red-100"
+                                    }`}>
+                                      {log.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3.5 font-bold uppercase text-[9px] tracking-wide text-slate-400">
+                                    {log.notification_type === "missing_documents" ? "Docs" : log.notification_type === "consultation" ? "Meeting" : "Visa"}
+                                  </td>
+                                  <td className="px-4 py-3.5 max-w-[250px] truncate" title={log.subject}>
+                                    {log.subject}
+                                  </td>
+                                  <td className="px-4 py-3.5 text-[10px] text-slate-400 font-medium">
+                                    {new Date(log.sent_at).toLocaleDateString()} at {new Date(log.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </div>
+          )}
+
+          </div>
       </main>
     </div>
   );
