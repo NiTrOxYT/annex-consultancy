@@ -2774,7 +2774,8 @@ export default function AdminDashboard() {
         await fetch("/api/send-student-notification", {
           method: "POST",
           headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${sessionStorage.getItem("annex_admin_password") || ""}`
           },
           body: JSON.stringify({
             studentId: selectedStudent.id,
@@ -2893,7 +2894,10 @@ export default function AdminDashboard() {
 
       const res = await fetch("/api/send-student-notification", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${sessionStorage.getItem("annex_admin_password") || ""}`
+        },
         body: JSON.stringify(payload)
       });
 
@@ -7015,7 +7019,10 @@ export default function AdminDashboard() {
                                 try {
                                   const res = await fetch("/api/send-student-notification", {
                                     method: "POST",
-                                    headers: { "Content-Type": "application/json" },
+                                    headers: { 
+                                      "Content-Type": "application/json",
+                                      "Authorization": `Bearer ${sessionStorage.getItem("annex_admin_password") || ""}`
+                                    },
                                     body: JSON.stringify({
                                       trainingStudentId: selectedTrainingStudent.id,
                                       action: "missing-documents-reminder",
@@ -7054,7 +7061,10 @@ export default function AdminDashboard() {
                                       try {
                                         const res = await fetch("/api/send-student-notification", {
                                           method: "POST",
-                                          headers: { "Content-Type": "application/json" },
+                                          headers: { 
+                                            "Content-Type": "application/json",
+                                            "Authorization": `Bearer ${sessionStorage.getItem("annex_admin_password") || ""}`
+                                          },
                                           body: JSON.stringify({
                                             trainingStudentId: selectedTrainingStudent.id,
                                             action: "consultation-reminder",
@@ -8974,7 +8984,10 @@ export default function AdminDashboard() {
 
                                       fetch("/api/send-meeting-notification", {
                                         method: "POST",
-                                        headers: { "Content-Type": "application/json" },
+                                        headers: { 
+                                          "Content-Type": "application/json",
+                                          "Authorization": `Bearer ${sessionStorage.getItem("annex_admin_password") || ""}`
+                                        },
                                         body: JSON.stringify({
                                           action: "cancelled",
                                           studentId: selectedStudent.id,
@@ -9106,7 +9119,10 @@ export default function AdminDashboard() {
                                 try {
                                   const res = await fetch("/api/send-student-notification", {
                                     method: "POST",
-                                    headers: { "Content-Type": "application/json" },
+                                    headers: { 
+                                      "Content-Type": "application/json",
+                                      "Authorization": `Bearer ${sessionStorage.getItem("annex_admin_password") || ""}`
+                                    },
                                     body: JSON.stringify({
                                       studentId: selectedStudent.id,
                                       action: "missing-documents-reminder",
@@ -9145,7 +9161,10 @@ export default function AdminDashboard() {
                                       try {
                                         const res = await fetch("/api/send-student-notification", {
                                           method: "POST",
-                                          headers: { "Content-Type": "application/json" },
+                                          headers: { 
+                                            "Content-Type": "application/json",
+                                            "Authorization": `Bearer ${sessionStorage.getItem("annex_admin_password") || ""}`
+                                          },
                                           body: JSON.stringify({
                                             studentId: selectedStudent.id,
                                             action: "consultation-reminder",
