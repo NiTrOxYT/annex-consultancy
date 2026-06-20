@@ -826,45 +826,31 @@ export default function AdminDashboard() {
       console.error("Error loading email config status:", err.message);
     }
 
-    // 9.5 Fetch Notification Global Settings and History Logs
+    // 9.5 Fetch Notification Global Settings and History Logs via secure admin endpoint
     try {
-      const { data: globalSetting, error: globalErr } = await supabase
-        .from("system_settings")
-        .select("value")
-        .eq("key", "notifications_enabled")
-        .maybeSingle();
-      if (globalErr) {
-        if (globalErr.code === "42P01" || globalErr.message.includes("does not exist")) {
-          setSystemSettingsTableExists(false);
-        } else {
-          throw globalErr;
+      const token = getAdminCredentials();
+      const res = await fetch("/api/admin/notifications", {
+        headers: {
+          "Authorization": `Bearer ${token}`
         }
-      } else {
+      });
+      if (res.ok) {
+        const data = await res.json();
         setSystemSettingsTableExists(true);
-        setNotificationsEnabled(globalSetting ? globalSetting.value === "true" : true);
-      }
-    } catch (err: any) {
-      console.error("Error loading system settings:", err.message);
-    }
-
-    try {
-      const { data: allHist, error: histErr } = await supabase
-        .from("notification_history")
-        .select("*, students(name, email), training_students(student_name, student_email)")
-        .order("sent_at", { ascending: false })
-        .limit(200);
-      if (histErr) {
-        if (histErr.code === "42P01" || histErr.message.includes("does not exist")) {
-          setNotifHistoryTableExists(false);
-        } else {
-          throw histErr;
-        }
-      } else {
         setNotifHistoryTableExists(true);
-        setNotificationHistory(allHist || []);
+        setNotificationsEnabled(data.globalSetting ? data.globalSetting.value === "true" : true);
+        setNotificationHistory(data.history || []);
+      } else {
+        const errData = await res.json();
+        const errMsg = errData.error || "";
+        if (errMsg.includes("does not exist") || errMsg.includes("42P01") || errMsg.includes("relation \"system_settings\"") || errMsg.includes("relation \"notification_history\"")) {
+          setSystemSettingsTableExists(false);
+          setNotifHistoryTableExists(false);
+        }
+        console.error("Error loading notifications data from API:", errMsg);
       }
     } catch (err: any) {
-      console.error("Error loading notification history:", err.message);
+      console.error("Error loading notifications info:", err.message);
     }
     // 10. Fetch Training & Placement Data
     try {
@@ -1671,34 +1657,28 @@ export default function AdminDashboard() {
         .order("created_at", { ascending: true });
       setTrainingDetailMessages(c || []);
 
-      // Fetch selected training student notification preferences
+      // Fetch selected training student notification preferences and history logs
       try {
-        const { data: prefData } = await supabase
-          .from("notification_preferences")
-          .select("*")
-          .eq("training_student_id", id)
-          .maybeSingle();
-        
-        setSelectedStudentPrefs(prefData || {
-          missing_documents_enabled: true,
-          consultation_enabled: true,
-          visa_updates_enabled: true,
-          all_notifications_enabled: true
+        const token = getAdminCredentials();
+        const res = await fetch(`/api/admin/notifications?trainingStudentId=${id}`, {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
         });
+        if (res.ok) {
+          const data = await res.json();
+          setSelectedStudentPrefs(data.preferences || {
+            missing_documents_enabled: true,
+            consultation_enabled: true,
+            visa_updates_enabled: true,
+            all_notifications_enabled: true
+          });
+          setSelectedStudentHistory(data.history || []);
+        } else {
+          console.error("Error loading training student notifications from API:", res.statusText);
+        }
       } catch (prefErr: any) {
-        console.error("Error loading training student preferences:", prefErr.message);
-      }
-
-      // Fetch selected training student notification history logs
-      try {
-        const { data: histData } = await supabase
-          .from("notification_history")
-          .select("*")
-          .eq("training_student_id", id)
-          .order("sent_at", { ascending: false });
-        setSelectedStudentHistory(histData || []);
-      } catch (histErr: any) {
-        console.error("Error loading training student notification history:", histErr.message);
+        console.error("Error loading training student preferences and history:", prefErr.message);
       }
     } catch (err: any) {
       console.error("Error loading detail candidate data:", err.message);
@@ -2561,34 +2541,28 @@ export default function AdminDashboard() {
       const { data: mtgs } = await supabase.from("meetings").select("*, counselors(full_name)").eq("student_id", id).order("scheduled_at", { ascending: false });
       setAuditMeetings(mtgs || []);
 
-      // Fetch selected student notification preferences
+      // Fetch selected student notification preferences and history logs
       try {
-        const { data: prefData } = await supabase
-          .from("notification_preferences")
-          .select("*")
-          .eq("student_id", id)
-          .maybeSingle();
-        
-        setSelectedStudentPrefs(prefData || {
-          missing_documents_enabled: true,
-          consultation_enabled: true,
-          visa_updates_enabled: true,
-          all_notifications_enabled: true
+        const token = getAdminCredentials();
+        const res = await fetch(`/api/admin/notifications?studentId=${id}`, {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
         });
+        if (res.ok) {
+          const data = await res.json();
+          setSelectedStudentPrefs(data.preferences || {
+            missing_documents_enabled: true,
+            consultation_enabled: true,
+            visa_updates_enabled: true,
+            all_notifications_enabled: true
+          });
+          setSelectedStudentHistory(data.history || []);
+        } else {
+          console.error("Error loading student notifications from API:", res.statusText);
+        }
       } catch (prefErr: any) {
-        console.error("Error loading student preferences:", prefErr.message);
-      }
-
-      // Fetch selected student notification history logs
-      try {
-        const { data: histData } = await supabase
-          .from("notification_history")
-          .select("*")
-          .eq("student_id", id)
-          .order("sent_at", { ascending: false });
-        setSelectedStudentHistory(histData || []);
-      } catch (histErr: any) {
-        console.error("Error loading student notification history:", histErr.message);
+        console.error("Error loading student preferences and history:", prefErr.message);
       }
     } catch (err: any) {
       console.error("Error loading student audit details:", err.message);
@@ -2815,38 +2789,27 @@ export default function AdminDashboard() {
     if (!student) return;
     setSavingStudentPrefs(true);
     try {
-      const updatedPrefs: any = {
-        ...selectedStudentPrefs,
-        [key]: value,
-        updated_at: new Date().toISOString()
-      };
-      
-      if (studentType === "standard") {
-        updatedPrefs.student_id = student.id;
-      } else {
-        updatedPrefs.training_student_id = student.id;
+      const token = getAdminCredentials();
+      const res = await fetch("/api/admin/notifications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: "update-prefs",
+          studentId: studentType === "standard" ? student.id : undefined,
+          trainingStudentId: studentType === "training" ? student.id : undefined,
+          key,
+          value
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to update notification preferences");
       }
 
-      let error;
-      if (selectedStudentPrefs?.id) {
-        const res = await supabase
-          .from("notification_preferences")
-          .update(updatedPrefs)
-          .eq("id", selectedStudentPrefs.id);
-        error = res.error;
-      } else {
-        const res = await supabase
-          .from("notification_preferences")
-          .insert([updatedPrefs])
-          .select()
-          .single();
-        error = res.error;
-        if (!error && res.data) {
-          setSelectedStudentPrefs(res.data);
-        }
-      }
-
-      if (error) throw error;
       setSelectedStudentPrefs((prev: any) => ({ ...prev, [key]: value }));
       showToast("Notification preferences updated successfully");
     } catch (err: any) {
@@ -2858,10 +2821,24 @@ export default function AdminDashboard() {
 
   const handleToggleGlobalNotifications = async (enabled: boolean) => {
     try {
-      const { error } = await supabase
-        .from("system_settings")
-        .upsert([{ key: "notifications_enabled", value: String(enabled), updated_at: new Date().toISOString() }], { onConflict: "key" });
-      if (error) throw error;
+      const token = getAdminCredentials();
+      const res = await fetch("/api/admin/notifications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: "toggle-global",
+          enabled
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to save global settings");
+      }
+
       setNotificationsEnabled(enabled);
       showToast(`Global notifications ${enabled ? "enabled" : "disabled"}`);
     } catch (err: any) {
