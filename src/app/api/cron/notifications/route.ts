@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { 
   sendMissingDocumentsReminderEmail, 
   sendConsultationReminderEmail 
 } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
+
+const db = supabaseAdmin || supabase;
 
 export async function GET(request: Request) {
   try {
@@ -27,7 +30,7 @@ export async function GET(request: Request) {
     // 2. Check Global Master Switch in system_settings
     let notificationsEnabled = true;
     try {
-      const { data: settingData, error: settingError } = await supabase
+      const { data: settingData, error: settingError } = await db
         .from("system_settings")
         .select("value")
         .eq("key", "notifications_enabled")
@@ -55,7 +58,7 @@ export async function GET(request: Request) {
       const standardRequiredTypes = ["Passport", "Academic Certificates", "SOP", "LOR"];
 
       // Fetch all Active students
-      const { data: students, error: studentsError } = await supabase
+      const { data: students, error: studentsError } = await db
         .from("students")
         .select("id, name, email, status")
         .eq("status", "Active");
@@ -63,7 +66,7 @@ export async function GET(request: Request) {
       if (!studentsError && students) {
         for (const student of students) {
           // Check preferences
-          const { data: prefs } = await supabase
+          const { data: prefs } = await db
             .from("notification_preferences")
             .select("missing_documents_enabled, all_notifications_enabled")
             .eq("student_id", student.id)
@@ -74,7 +77,7 @@ export async function GET(request: Request) {
           if (!docRemindersEnabled) continue;
 
           // Check 24h Cooldown
-          const { data: pastNotifs } = await supabase
+          const { data: pastNotifs } = await db
             .from("notification_history")
             .select("id")
             .eq("student_id", student.id)
@@ -86,7 +89,7 @@ export async function GET(request: Request) {
           if (cooldownActive) continue;
 
           // Query student documents
-          const { data: docs } = await supabase
+          const { data: docs } = await db
             .from("student_documents")
             .select("document_type, status")
             .eq("student_id", student.id);
@@ -113,7 +116,7 @@ export async function GET(request: Request) {
             });
 
             // Log history
-            await supabase.from("notification_history").insert([{
+            await db.from("notification_history").insert([{
               student_id: student.id,
               notification_type: "missing_documents",
               subject: "⚠️ Action Required: Missing Documents for Your Application",
@@ -127,14 +130,14 @@ export async function GET(request: Request) {
       }
 
       // Fetch all Active Career training students
-      const { data: trainingStudents, error: trainingError } = await supabase
+      const { data: trainingStudents, error: trainingError } = await db
         .from("training_students")
         .select("id, student_name, student_email, status")
         .eq("status", "Active");
 
       if (!trainingError && trainingStudents) {
         for (const student of trainingStudents) {
-          const { data: prefs } = await supabase
+          const { data: prefs } = await db
             .from("notification_preferences")
             .select("missing_documents_enabled, all_notifications_enabled")
             .eq("training_student_id", student.id)
@@ -144,7 +147,7 @@ export async function GET(request: Request) {
           if (!docRemindersEnabled) continue;
 
           // Cooldown check
-          const { data: pastNotifs } = await supabase
+          const { data: pastNotifs } = await db
             .from("notification_history")
             .select("id")
             .eq("training_student_id", student.id)
@@ -156,7 +159,7 @@ export async function GET(request: Request) {
           if (cooldownActive) continue;
 
           // Query training documents
-          const { data: docs } = await supabase
+          const { data: docs } = await db
             .from("training_documents")
             .select("title")
             .eq("student_id", student.id);
@@ -179,7 +182,7 @@ export async function GET(request: Request) {
               isTraining: true
             });
 
-            await supabase.from("notification_history").insert([{
+            await db.from("notification_history").insert([{
               training_student_id: student.id,
               notification_type: "missing_documents",
               subject: "⚠️ Action Required: Missing Documents for Your Application",
@@ -203,7 +206,7 @@ export async function GET(request: Request) {
       const twentyFourHoursLater = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
       // Query upcoming meetings
-      const { data: meetings, error: meetingsError } = await supabase
+      const { data: meetings, error: meetingsError } = await db
         .from("meetings")
         .select("*, students(*), training_students(*)")
         .gte("scheduled_at", now.toISOString())
@@ -227,7 +230,7 @@ export async function GET(request: Request) {
           // Check preferences
           let consultationEnabled = true;
           if (studentId) {
-            const { data: prefs } = await supabase
+            const { data: prefs } = await db
               .from("notification_preferences")
               .select("consultation_enabled, all_notifications_enabled")
               .eq("student_id", studentId)
@@ -236,7 +239,7 @@ export async function GET(request: Request) {
               consultationEnabled = prefs.consultation_enabled && prefs.all_notifications_enabled;
             }
           } else if (trainingId) {
-            const { data: prefs } = await supabase
+            const { data: prefs } = await db
               .from("notification_preferences")
               .select("consultation_enabled, all_notifications_enabled")
               .eq("training_student_id", trainingId)
@@ -249,7 +252,7 @@ export async function GET(request: Request) {
           if (!consultationEnabled) continue;
 
           // 24h Cooldown check: prevent sending duplicate consultation reminders for the SAME meeting
-          const cooldownQuery = supabase
+          const cooldownQuery = db
             .from("notification_history")
             .select("id")
             .eq("notification_type", "consultation")
@@ -288,7 +291,7 @@ export async function GET(request: Request) {
           if (studentId) insertPayload.student_id = studentId;
           if (trainingId) insertPayload.training_student_id = trainingId;
 
-          await supabase.from("notification_history").insert([insertPayload]);
+          await db.from("notification_history").insert([insertPayload]);
           logActivity.push(`Sent Consultation Reminder for "${meeting.title}" to: ${recipientEmail}`);
         }
       }

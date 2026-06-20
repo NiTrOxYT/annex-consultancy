@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { 
   sendVisaStatusUpdateEmail, 
   sendMissingDocumentsReminderEmail,
@@ -8,6 +9,8 @@ import {
 import { verifyAdminSession } from "@/lib/adminAuth";
 
 export const dynamic = "force-dynamic";
+
+const db = supabaseAdmin || supabase;
 
 export async function POST(request: Request) {
   try {
@@ -34,7 +37,7 @@ export async function POST(request: Request) {
     // 2. Check Global Master Switch in system_settings (unless manual override)
     let notificationsEnabled = true;
     try {
-      const { data: settingData, error: settingError } = await supabase
+      const { data: settingData, error: settingError } = await db
         .from("system_settings")
         .select("value")
         .eq("key", "notifications_enabled")
@@ -57,7 +60,7 @@ export async function POST(request: Request) {
     let studentEmail = "";
 
     if (isTraining) {
-      const { data: trainingStudent, error: trainingErr } = await supabase
+      const { data: trainingStudent, error: trainingErr } = await db
         .from("training_students")
         .select("id, student_name, student_email")
         .eq("id", targetStudentId)
@@ -69,7 +72,7 @@ export async function POST(request: Request) {
       studentName = trainingStudent.student_name;
       studentEmail = trainingStudent.student_email;
     } else {
-      const { data: student, error: studentErr } = await supabase
+      const { data: student, error: studentErr } = await db
         .from("students")
         .select("id, name, email")
         .eq("id", targetStudentId)
@@ -96,7 +99,7 @@ export async function POST(request: Request) {
       if (!isManual) {
         let visaUpdatesEnabled = true;
         try {
-          const { data: prefs } = await supabase
+          const { data: prefs } = await db
             .from("notification_preferences")
             .select("visa_updates_enabled, all_notifications_enabled")
             .eq("student_id", targetStudentId)
@@ -116,7 +119,7 @@ export async function POST(request: Request) {
         // Check 24-hour Cooldown
         const subjectText = `✈️ Visa Application Update - Status: ${status}`;
         try {
-          const { data: pastNotifs } = await supabase
+          const { data: pastNotifs } = await db
             .from("notification_history")
             .select("id")
             .eq("student_id", targetStudentId)
@@ -143,7 +146,7 @@ export async function POST(request: Request) {
       });
 
       // Log in history
-      await supabase.from("notification_history").insert([{
+      await db.from("notification_history").insert([{
         student_id: targetStudentId,
         notification_type: "visa_update",
         subject: subjectText,
@@ -163,7 +166,7 @@ export async function POST(request: Request) {
       let missingDocs: string[] = [];
 
       if (isTraining) {
-        const { data: docs } = await supabase
+        const { data: docs } = await db
           .from("training_documents")
           .select("title")
           .eq("student_id", targetStudentId);
@@ -175,7 +178,7 @@ export async function POST(request: Request) {
         }
       } else {
         const standardRequiredTypes = ["Passport", "Academic Certificates", "SOP", "LOR"];
-        const { data: docs } = await supabase
+        const { data: docs } = await db
           .from("student_documents")
           .select("document_type, status")
           .eq("student_id", targetStudentId);
@@ -216,7 +219,7 @@ export async function POST(request: Request) {
         historyRecord.student_id = targetStudentId;
       }
 
-      await supabase.from("notification_history").insert([historyRecord]);
+      await db.from("notification_history").insert([historyRecord]);
 
       if (!emailResult.success) {
         return NextResponse.json({ success: false, error: emailResult.error || "Email failed to send" }, { status: 500 });
@@ -231,7 +234,7 @@ export async function POST(request: Request) {
       let meetingData: any = null;
 
       if (meetingId) {
-        const { data: meeting } = await supabase
+        const { data: meeting } = await db
           .from("meetings")
           .select("*")
           .eq("id", meetingId)
@@ -239,7 +242,7 @@ export async function POST(request: Request) {
         meetingData = meeting;
       } else {
         // Find most recent upcoming meeting
-        const meetingQuery = supabase
+        const meetingQuery = db
           .from("meetings")
           .select("*")
           .order("scheduled_at", { ascending: false })
@@ -283,7 +286,7 @@ export async function POST(request: Request) {
         historyRecord.student_id = targetStudentId;
       }
 
-      await supabase.from("notification_history").insert([historyRecord]);
+      await db.from("notification_history").insert([historyRecord]);
 
       if (!emailResult.success) {
         return NextResponse.json({ success: false, error: emailResult.error || "Email failed to send" }, { status: 500 });

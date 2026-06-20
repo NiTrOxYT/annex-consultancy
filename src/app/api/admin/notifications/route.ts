@@ -15,6 +15,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: authResult.error || "Unauthorized" }, { status: authResult.status || 401 });
     }
 
+    if (!supabaseAdmin) {
+      return NextResponse.json({ 
+        error: "SUPABASE_SERVICE_ROLE_KEY is not defined in environment variables. Admin operations require this key to bypass Row-Level Security (RLS)." 
+      }, { status: 500 });
+    }
+
     const { searchParams } = new URL(request.url);
     const studentId = searchParams.get("studentId");
     const trainingStudentId = searchParams.get("trainingStudentId");
@@ -82,6 +88,12 @@ export async function POST(request: Request) {
     const authResult = await verifyAdminSession(request);
     if (!authResult.authorized) {
       return NextResponse.json({ error: authResult.error || "Unauthorized" }, { status: authResult.status || 401 });
+    }
+
+    if (!supabaseAdmin) {
+      return NextResponse.json({ 
+        error: "SUPABASE_SERVICE_ROLE_KEY is not defined in environment variables. Admin operations require this key to bypass Row-Level Security (RLS)." 
+      }, { status: 500 });
     }
 
     const body = await request.json();

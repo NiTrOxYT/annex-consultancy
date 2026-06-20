@@ -82,6 +82,13 @@ CREATE POLICY "Students can update own preferences" ON public.notification_prefe
         training_student_id IN (SELECT id FROM public.training_students WHERE auth_user_id = auth.uid())
     );
 
+DROP POLICY IF EXISTS "Students can insert own preferences" ON public.notification_preferences;
+CREATE POLICY "Students can insert own preferences" ON public.notification_preferences
+    FOR INSERT WITH CHECK (
+        student_id IN (SELECT id FROM public.students WHERE auth_user_id = auth.uid()) OR
+        training_student_id IN (SELECT id FROM public.training_students WHERE auth_user_id = auth.uid())
+    );
+
 DROP POLICY IF EXISTS "Students can view own notification history" ON public.notification_history;
 CREATE POLICY "Students can view own notification history" ON public.notification_history
     FOR SELECT USING (
