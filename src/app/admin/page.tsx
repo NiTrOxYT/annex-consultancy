@@ -6,7 +6,7 @@ import {
   Calendar, Users, Eye, CheckCircle, XCircle, ChartBar, 
   Download, MagnifyingGlass, Funnel, ArrowSquareOut, Globe, 
   Warning, WarningCircle, Check, X, SpinnerGap, GraduationCap, Star, Copy,
-  User, Paperclip, PaperPlaneRight, Gear, UploadSimple, Lock, Clock, Checks,
+  User, Paperclip, PaperPlaneRight, Gear, UploadSimple, Lock, Key, Clock, Checks,
   ChatCircleDots, Briefcase, Bell
 } from "@phosphor-icons/react";
 import { createClient } from "@supabase/supabase-js";
@@ -105,14 +105,24 @@ interface SuccessStory {
   created_at: string;
 }
 
-export default function AdminDashboard() {
+interface AdminDashboardProps {
+  initialTab?: string;
+}
+
+export default function AdminDashboard({ initialTab }: AdminDashboardProps = {}) {
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+  const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [authError, setAuthError] = React.useState("");
   const [checkingAuth, setCheckingAuth] = React.useState(true);
   
   // Dashboard Tabs
-  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat" | "counselors" | "settings" | "training" | "experts" | "notifications">("bookings");
+  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat" | "counselors" | "settings" | "training" | "experts" | "notifications" | "roles">((initialTab as any) || "bookings");
+
+  const [userType, setUserType] = React.useState<"super-admin" | "counselor" | null>(null);
+  const [userPermissions, setUserPermissions] = React.useState<string[]>([]);
+  const [counselorProfile, setCounselorProfile] = React.useState<any | null>(null);
+  const [loginMethod, setLoginMethod] = React.useState<"counselor" | "access-key">("counselor");
 
   // Loaders & table existence flags
   const [loading, setLoading] = React.useState(false);
@@ -334,6 +344,29 @@ export default function AdminDashboard() {
   const [savingCounselor, setSavingCounselor] = React.useState(false);
   const [uploadingCounselorAvatar, setUploadingCounselorAvatar] = React.useState(false);
 
+  // RBAC Permission States
+  const [roles, setRoles] = React.useState<any[]>([]);
+  const [selectedCounselorRole, setSelectedCounselorRole] = React.useState<string>("");
+  const [counselorPermOverrides, setCounselorPermOverrides] = React.useState<{[key: string]: boolean | null}>({});
+  const [loadingPerms, setLoadingPerms] = React.useState(false);
+  
+  // Provision login modal state
+  const [provisionModalOpen, setProvisionModalOpen] = React.useState(false);
+  const [provisionCounselor, setProvisionCounselor] = React.useState<any | null>(null);
+  const [provisionPassword, setProvisionPassword] = React.useState("");
+  const [provisioning, setProvisioning] = React.useState(false);
+
+  // Role Management Modal States
+  const [isRoleModalOpen, setIsRoleModalOpen] = React.useState(false);
+  const [editingRole, setEditingRole] = React.useState<any | null>(null);
+  const [roleForm, setRoleForm] = React.useState({
+    name: "",
+    description: "",
+    permissions: [] as string[]
+  });
+  const [savingRole, setSavingRole] = React.useState(false);
+  const [expandedRoleId, setExpandedRoleId] = React.useState<string | null>(null);
+
   // Career Experts Management States
   const [experts, setExperts] = React.useState<any[]>([]);
   const [isExpertModalOpen, setIsExpertModalOpen] = React.useState(false);
@@ -474,23 +507,107 @@ export default function AdminDashboard() {
     published: false
   });
 
-  // Check auth persistence on mount
+  const getPermissionKeyForTab = (tabId: string): string => {
+    const mapping: { [key: string]: string } = {
+      bookings: "Dashboard",
+      students: "Students",
+      counselors: "Counselors Management",
+      chat: "Messages",
+      training: "Training & Placement",
+      universities: "Universities",
+      blog: "Blog",
+      stories: "Success Stories",
+      experts: "Training & Placement",
+      notifications: "Notifications",
+      settings: "Settings",
+      roles: "System Administration"
+    };
+    return mapping[tabId] || "";
+  };
+
+  const hasPermission = (permKey: string): boolean => {
+    if (userType === "super-admin") return true;
+    return userPermissions.includes(permKey);
+  };
+
+  const allTabsList = [
+    { id: "bookings", label: `Consultations (${bookings.length})` },
+    { id: "students", label: `Students (${students.length})` },
+    { id: "counselors", label: `Counselors (${counselors.length})` },
+    { id: "chat", label: "Messaging" },
+    { id: "training", label: `Training & Placement (${trainingStudents.length})` },
+    { id: "universities", label: `Universities (${universities.length})` },
+    { id: "blog", label: `Blog posts (${posts.length})` },
+    { id: "stories", label: `Success stories (${stories.length})` },
+    { id: "experts", label: `Career Experts (${experts.length})` },
+    { id: "notifications", label: "Notifications" },
+    { id: "settings", label: "Email Status" },
+    { id: "roles", label: "Roles & Permissions" }
+  ];
+
+  const visibleTabs = allTabsList.filter(tab => {
+    const permKey = getPermissionKeyForTab(tab.id);
+    return hasPermission(permKey);
+  });
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId as any);
+    if (typeof window !== "undefined") {
+      window.history.pushState(null, "", `/admin/${tabId}`);
+    }
+  };
+
+  // Check auth persistence on mount and fetch resolved permissions
   React.useEffect(() => {
-    try {
-      const persisted = sessionStorage.getItem("annex_admin_authenticated");
-      if (persisted === "true") {
-        setIsAuthenticated(true);
-        const storedPwd = sessionStorage.getItem("annex_admin_password");
-        if (storedPwd) {
-          document.cookie = `annex_admin_token=${encodeURIComponent(storedPwd)}; path=/; max-age=86400; SameSite=Strict`;
+    const initAuth = async () => {
+      try {
+        const persisted = sessionStorage.getItem("annex_admin_authenticated");
+        if (persisted === "true") {
+          const storedPwd = sessionStorage.getItem("annex_admin_password");
+          if (storedPwd) {
+            document.cookie = `annex_admin_token=${encodeURIComponent(storedPwd)}; path=/; max-age=86400; SameSite=Strict`;
+          }
+        }
+
+        const token = getAdminCredentials();
+        if (token) {
+          const res = await fetch("/api/admin/rbac?action=get-current-user-perms", {
+            headers: {
+              "Authorization": `Bearer ${token}`
+            }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setUserType(data.userType);
+            setUserPermissions(data.permissions || []);
+            setCounselorProfile(data.counselor || null);
+            setIsAuthenticated(true);
+          } else {
+            handleSignOut();
+          }
+        }
+      } catch (e) {
+        console.error("Auth state loading error:", e);
+      } finally {
+        setCheckingAuth(false);
+      }
+    };
+    initAuth();
+  }, []);
+
+  // Enforce redirection to the first permitted tab if activeTab is not accessible
+  React.useEffect(() => {
+    if (isAuthenticated && visibleTabs.length > 0) {
+      const isCurrentTabVisible = visibleTabs.some(t => t.id === activeTab);
+      if (!isCurrentTabVisible) {
+        const fallbackTab = visibleTabs[0].id;
+        setActiveTab(fallbackTab as any);
+        if (typeof window !== "undefined") {
+          window.history.pushState(null, "", `/admin/${fallbackTab}`);
         }
       }
-    } catch (e) {
-      console.error("Auth state loading error:", e);
-    } finally {
-      setCheckingAuth(false);
     }
-  }, []);
+  }, [isAuthenticated, userPermissions, activeTab]);
 
   // Auto-logout after 10 minutes of inactivity
   React.useEffect(() => {
@@ -523,35 +640,115 @@ export default function AdminDashboard() {
   }, [isAuthenticated]);
 
   // Auth Handlers
-  const handleLogin = (e: React.FormEvent) => {
+  const ALL_PERMISSIONS = [
+    "Dashboard",
+    "Students",
+    "Career Portal Students",
+    "Training & Placement",
+    "Meetings",
+    "Documents",
+    "Messages",
+    "Notifications",
+    "Success Stories",
+    "Blog",
+    "Universities",
+    "Reports",
+    "Email System",
+    "Settings",
+    "Counselors Management",
+    "System Administration"
+  ];
+
+  // Auth Handlers
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const secretKey = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
-    if (!secretKey) {
-      setAuthError("Admin credentials are not configured on the server environment.");
-      return;
-    }
-    if (password === secretKey) {
-      setIsAuthenticated(true);
-      setAuthError("");
-      try {
+    setAuthError("");
+    setLoading(true);
+
+    try {
+      if (loginMethod === "counselor") {
+        // A. Counselor Login via Supabase Auth
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password
+        });
+
+        if (error) {
+          setAuthError(error.message);
+          return;
+        }
+
+        const sessionToken = data.session?.access_token;
+        if (!sessionToken) {
+          setAuthError("Failed to retrieve authenticated session.");
+          return;
+        }
+
+        // Set session cookie
+        document.cookie = `annex_admin_token=${encodeURIComponent(sessionToken)}; path=/; max-age=86400; SameSite=Strict`;
         sessionStorage.setItem("annex_admin_authenticated", "true");
-        sessionStorage.setItem("annex_admin_password", password);
-        document.cookie = `annex_admin_token=${encodeURIComponent(password)}; path=/; max-age=86400; SameSite=Strict`;
-      } catch (e) {
-        console.error("Auth persistence failed:", e);
+        sessionStorage.setItem("annex_admin_password", sessionToken);
+
+        // Fetch permissions and profile
+        const res = await fetch("/api/admin/rbac?action=get-current-user-perms", {
+          headers: {
+            "Authorization": `Bearer ${sessionToken}`
+          }
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          setAuthError(errData.error || "Failed to retrieve counselor permissions.");
+          handleSignOut();
+          return;
+        }
+
+        const resData = await res.json();
+        setUserType(resData.userType);
+        setUserPermissions(resData.permissions || []);
+        setCounselorProfile(resData.counselor || null);
+        setIsAuthenticated(true);
+      } else {
+        // B. Legacy Master Access Key Login
+        const secretKey = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
+        if (!secretKey) {
+          setAuthError("Admin credentials are not configured on the server environment.");
+          return;
+        }
+        if (password === secretKey) {
+          setIsAuthenticated(true);
+          setUserType("super-admin");
+          setUserPermissions(ALL_PERMISSIONS);
+          try {
+            sessionStorage.setItem("annex_admin_authenticated", "true");
+            sessionStorage.setItem("annex_admin_password", password);
+            document.cookie = `annex_admin_token=${encodeURIComponent(password)}; path=/; max-age=86400; SameSite=Strict`;
+          } catch (e) {
+            console.error("Auth persistence failed:", e);
+          }
+        } else {
+          setAuthError("Invalid admin access key.");
+        }
       }
-    } else {
-      setAuthError("Invalid admin access key.");
+    } catch (err: any) {
+      setAuthError("Authentication error: " + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSignOut = () => {
     setIsAuthenticated(false);
     setPassword("");
+    setEmail("");
+    setUserType(null);
+    setUserPermissions([]);
+    setCounselorProfile(null);
     try {
       sessionStorage.removeItem("annex_admin_authenticated");
       sessionStorage.removeItem("annex_admin_password");
       document.cookie = "annex_admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      supabase.auth.signOut();
     } catch (e) {
       console.error("Sign out storage error:", e);
     }
@@ -782,16 +979,33 @@ export default function AdminDashboard() {
       console.error("Error loading chat conversations in fetchAllData:", err.message);
     }
 
-    // 7. Fetch Counselors
+    // 7. Fetch Counselors and System Roles
     try {
       const { data, error } = await supabase
         .from("counselors")
-        .select("*")
+        .select("*, user_roles(id, name)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       setCounselors(data || []);
     } catch (err: any) {
       console.error("Error loading counselors:", err.message);
+    }
+
+    try {
+      const token = getAdminCredentials();
+      if (token) {
+        const res = await fetch("/api/admin/rbac?action=list-roles", {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        if (res.ok) {
+          const resData = await res.json();
+          setRoles(resData.roles || []);
+        }
+      }
+    } catch (err: any) {
+      console.error("Error loading system roles in fetchAllData:", err.message);
     }
 
     // 8. Fetch Email Logs
@@ -2141,6 +2355,47 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleStartEditCounselor = async (c: any) => {
+    setEditingCounselor(c);
+    setCounselorForm({
+      full_name: c.full_name,
+      email: c.email,
+      phone: c.phone || "",
+      designation: c.designation || "",
+      avatar_url: c.avatar_url || "",
+      is_active: c.is_active
+    });
+    setSelectedCounselorRole(c.role_id || "");
+    setCounselorPermOverrides({});
+    setIsCounselorModalOpen(true);
+    
+    // Load overrides from server side
+    setLoadingPerms(true);
+    try {
+      const token = getAdminCredentials();
+      const res = await fetch(`/api/admin/rbac?action=get-counselor-perms&counselorId=${c.id}`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedCounselorRole(data.roleId || "");
+        const overrides: any = {};
+        if (data.permissionsMatrix) {
+          Object.entries(data.permissionsMatrix).forEach(([key, val]: any) => {
+            overrides[key] = val.override;
+          });
+        }
+        setCounselorPermOverrides(overrides);
+      }
+    } catch (err: any) {
+      console.error("Failed to load counselor permissions overrides:", err.message);
+    } finally {
+      setLoadingPerms(false);
+    }
+  };
+
   const handleSaveCounselor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!counselorForm.full_name || !counselorForm.email) {
@@ -2150,6 +2405,7 @@ export default function AdminDashboard() {
 
     setSavingCounselor(true);
     try {
+      let cId = "";
       if (editingCounselor) {
         // Update existing counselor
         const { error } = await supabase
@@ -2165,10 +2421,11 @@ export default function AdminDashboard() {
           .eq("id", editingCounselor.id);
 
         if (error) throw error;
+        cId = editingCounselor.id;
         showToast("Counselor profile updated successfully");
       } else {
         // Create new counselor
-        const { error } = await supabase
+        const { data: newC, error } = await supabase
           .from("counselors")
           .insert([{
             full_name: counselorForm.full_name,
@@ -2177,11 +2434,36 @@ export default function AdminDashboard() {
             designation: counselorForm.designation || null,
             avatar_url: counselorForm.avatar_url || null,
             is_active: counselorForm.is_active
-          }]);
+          }])
+          .select()
+          .single();
 
         if (error) throw error;
+        cId = newC.id;
         showToast("Counselor created successfully!");
       }
+
+      // Save role & overrides
+      const token = getAdminCredentials();
+      const saveRes = await fetch("/api/admin/rbac", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: "save-counselor-perms",
+          counselorId: cId,
+          roleId: selectedCounselorRole || null,
+          overrides: counselorPermOverrides
+        })
+      });
+
+      if (!saveRes.ok) {
+        const saveErr = await saveRes.json();
+        throw new Error("Saved counselor profile, but failed to save permissions: " + (saveErr.error || "Unknown error"));
+      }
+
       setIsCounselorModalOpen(false);
       setEditingCounselor(null);
       setCounselorForm({
@@ -2192,6 +2474,8 @@ export default function AdminDashboard() {
         avatar_url: "",
         is_active: true
       });
+      setSelectedCounselorRole("");
+      setCounselorPermOverrides({});
       fetchAllData();
     } catch (err: any) {
       alert("Error saving counselor: " + err.message);
@@ -2225,6 +2509,115 @@ export default function AdminDashboard() {
       fetchAllData();
     } catch (err: any) {
       alert("Error deleting counselor: " + err.message);
+    }
+  };
+
+  // === Role Management Handlers ===
+  const openNewRoleModal = () => {
+    setEditingRole(null);
+    setRoleForm({ name: "", description: "", permissions: [] });
+    setIsRoleModalOpen(true);
+  };
+
+  const openEditRoleModal = (role: any) => {
+    setEditingRole(role);
+    setRoleForm({
+      name: role.name,
+      description: role.description || "",
+      permissions: role.permissions || []
+    });
+    setIsRoleModalOpen(true);
+  };
+
+  const handleSaveRole = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!roleForm.name.trim()) {
+      alert("Role name is required.");
+      return;
+    }
+    setSavingRole(true);
+    try {
+      const token = getAdminCredentials();
+      const action = editingRole ? "edit-role" : "create-role";
+      const payload: any = {
+        action,
+        name: roleForm.name.trim(),
+        description: roleForm.description.trim(),
+        permissions: roleForm.permissions
+      };
+      if (editingRole) {
+        payload.roleId = editingRole.id;
+      }
+      const res = await fetch("/api/admin/rbac", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to save role");
+      }
+      showToast(editingRole ? "Role updated successfully" : "New role created successfully");
+      setIsRoleModalOpen(false);
+      setEditingRole(null);
+      setRoleForm({ name: "", description: "", permissions: [] });
+      fetchAllData();
+    } catch (err: any) {
+      alert("Error saving role: " + err.message);
+    } finally {
+      setSavingRole(false);
+    }
+  };
+
+  const handleCloneRole = async (role: any) => {
+    const cloneName = prompt(`Clone role "${role.name}" as:`, `${role.name} (Copy)`);
+    if (!cloneName) return;
+    try {
+      const token = getAdminCredentials();
+      const res = await fetch("/api/admin/rbac", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: "clone-role",
+          sourceRoleId: role.id,
+          name: cloneName,
+          description: `Cloned from ${role.name}`
+        })
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to clone role");
+      }
+      showToast(`Role cloned as "${cloneName}"`);
+      fetchAllData();
+    } catch (err: any) {
+      alert("Error cloning role: " + err.message);
+    }
+  };
+
+  const handleDeleteRole = async (role: any) => {
+    if (role.userCount > 0) {
+      alert(`Cannot delete role "${role.name}" — ${role.userCount} counselor(s) are still assigned to it. Reassign them first.`);
+      return;
+    }
+    if (!confirm(`Delete role "${role.name}"? This action cannot be undone.`)) return;
+    try {
+      const token = getAdminCredentials();
+      // Delete role permissions first, then the role itself
+      const { error: permErr } = await supabase.from("role_permissions").delete().eq("role_id", role.id);
+      if (permErr) throw permErr;
+      const { error: roleErr } = await supabase.from("user_roles").delete().eq("id", role.id);
+      if (roleErr) throw roleErr;
+      showToast(`Role "${role.name}" deleted`);
+      fetchAllData();
+    } catch (err: any) {
+      alert("Error deleting role: " + err.message);
     }
   };
 
@@ -3213,35 +3606,94 @@ export default function AdminDashboard() {
   if (!isAuthenticated) {
     return (
       <main className="min-h-[100dvh] flex items-center justify-center bg-subtle-gray/30 px-6 py-12">
-        <Card className="max-w-md w-full p-8 bg-white">
-          <div className="flex flex-col items-center text-center mb-8">
+        <Card className="max-w-md w-full p-8 bg-white shadow-xl rounded-2xl border border-hairline">
+          <div className="flex flex-col items-center text-center mb-6">
             <div className="w-12 h-12 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-4 p-2">
               <AnnexLogo size={32} showText={false} />
             </div>
-            <CardTitle className="text-xl">Annex Admin Portal</CardTitle>
-            <CardDescription className="mt-1">Enter your admin access credentials below.</CardDescription>
+            <CardTitle className="text-xl font-bold tracking-tight text-slate-800 font-display">Annex Consultancy</CardTitle>
+            <CardDescription className="mt-1 text-xs text-slate-500">Sign in to manage student profiles and counselor portals.</CardDescription>
           </div>
 
-          <form onSubmit={handleLogin} className="flex flex-col gap-5">
+          <div className="flex gap-1.5 p-1 bg-slate-100 rounded-xl mb-5">
+            <button
+              type="button"
+              onClick={() => { setLoginMethod("counselor"); setAuthError(""); }}
+              className={`flex-1 py-2 text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer ${
+                loginMethod === "counselor" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Counselor Login
+            </button>
+            <button
+              type="button"
+              onClick={() => { setLoginMethod("access-key"); setAuthError(""); setEmail(""); }}
+              className={`flex-1 py-2 text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer ${
+                loginMethod === "access-key" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Access Key
+            </button>
+          </div>
+
+          <form onSubmit={handleLogin} className="flex flex-col gap-4">
             {authError && (
               <div className="p-3 rounded-lg bg-red-50 border border-red-100 text-xs font-semibold text-red-600">
                 {authError}
               </div>
             )}
-            <div className="flex flex-col gap-2 text-left">
-              <label htmlFor="pass" className="text-xs font-bold text-primary uppercase tracking-wider">Access Key</label>
-              <input
-                type="password"
-                id="pass"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="px-4 py-3 border border-hairline rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
-                placeholder="••••••••"
-                required
-              />
-            </div>
-            <Button type="submit" variant="primary" className="w-full mt-2">
-              Verify Key
+            
+            {loginMethod === "counselor" ? (
+              <>
+                <div className="flex flex-col gap-1.5 text-left">
+                  <label htmlFor="email" className="text-xs font-bold text-primary uppercase tracking-wider">Email Address</label>
+                  <input
+                    type="email"
+                    id="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="px-4 py-3 border border-hairline rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
+                    placeholder="counselor@annex.com"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5 text-left">
+                  <label htmlFor="pass" className="text-xs font-bold text-primary uppercase tracking-wider">Password</label>
+                  <input
+                    type="password"
+                    id="pass"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="px-4 py-3 border border-hairline rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col gap-1.5 text-left">
+                <label htmlFor="pass" className="text-xs font-bold text-primary uppercase tracking-wider">Access Key</label>
+                <input
+                  type="password"
+                  id="pass"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="px-4 py-3 border border-hairline rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+            )}
+
+            <Button type="submit" variant="primary" className="w-full mt-2" disabled={loading}>
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <SpinnerGap className="animate-spin" size={16} />
+                  Authenticating...
+                </span>
+              ) : (
+                loginMethod === "counselor" ? "Sign In" : "Verify Key"
+              )}
             </Button>
           </form>
         </Card>
@@ -3288,20 +3740,8 @@ export default function AdminDashboard() {
             <span className="font-display font-bold text-lg text-slate-400 tracking-tight">ADMIN</span>
           </div>
           
-          <nav className="flex gap-1 sm:gap-2">
-            {[
-              { id: "bookings", label: `Consultations (${bookings.length})` },
-              { id: "students", label: `Students (${students.length})` },
-              { id: "counselors", label: `Counselors (${counselors.length})` },
-              { id: "chat", label: "Messaging" },
-              { id: "training", label: `Training & Placement (${trainingStudents.length})` },
-              { id: "universities", label: `Universities (${universities.length})` },
-              { id: "blog", label: `Blog posts (${posts.length})` },
-              { id: "stories", label: `Success stories (${stories.length})` },
-              { id: "experts", label: `Career Experts (${experts.length})` },
-              { id: "notifications", label: "Notifications" },
-              { id: "settings", label: "Email Status" }
-            ].map(tab => {
+          <nav className="flex flex-wrap gap-1 sm:gap-2">
+            {visibleTabs.map(tab => {
               const isActive = activeTab === tab.id;
               const unreadCount = tab.id === "chat" 
                 ? conversations.reduce((sum, c) => sum + (c.unread_count_admin || 0), 0)
@@ -3310,7 +3750,7 @@ export default function AdminDashboard() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => handleTabChange(tab.id)}
                   className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
                     isActive ? "bg-primary text-white" : "text-slate-500 hover:text-primary hover:bg-slate-50"
                   }`}
@@ -4755,6 +5195,7 @@ export default function AdminDashboard() {
                     <tr className="bg-slate-50 border-b border-hairline text-slate-500 font-bold uppercase tracking-wider">
                       <th className="p-4">Name</th>
                       <th className="p-4">Designation</th>
+                      <th className="p-4">System Role</th>
                       <th className="p-4">Phone</th>
                       <th className="p-4">Assigned Students</th>
                       <th className="p-4">Status</th>
@@ -4803,6 +5244,11 @@ export default function AdminDashboard() {
                             </div>
                           </td>
                           <td className="p-4 text-slate-600 font-medium">{c.designation || "Counselor"}</td>
+                          <td className="p-4 text-slate-600 font-medium">
+                            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-[10px]">
+                              {c.user_roles?.name || "No Role"}
+                            </span>
+                          </td>
                           <td className="p-4 font-mono-data text-slate-500">{c.phone || "N/A"}</td>
                           <td className="p-4 font-bold text-primary">{studentCount} students</td>
                           <td className="p-4">
@@ -4817,23 +5263,29 @@ export default function AdminDashboard() {
                           <td className="p-4 font-mono-data text-slate-400">{lastActivityFormatted}</td>
                           <td className="p-4 text-right flex justify-end gap-1.5 items-center h-full">
                             <button
-                              onClick={() => {
-                                setEditingCounselor(c);
-                                setCounselorForm({
-                                  full_name: c.full_name,
-                                  email: c.email,
-                                  phone: c.phone || "",
-                                  designation: c.designation || "",
-                                  avatar_url: c.avatar_url || "",
-                                  is_active: c.is_active
-                                });
-                                setIsCounselorModalOpen(true);
-                              }}
+                              onClick={() => handleStartEditCounselor(c)}
                               className="p-1.5 text-slate-500 hover:text-primary hover:bg-slate-50 rounded transition-colors cursor-pointer"
-                              title="Edit profile"
+                              title="Edit profile & permissions"
                             >
                               <Gear size={16} />
                             </button>
+                            {!c.auth_user_id ? (
+                              <button
+                                onClick={() => {
+                                  setProvisionCounselor(c);
+                                  setProvisionPassword("");
+                                  setProvisionModalOpen(true);
+                                }}
+                                className="p-1.5 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors cursor-pointer"
+                                title="Provision Login Credentials"
+                              >
+                                <Key size={16} />
+                              </button>
+                            ) : (
+                              <span className="p-1.5 text-emerald-500 cursor-default" title="Login Active">
+                                <Key size={16} weight="fill" />
+                              </span>
+                            )}
                             <button
                               onClick={() => toggleCounselorStatus(c)}
                               className={`p-1.5 rounded transition-colors cursor-pointer ${
@@ -6365,6 +6817,194 @@ export default function AdminDashboard() {
             </div>
           </section>
         )}
+
+        {/* ===================== ROLES & PERMISSIONS TAB ===================== */}
+        {activeTab === "roles" && (
+          <section className="flex flex-col gap-6 animate-fade-in text-slate-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-display font-bold text-2xl text-primary">Roles & Permissions</h2>
+                <p className="text-xs text-slate-400 mt-1">Define system roles with default permission sets. Override per-counselor in the Counselors tab.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" size="sm" onClick={fetchAllData} className="flex items-center gap-1.5">
+                  <SpinnerGap className={loading ? "animate-spin" : ""} size={14} /> Refresh
+                </Button>
+                <Button 
+                  onClick={openNewRoleModal} 
+                  variant="primary" 
+                  size="sm" 
+                  className="flex items-center gap-1"
+                >
+                  <Plus size={14} /> Create Role
+                </Button>
+              </div>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { label: "Total Roles", value: roles.length, icon: <ShieldCheck size={18} className="text-primary" weight="bold" />, bg: "bg-slate-50 border-slate-100" },
+                { label: "Counselors Assigned", value: roles.reduce((sum: number, r: any) => sum + (r.userCount || 0), 0), icon: <Users size={18} className="text-emerald-600" weight="bold" />, bg: "bg-emerald-50/20 border-emerald-100/60" },
+                { label: "Unassigned Staff", value: counselors.filter(c => !c.role_id).length, icon: <Warning size={18} className="text-amber-600" weight="bold" />, bg: "bg-amber-50/20 border-amber-100/60" },
+                { label: "Permissions Keys", value: ALL_PERMISSIONS.length, icon: <Key size={18} className="text-purple-600" weight="bold" />, bg: "bg-purple-50/20 border-purple-100/60" }
+              ].map((stat, idx) => (
+                <div key={idx} className={`border rounded-2xl p-4 flex flex-col justify-between min-h-[90px] ${stat.bg}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500">{stat.label}</span>
+                    {stat.icon}
+                  </div>
+                  <span className="text-2xl font-bold font-mono-data text-primary mt-2">{stat.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Roles List */}
+            {loading ? (
+              <div className="text-center py-12 text-slate-400 text-xs font-semibold">Loading roles...</div>
+            ) : roles.length === 0 ? (
+              <div className="text-center py-12 border border-dashed border-hairline rounded-2xl text-slate-400 text-xs font-semibold">
+                No roles defined yet. Click &quot;Create Role&quot; to set up your first system role.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {roles.map((role: any) => {
+                  const isExpanded = expandedRoleId === role.id;
+                  const assignedCounselors = counselors.filter(c => c.role_id === role.id);
+
+                  return (
+                    <div key={role.id} className="border border-hairline rounded-2xl bg-white overflow-hidden transition-all">
+                      {/* Role Header */}
+                      <div 
+                        className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50/50 transition-colors"
+                        onClick={() => setExpandedRoleId(isExpanded ? null : role.id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-center">
+                            <ShieldCheck size={18} className="text-primary" weight="bold" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-sm text-primary">{role.name}</h3>
+                            <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                              {role.description || "No description"} · {role.permissions?.length || 0} permissions · {role.userCount || 0} users
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                            (role.userCount || 0) > 0
+                              ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                              : "bg-slate-50 text-slate-400 border-slate-100"
+                          }`}>
+                            {role.userCount || 0} assigned
+                          </span>
+                          <span className={`transition-transform ${isExpanded ? "rotate-180" : ""}`}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><polyline points="6 9 12 15 18 9" /></svg>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Expanded Content */}
+                      {isExpanded && (
+                        <div className="border-t border-hairline">
+                          {/* Default Permissions Grid */}
+                          <div className="p-4">
+                            <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">Default Permissions</h4>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                              {ALL_PERMISSIONS.map(perm => {
+                                const hasIt = role.permissions?.includes(perm);
+                                return (
+                                  <div key={perm} className={`flex items-center gap-2 p-2 rounded-xl border text-[10px] ${
+                                    hasIt
+                                      ? "bg-emerald-50/40 border-emerald-200/50 text-emerald-700"
+                                      : "bg-slate-50/50 border-slate-100 text-slate-400"
+                                  }`}>
+                                    {hasIt 
+                                      ? <CheckCircle size={12} weight="fill" className="text-emerald-500 shrink-0" /> 
+                                      : <XCircle size={12} weight="fill" className="text-slate-300 shrink-0" />
+                                    }
+                                    <span className="font-bold truncate">{perm}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Assigned Counselors */}
+                          {assignedCounselors.length > 0 && (
+                            <div className="px-4 pb-4">
+                              <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Assigned Counselors</h4>
+                              <div className="flex flex-wrap gap-2">
+                                {assignedCounselors.map((c: any) => (
+                                  <div key={c.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-hairline text-xs">
+                                    {c.avatar_url ? (
+                                      <img src={c.avatar_url} alt={c.full_name} className="w-5 h-5 rounded-full object-cover border border-hairline" />
+                                    ) : (
+                                      <div className="w-5 h-5 rounded-full bg-slate-200 text-slate-500 text-[9px] flex items-center justify-center font-bold">{c.full_name.charAt(0)}</div>
+                                    )}
+                                    <span className="font-semibold text-primary">{c.full_name}</span>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${c.is_active ? "bg-emerald-500" : "bg-red-400"}`} />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-2 px-4 py-3 bg-slate-50/80 border-t border-hairline">
+                            <Button 
+                              onClick={(e: React.MouseEvent) => { e.stopPropagation(); openEditRoleModal(role); }} 
+                              variant="secondary" 
+                              size="sm" 
+                              className="text-xs flex items-center gap-1"
+                            >
+                              <Gear size={12} /> Edit Role
+                            </Button>
+                            <Button 
+                              onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleCloneRole(role); }} 
+                              variant="secondary" 
+                              size="sm"
+                              className="text-xs flex items-center gap-1"
+                            >
+                              <Copy size={12} /> Clone
+                            </Button>
+                            <Button 
+                              onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleDeleteRole(role); }} 
+                              variant="ghost" 
+                              size="sm"
+                              className="text-xs flex items-center gap-1 text-red-500 hover:text-red-600"
+                            >
+                              <Trash size={12} /> Delete
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Quick Reference: All Permission Keys */}
+            <Card className="p-5">
+              <h3 className="font-bold text-sm text-primary mb-3 flex items-center gap-2">
+                <Key size={16} className="text-primary" /> All Permission Keys Reference
+              </h3>
+              <p className="text-[10px] text-slate-400 font-medium mb-3">
+                These keys map to specific admin dashboard tabs and system functions.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                {ALL_PERMISSIONS.map(perm => (
+                  <div key={perm} className="flex items-center gap-2 px-2.5 py-2 rounded-xl bg-slate-50 border border-hairline text-[10px] font-bold text-slate-600">
+                    <Lock size={10} className="text-slate-400 shrink-0" />
+                    {perm}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </section>
+        )}
+
       </div>
 
       {/* MODALS */}
@@ -7801,7 +8441,7 @@ export default function AdminDashboard() {
       {/* 5b. ADD/EDIT COUNSELOR MODAL */}
       {isCounselorModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
-          <Card className="max-w-md w-full p-6 relative bg-white shadow-2xl">
+          <Card className="max-w-2xl w-full p-6 relative bg-white shadow-2xl rounded-2xl border border-hairline">
             <button onClick={() => setIsCounselorModalOpen(false)} className="absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer">
               <X size={20} />
             </button>
@@ -7812,103 +8452,184 @@ export default function AdminDashboard() {
                 <CardDescription className="text-xs">Setup details and profile settings for Annex Consultancy counselors.</CardDescription>
               </div>
             </div>
-            <form onSubmit={handleSaveCounselor} className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-1 text-xs text-slate-700">
+            <form onSubmit={handleSaveCounselor} className="flex flex-col gap-4 max-h-[75vh] overflow-y-auto pr-1 text-xs text-slate-700">
               
-              <div className="flex flex-col gap-1.5">
-                <label className="font-bold text-primary uppercase tracking-wider">Full Name *</label>
-                <input 
-                  type="text" 
-                  value={counselorForm.full_name} 
-                  onChange={(e) => setCounselorForm({ ...counselorForm, full_name: e.target.value })} 
-                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
-                  required
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="font-bold text-primary uppercase tracking-wider">Email Address *</label>
-                <input 
-                  type="email" 
-                  value={counselorForm.email} 
-                  onChange={(e) => setCounselorForm({ ...counselorForm, email: e.target.value })} 
-                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
-                  required
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="font-bold text-primary uppercase tracking-wider">Phone Number</label>
-                <input 
-                  type="text" 
-                  value={counselorForm.phone} 
-                  onChange={(e) => setCounselorForm({ ...counselorForm, phone: e.target.value })} 
-                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="font-bold text-primary uppercase tracking-wider">Designation</label>
-                <input 
-                  type="text" 
-                  value={counselorForm.designation} 
-                  onChange={(e) => setCounselorForm({ ...counselorForm, designation: e.target.value })} 
-                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
-                  placeholder="e.g. Senior Admission Counselor"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="font-bold text-primary uppercase tracking-wider">Profile Photo (Avatar)</label>
-                <div className="flex items-center gap-3">
-                  {counselorForm.avatar_url ? (
-                    <img 
-                      src={counselorForm.avatar_url} 
-                      alt="Avatar Preview" 
-                      className="w-10 h-10 rounded-full object-cover border border-hairline"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-400">
-                      ?
-                    </div>
-                  )}
-                  <div className="flex-grow">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="font-bold text-primary uppercase tracking-wider">Full Name *</label>
                     <input 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={handleCounselorAvatarUpload} 
-                      disabled={uploadingCounselorAvatar}
-                      className="hidden" 
-                      id="counselorAvatarFileInput"
+                      type="text" 
+                      value={counselorForm.full_name} 
+                      onChange={(e) => setCounselorForm({ ...counselorForm, full_name: e.target.value })} 
+                      className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                      required
                     />
-                    <label 
-                      htmlFor="counselorAvatarFileInput"
-                      className="px-3 py-2 border border-hairline rounded-xl hover:bg-slate-50 cursor-pointer flex items-center justify-center gap-1.5 font-bold uppercase tracking-wider text-[10px]"
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="font-bold text-primary uppercase tracking-wider">Email Address *</label>
+                    <input 
+                      type="email" 
+                      value={counselorForm.email} 
+                      onChange={(e) => setCounselorForm({ ...counselorForm, email: e.target.value })} 
+                      className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="font-bold text-primary uppercase tracking-wider">Phone Number</label>
+                    <input 
+                      type="text" 
+                      value={counselorForm.phone} 
+                      onChange={(e) => setCounselorForm({ ...counselorForm, phone: e.target.value })} 
+                      className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="font-bold text-primary uppercase tracking-wider">Designation</label>
+                    <input 
+                      type="text" 
+                      value={counselorForm.designation} 
+                      onChange={(e) => setCounselorForm({ ...counselorForm, designation: e.target.value })} 
+                      className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                      placeholder="e.g. Senior Admission Counselor"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="font-bold text-primary uppercase tracking-wider">System Role *</label>
+                    <select
+                      value={selectedCounselorRole}
+                      onChange={(e) => {
+                        setSelectedCounselorRole(e.target.value);
+                        setCounselorPermOverrides({});
+                      }}
+                      className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                      required
                     >
-                      {uploadingCounselorAvatar ? (
-                        <>
-                          <SpinnerGap className="animate-spin text-slate-400" size={14} />
-                          Uploading...
-                        </>
+                      <option value="">Select a Role</option>
+                      {roles.map(r => (
+                        <option key={r.id} value={r.id}>{r.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="font-bold text-primary uppercase tracking-wider">Profile Photo (Avatar)</label>
+                    <div className="flex items-center gap-3">
+                      {counselorForm.avatar_url ? (
+                        <img 
+                          src={counselorForm.avatar_url} 
+                          alt="Avatar Preview" 
+                          className="w-10 h-10 rounded-full object-cover border border-hairline"
+                        />
                       ) : (
-                        <>
-                          <UploadSimple size={14} />
-                          Upload Image
-                        </>
+                        <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-400">
+                          ?
+                        </div>
                       )}
-                    </label>
+                      <div className="flex-grow">
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={handleCounselorAvatarUpload} 
+                          disabled={uploadingCounselorAvatar}
+                          className="hidden" 
+                          id="counselorAvatarFileInput"
+                        />
+                        <label 
+                          htmlFor="counselorAvatarFileInput"
+                          className="px-3 py-2 border border-hairline rounded-xl hover:bg-slate-50 cursor-pointer flex items-center justify-center gap-1.5 font-bold uppercase tracking-wider text-[10px]"
+                        >
+                          {uploadingCounselorAvatar ? (
+                            <>
+                              <SpinnerGap className="animate-spin text-slate-400" size={14} />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <UploadSimple size={14} />
+                              Upload Image
+                            </>
+                          )}
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <input 
+                      type="checkbox" 
+                      id="counselorActive" 
+                      checked={counselorForm.is_active} 
+                      onChange={(e) => setCounselorForm({ ...counselorForm, is_active: e.target.checked })} 
+                      className="w-4 h-4 text-primary cursor-pointer border-hairline rounded"
+                    />
+                    <label htmlFor="counselorActive" className="text-xs font-bold text-primary uppercase tracking-wider cursor-pointer">Active Counselor</label>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 mt-2">
-                <input 
-                  type="checkbox" 
-                  id="counselorActive" 
-                  checked={counselorForm.is_active} 
-                  onChange={(e) => setCounselorForm({ ...counselorForm, is_active: e.target.checked })} 
-                  className="w-4 h-4 text-primary cursor-pointer border-hairline rounded"
-                />
-                <label htmlFor="counselorActive" className="text-xs font-bold text-primary uppercase tracking-wider cursor-pointer">Active Counselor</label>
+              {/* Permissions matrix check grid */}
+              <div className="flex flex-col gap-2 mt-2 border-t border-hairline pt-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-primary uppercase tracking-wider">Permissions Matrix Overrides</span>
+                  <span className="text-[10px] text-slate-400 font-medium">Highlight indicates custom override value</span>
+                </div>
+                {loadingPerms ? (
+                  <div className="text-center py-4 text-slate-400 text-xs font-semibold">Loading permissions...</div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-slate-50 border border-hairline rounded-2xl max-h-[220px] overflow-y-auto">
+                    {ALL_PERMISSIONS.map(permKey => {
+                      const selectedRoleObj = roles.find(r => r.id === selectedCounselorRole);
+                      const isInherited = selectedRoleObj?.permissions?.includes(permKey);
+                      const overrideValue = counselorPermOverrides[permKey];
+                      const isChecked = overrideValue !== undefined && overrideValue !== null 
+                        ? overrideValue 
+                        : !!isInherited;
+
+                      return (
+                        <div 
+                          key={permKey} 
+                          className={`flex items-center justify-between p-2 rounded-xl border text-[10px] transition-colors ${
+                            overrideValue !== undefined && overrideValue !== null
+                              ? "bg-amber-50/60 border-amber-200/60 text-amber-900"
+                              : "bg-white border-hairline"
+                          }`}
+                        >
+                          <div className="flex flex-col text-left">
+                            <span className="font-bold text-slate-700">{permKey}</span>
+                            <span className="text-[9px] text-slate-400 font-medium">
+                              {overrideValue !== undefined && overrideValue !== null
+                                ? "Custom Override"
+                                : selectedCounselorRole
+                                  ? (isInherited ? "Inherited (On)" : "Inherited (Off)")
+                                  : "Select a Role"
+                              }
+                            </span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const targetVal = e.target.checked;
+                              setCounselorPermOverrides(prev => ({
+                                ...prev,
+                                [permKey]: targetVal === !!isInherited ? null : targetVal
+                              }));
+                            }}
+                            className="w-3.5 h-3.5 text-primary border-hairline rounded cursor-pointer"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-3 border-t border-hairline pt-4 mt-2">
@@ -8062,6 +8783,202 @@ export default function AdminDashboard() {
                   ) : "Save Record"}
                 </Button>
                 <Button type="button" onClick={() => setIsExpertModalOpen(false)} variant="ghost" size="sm">Cancel</Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* 5c. PROVISION LOGIN MODAL */}
+      {provisionModalOpen && provisionCounselor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+          <Card className="max-w-md w-full p-6 relative bg-white shadow-2xl rounded-2xl border border-hairline">
+            <button onClick={() => setProvisionModalOpen(false)} className="absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer">
+              <X size={20} />
+            </button>
+            <div className="flex items-center gap-2 mb-6 border-b border-hairline pb-4 text-slate-700">
+              <Key size={22} className="text-primary" />
+              <div>
+                <CardTitle className="text-lg">Provision Counselor Login</CardTitle>
+                <CardDescription className="text-xs">Create Supabase Auth credentials for counselor login.</CardDescription>
+              </div>
+            </div>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!provisionPassword || provisionPassword.length < 6) {
+                alert("Password must be at least 6 characters.");
+                return;
+              }
+              setProvisioning(true);
+              try {
+                const token = getAdminCredentials();
+                const res = await fetch("/api/admin/rbac", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                  },
+                  body: JSON.stringify({
+                    action: "provision-login",
+                    counselorId: provisionCounselor.id,
+                    email: provisionCounselor.email,
+                    password: provisionPassword
+                  })
+                });
+                
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || "Provisioning failed");
+                
+                showToast(`Login credentials provisioned successfully for ${provisionCounselor.full_name}!`);
+                setProvisionModalOpen(false);
+                fetchAllData();
+              } catch (err: any) {
+                alert("Error provisioning login: " + err.message);
+              } finally {
+                setProvisioning(false);
+              }
+            }} className="flex flex-col gap-4 text-slate-700">
+              <div className="flex flex-col gap-1 text-left">
+                <span className="font-bold uppercase tracking-wider text-[10px] text-primary">Counselor Name</span>
+                <span className="text-xs font-semibold">{provisionCounselor.full_name}</span>
+              </div>
+              <div className="flex flex-col gap-1 text-left">
+                <span className="font-bold uppercase tracking-wider text-[10px] text-primary">Login Email</span>
+                <span className="text-xs font-mono-data font-semibold">{provisionCounselor.email}</span>
+              </div>
+              <div className="flex flex-col gap-1.5 text-left">
+                <label className="font-bold text-primary uppercase tracking-wider">Set Password *</label>
+                <input 
+                  type="password" 
+                  value={provisionPassword} 
+                  onChange={(e) => setProvisionPassword(e.target.value)} 
+                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                  placeholder="At least 6 characters"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-3 border-t border-hairline pt-4 mt-2">
+                <Button type="submit" variant="primary" size="sm" disabled={provisioning}>
+                  {provisioning ? (
+                    <>
+                      <SpinnerGap className="animate-spin" size={14} />
+                      Provisioning...
+                    </>
+                  ) : "Provision Access"}
+                </Button>
+                <Button type="button" onClick={() => setProvisionModalOpen(false)} variant="ghost" size="sm">Cancel</Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* 5d. CREATE/EDIT ROLE MODAL */}
+      {isRoleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+          <Card className="max-w-lg w-full p-6 relative bg-white shadow-2xl rounded-2xl border border-hairline">
+            <button onClick={() => setIsRoleModalOpen(false)} className="absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer">
+              <X size={20} />
+            </button>
+            <div className="flex items-center gap-2 mb-6 border-b border-hairline pb-4 text-slate-700">
+              <ShieldCheck size={22} className="text-primary" />
+              <div>
+                <CardTitle className="text-lg">{editingRole ? "Edit Role" : "Create New Role"}</CardTitle>
+                <CardDescription className="text-xs">Define a role with default permissions for counselors.</CardDescription>
+              </div>
+            </div>
+            <form onSubmit={handleSaveRole} className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-1 text-xs text-slate-700">
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Role Name *</label>
+                <input 
+                  type="text" 
+                  value={roleForm.name} 
+                  onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })} 
+                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                  placeholder="e.g. Senior Counselor"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Description</label>
+                <input 
+                  type="text" 
+                  value={roleForm.description} 
+                  onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })} 
+                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
+                  placeholder="Brief description of this role's responsibilities"
+                />
+              </div>
+
+              {/* Permission Matrix */}
+              <div className="flex flex-col gap-2 mt-1 border-t border-hairline pt-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-primary uppercase tracking-wider">Default Permissions</span>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      type="button"
+                      onClick={() => setRoleForm({ ...roleForm, permissions: [...ALL_PERMISSIONS] })}
+                      className="text-[9px] font-bold text-emerald-600 hover:underline cursor-pointer"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button 
+                      type="button"
+                      onClick={() => setRoleForm({ ...roleForm, permissions: [] })}
+                      className="text-[9px] font-bold text-red-500 hover:underline cursor-pointer"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-slate-50 border border-hairline rounded-2xl max-h-[260px] overflow-y-auto">
+                  {ALL_PERMISSIONS.map(permKey => {
+                    const isChecked = roleForm.permissions.includes(permKey);
+                    return (
+                      <div 
+                        key={permKey} 
+                        className={`flex items-center justify-between p-2 rounded-xl border text-[10px] transition-colors cursor-pointer ${
+                          isChecked
+                            ? "bg-emerald-50/40 border-emerald-200/50 text-emerald-700"
+                            : "bg-white border-hairline text-slate-500"
+                        }`}
+                        onClick={() => {
+                          setRoleForm(prev => ({
+                            ...prev,
+                            permissions: isChecked
+                              ? prev.permissions.filter(p => p !== permKey)
+                              : [...prev.permissions, permKey]
+                          }));
+                        }}
+                      >
+                        <span className="font-bold">{permKey}</span>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}}
+                          className="w-3.5 h-3.5 text-primary border-hairline rounded cursor-pointer pointer-events-none"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-[9px] text-slate-400 font-medium">
+                  {roleForm.permissions.length} of {ALL_PERMISSIONS.length} permissions enabled
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-hairline pt-4 mt-2">
+                <Button type="submit" variant="primary" size="sm" disabled={savingRole}>
+                  {savingRole ? (
+                    <>
+                      <SpinnerGap className="animate-spin" size={14} />
+                      Saving...
+                    </>
+                  ) : editingRole ? "Update Role" : "Create Role"}
+                </Button>
+                <Button type="button" onClick={() => setIsRoleModalOpen(false)} variant="ghost" size="sm">Cancel</Button>
               </div>
             </form>
           </Card>
