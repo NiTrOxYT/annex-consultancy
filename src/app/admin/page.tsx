@@ -1079,6 +1079,18 @@ export default function AdminDashboard() {
     }
   }, [activeTab, activeChatStudentId, markAdminMessagesAsRead]);
 
+  // Retrieve admin token from sessionStorage or cookie
+  const getAdminCredentials = () => {
+    if (typeof window === "undefined") return "";
+    const pwd = sessionStorage.getItem("annex_admin_password");
+    if (pwd) return pwd;
+    const match = document.cookie.match(/annex_admin_token=([^;]+)/);
+    if (match) {
+      return decodeURIComponent(match[1]);
+    }
+    return "";
+  };
+
   // Toast Helper
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -2775,7 +2787,7 @@ export default function AdminDashboard() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${sessionStorage.getItem("annex_admin_password") || ""}`
+            "Authorization": `Bearer ${getAdminCredentials()}`
           },
           body: JSON.stringify({
             studentId: selectedStudent.id,
@@ -2896,7 +2908,7 @@ export default function AdminDashboard() {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${sessionStorage.getItem("annex_admin_password") || ""}`
+          "Authorization": `Bearer ${getAdminCredentials()}`
         },
         body: JSON.stringify(payload)
       });
@@ -7021,7 +7033,7 @@ export default function AdminDashboard() {
                                     method: "POST",
                                     headers: { 
                                       "Content-Type": "application/json",
-                                      "Authorization": `Bearer ${sessionStorage.getItem("annex_admin_password") || ""}`
+                                      "Authorization": `Bearer ${getAdminCredentials()}`
                                     },
                                     body: JSON.stringify({
                                       trainingStudentId: selectedTrainingStudent.id,
@@ -7063,7 +7075,7 @@ export default function AdminDashboard() {
                                           method: "POST",
                                           headers: { 
                                             "Content-Type": "application/json",
-                                            "Authorization": `Bearer ${sessionStorage.getItem("annex_admin_password") || ""}`
+                                            "Authorization": `Bearer ${getAdminCredentials()}`
                                           },
                                           body: JSON.stringify({
                                             trainingStudentId: selectedTrainingStudent.id,
@@ -8986,7 +8998,7 @@ export default function AdminDashboard() {
                                         method: "POST",
                                         headers: { 
                                           "Content-Type": "application/json",
-                                          "Authorization": `Bearer ${sessionStorage.getItem("annex_admin_password") || ""}`
+                                          "Authorization": `Bearer ${getAdminCredentials()}`
                                         },
                                         body: JSON.stringify({
                                           action: "cancelled",
@@ -9121,7 +9133,7 @@ export default function AdminDashboard() {
                                     method: "POST",
                                     headers: { 
                                       "Content-Type": "application/json",
-                                      "Authorization": `Bearer ${sessionStorage.getItem("annex_admin_password") || ""}`
+                                      "Authorization": `Bearer ${getAdminCredentials()}`
                                     },
                                     body: JSON.stringify({
                                       studentId: selectedStudent.id,
@@ -9163,7 +9175,7 @@ export default function AdminDashboard() {
                                           method: "POST",
                                           headers: { 
                                             "Content-Type": "application/json",
-                                            "Authorization": `Bearer ${sessionStorage.getItem("annex_admin_password") || ""}`
+                                            "Authorization": `Bearer ${getAdminCredentials()}`
                                           },
                                           body: JSON.stringify({
                                             studentId: selectedStudent.id,

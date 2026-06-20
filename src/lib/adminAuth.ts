@@ -68,6 +68,13 @@ export async function verifyAdminSession(request: Request) {
     }
   }
 
+  if (token) {
+    const trimmed = token.trim();
+    if (trimmed === "" || trimmed === "null" || trimmed === "undefined") {
+      token = null;
+    }
+  }
+
   if (!token) {
     return { 
       authenticated: false, 
