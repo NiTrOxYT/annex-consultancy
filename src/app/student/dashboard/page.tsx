@@ -8,7 +8,7 @@ import {
   PaperPlaneRight, Paperclip, ArrowSquareOut, WarningCircle, 
   UploadSimple, Check, X, SpinnerGap, Bell, ArrowLeft,
   CalendarCheck, ShieldWarning, ChatCircleDots, Gear, Checks, Download,
-  VideoCamera, Phone, MapPin, ShareNetwork, Gift
+  VideoCamera, Phone, MapPin, ShareNetwork, Gift, MagnifyingGlass, Funnel
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "@/lib/supabase";
@@ -57,6 +57,8 @@ export default function StudentDashboard() {
     rewards: 0
   });
   const [loadingReferrals, setLoadingReferrals] = React.useState(false);
+  const [referralSearchQuery, setReferralSearchQuery] = React.useState("");
+  const [referralStatusFilter, setReferralStatusFilter] = React.useState("All");
 
   const loadReferralData = React.useCallback(async (id: string) => {
     setLoadingReferrals(true);
@@ -872,6 +874,16 @@ export default function StudentDashboard() {
     if (activeMeetings.length === 0) return null;
     return [...activeMeetings].sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())[0];
   }, [meetings]);
+
+  const filteredReferrals = React.useMemo(() => {
+    return referrals.filter(ref => {
+      const nameMatch = (ref.referred_name || "").toLowerCase().includes(referralSearchQuery.toLowerCase());
+      const emailMatch = (ref.referred_email || "").toLowerCase().includes(referralSearchQuery.toLowerCase());
+      const matchesSearch = nameMatch || emailMatch;
+      const matchesStatus = referralStatusFilter === "All" || ref.status === referralStatusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [referrals, referralSearchQuery, referralStatusFilter]);
 
   if (loading) {
     return (
@@ -2368,193 +2380,343 @@ export default function StudentDashboard() {
 
         {/* TAB 9: REFERRALS */}
         {activeTab === "referrals" && (
-          <div className="space-y-8 animate-fade-in">
-            <div className="max-w-3xl">
-              <h1 className="font-display font-bold text-2xl md:text-3xl text-primary tracking-tight mb-2">
-                Referral Program
-              </h1>
-              <p className="text-slate-500 text-sm">
-                Refer your friends to study abroad through Annex Consultancy. Earn rewards when they enroll!
-              </p>
+          <div className="space-y-8 animate-fade-in text-slate-700">
+            {/* Section 1: Hero Card (Full Width) */}
+            <Card className="bg-gradient-to-br from-[#0B1F3A] to-[#1E3A8A] text-white p-8 md:p-12 rounded-[2.5rem] shadow-xl relative overflow-hidden flex flex-col items-center text-center gap-6 border border-[#1E3A8A]/35">
+              {/* Background decorative glow */}
+              <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-white/5 blur-3xl z-0" />
+              <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-gold/10 blur-3xl z-0" />
+
+              <div className="relative z-10 max-w-2xl space-y-4">
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest bg-white/10 px-3.5 py-1 rounded-full border border-white/15">
+                    Annex Consultancy Onboarding
+                  </span>
+                </div>
+                <h1 className="font-display font-black text-3xl md:text-5xl tracking-tight text-white leading-tight">
+                  Referral Program
+                </h1>
+                <p className="text-slate-300 text-sm md:text-base leading-relaxed">
+                  Earn rewards when your referrals successfully enroll through Annex Consultancy.
+                </p>
+              </div>
+
+              <div className="relative z-10 space-y-2 mt-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#D4AF37] block">Your Unique Referral Code</span>
+                <div className="text-3xl md:text-5xl font-black font-mono tracking-wider select-all text-white py-3 px-8 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 inline-block shadow-[0_4px_30px_rgba(0,0,0,0.15)]">
+                  {studentData?.referral_code || "GENERATING..."}
+                </div>
+              </div>
+
+              <div className="relative z-10 flex flex-col sm:flex-row gap-4 w-full sm:w-auto mt-2">
+                {/* WhatsApp Button (Primary CTA) */}
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(
+                    `Hey! I'm studying through Annex Consultancy. Use my link to register and explore global education options: ${window.location.origin}/refer/${studentData?.referral_code || ""}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-8 py-4 bg-[#25D366] hover:bg-[#20ba5a] text-white text-xs md:text-sm font-extrabold rounded-full transition-all flex items-center justify-center gap-2.5 cursor-pointer shadow-lg shadow-emerald-500/10 hover:scale-102 duration-200 active:scale-98"
+                >
+                  <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.97C16.579 2.028 14.11 1.001 11.47 1c-5.449 0-9.873 4.369-9.877 9.8.002 1.83.493 3.618 1.42 5.2l-.33 1.202-.314 1.15 1.173-.305 1.285-.333zM18.001 14.77c-.328-.164-1.944-.959-2.244-1.069-.3-.109-.52-.164-.738.164-.219.328-.847 1.069-1.039 1.288-.192.218-.384.246-.712.081-1.095-.548-1.815-.992-2.529-1.611-.83-.718-1.287-1.503-1.451-1.777-.164-.274-.018-.423.118-.558.122-.121.274-.328.411-.492.137-.164.183-.274.274-.456.09-.182.046-.341-.022-.478-.069-.137-.738-1.78-.992-2.434-.26-.626-.525-.54-.738-.551-.192-.01-.41-.012-.629-.012-.219 0-.575.082-.876.411-.3.328-1.15 1.122-1.15 2.738 0 1.616 1.178 3.177 1.342 3.396.164.218 2.317 3.538 5.613 4.961.784.339 1.396.541 1.873.692.788.251 1.505.216 2.071.131.63-.094 1.944-.794 2.217-1.56.274-.767.274-1.424.192-1.56-.082-.136-.3-.218-.628-.382z"/>
+                  </svg>
+                  <span>Share on WhatsApp</span>
+                </a>
+
+                {/* Copy Link Button (Secondary CTA) */}
+                <button
+                  onClick={() => {
+                    const link = `${window.location.origin}/refer/${studentData?.referral_code || ""}`;
+                    navigator.clipboard.writeText(link);
+                    alert("Referral link copied to clipboard!");
+                  }}
+                  className="px-8 py-4 border border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 text-white text-xs md:text-sm font-extrabold rounded-full transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <ArrowSquareOut size={16} />
+                  <span>Copy Referral Link</span>
+                </button>
+              </div>
+            </Card>
+
+            {/* Section 2: Statistics Row */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="bg-white border border-hairline/80 shadow-sm p-6 rounded-3xl relative overflow-hidden group hover:border-primary/20 transition-all duration-300">
+                <div className="flex items-center justify-between text-slate-400 mb-4">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider">Total Referred</span>
+                  <ShareNetwork size={20} />
+                </div>
+                <div>
+                  <span className="text-3xl font-extrabold font-display text-primary leading-none block">{referralStats.total}</span>
+                  <span className="text-[10px] text-slate-400 font-semibold block mt-1.5">Leads submitted</span>
+                </div>
+              </Card>
+
+              <Card className="bg-white border border-hairline/80 shadow-sm p-6 rounded-3xl relative overflow-hidden group hover:border-primary/20 transition-all duration-300">
+                <div className="flex items-center justify-between text-slate-400 mb-4">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider">Active Referrals</span>
+                  <div className="p-2 rounded-xl bg-slate-50 text-slate-500 group-hover:bg-primary/5 group-hover:text-primary transition-colors">
+                    <Clock size={20} />
+                  </div>
+                </div>
+                <div>
+                  <span className="text-3xl font-extrabold font-display text-primary leading-none block">{referralStats.active}</span>
+                  <span className="text-[10px] text-slate-400 font-semibold block mt-1.5">In active process</span>
+                </div>
+              </Card>
+
+              <Card className="bg-white border border-hairline/80 shadow-sm p-6 rounded-3xl relative overflow-hidden group hover:border-emerald-500/20 transition-all duration-300">
+                <div className="flex items-center justify-between text-slate-400 mb-4">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider">Enrolled</span>
+                  <div className="p-2 rounded-xl bg-slate-50 text-emerald-600 group-hover:bg-emerald-50 transition-colors">
+                    <GraduationCap size={20} />
+                  </div>
+                </div>
+                <div>
+                  <span className="text-3xl font-extrabold font-display text-emerald-600 leading-none block">{referralStats.enrolled}</span>
+                  <span className="text-[10px] text-slate-400 font-semibold block mt-1.5">Successful placements</span>
+                </div>
+              </Card>
+
+              <Card className="bg-white border border-hairline/80 shadow-sm p-6 rounded-3xl relative overflow-hidden group hover:border-primary/20 transition-all duration-300">
+                <div className="flex items-center justify-between text-slate-400 mb-4">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider">Rewards Earned</span>
+                  <div className="p-2 rounded-xl bg-slate-50 text-[#D4AF37] group-hover:bg-amber-50 transition-colors">
+                    <Gift size={20} />
+                  </div>
+                </div>
+                <div>
+                  <span className="text-3xl font-extrabold font-display text-primary leading-none block">Rs. {referralStats.rewards.toLocaleString()}</span>
+                  <span className="text-[10px] text-slate-400 font-semibold block mt-1.5">Approved payouts</span>
+                </div>
+              </Card>
             </div>
 
-            {/* Top Cards: Referral Code & Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              
-              {/* Copy Code card */}
-              <Card className="md:col-span-3 bg-white border border-hairline/80 shadow-sm p-6 md:p-8 rounded-3xl">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-bold text-primary">Your Referral Code</h3>
-                    <p className="text-slate-500 text-xs max-w-xl">
-                      Share this unique code or direct link with friends. They will get a consultation slot, and you will track their admissions journey.
-                    </p>
+            {/* Section 3: Referral Journey */}
+            <Card className="bg-white border border-hairline/80 shadow-sm p-6 md:p-8 rounded-3xl">
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-6">Referral Journey Milestones</h3>
+              <div className="hidden md:flex items-stretch justify-between relative">
+                {/* Connecting Line */}
+                <div className="absolute top-5 left-[8%] right-[8%] h-0.5 bg-slate-100 z-0" />
+                {[
+                  { label: "Lead Submitted", desc: "Friend registers online via referral link" },
+                  { label: "Counseling", desc: "Annex counselor schedules admissions review" },
+                  { label: "Application", desc: "Shortlisting and admissions files are submitted" },
+                  { label: "Visa Processing", desc: "Visa application lodges and decisions complete" },
+                  { label: "Enrollment", desc: "Friend successfully joins classes abroad" },
+                  { label: "Reward Issued", desc: "Cash payout generates in student portal" }
+                ].map((stage, idx) => (
+                  <div key={idx} className="flex-1 flex flex-col items-center text-center relative z-10 px-2 group">
+                    <div className="w-10 h-10 rounded-full border-2 border-slate-200 bg-white flex items-center justify-center font-bold text-xs text-slate-500 group-hover:border-primary group-hover:text-primary transition-all duration-300">
+                      {idx + 1}
+                    </div>
+                    <p className="text-xs font-bold text-primary mt-3 mb-1">{stage.label}</p>
+                    <p className="text-[10px] text-slate-400 leading-tight max-w-[125px]">{stage.desc}</p>
                   </div>
-                  <div className="flex flex-col sm:flex-row items-center gap-3">
-                    <div className="bg-slate-50 border border-hairline rounded-2xl px-5 py-3 text-center sm:text-left">
-                      <span className="text-[10px] text-slate-400 font-extrabold uppercase block tracking-wider">Referral Code</span>
-                      <span className="text-lg font-bold text-primary font-mono select-all">
-                        {studentData?.referral_code || "GENERATING..."}
-                      </span>
+                ))}
+              </div>
+              
+              {/* Mobile Timeline */}
+              <div className="md:hidden space-y-6 relative pl-6 border-l-2 border-slate-150 ml-4 py-2">
+                {[
+                  { label: "Lead Submitted", desc: "Friend registers online via referral link" },
+                  { label: "Counseling", desc: "Annex counselor schedules admissions review" },
+                  { label: "Application", desc: "Shortlisting and admissions files are submitted" },
+                  { label: "Visa Processing", desc: "Visa application lodges and decisions complete" },
+                  { label: "Enrollment", desc: "Friend successfully joins classes abroad" },
+                  { label: "Reward Issued", desc: "Cash payout generates in student portal" }
+                ].map((stage, idx) => (
+                  <div key={idx} className="relative flex items-start gap-4">
+                    <div className="absolute -left-[35px] w-6 h-6 rounded-full border-2 border-slate-200 bg-white flex items-center justify-center font-bold text-[10px] text-slate-500">
+                      {idx + 1}
                     </div>
-                    <div className="flex gap-2 w-full sm:w-auto">
-                      <button
-                        onClick={() => {
-                          const link = `${window.location.origin}/refer/${studentData?.referral_code || ""}`;
-                          navigator.clipboard.writeText(link);
-                          alert("Referral link copied to clipboard!");
-                        }}
-                        className="flex-grow sm:flex-grow-0 px-5 py-3 bg-primary text-white text-xs font-bold rounded-2xl hover:bg-primary/95 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
-                      >
-                        <ArrowSquareOut size={16} />
-                        Copy Link
-                      </button>
-                      
-                      <a
-                        href={`https://wa.me/?text=${encodeURIComponent(
-                          `Hey! I'm studying through Annex Consultancy. Use my link to register and explore global education options: ${window.location.origin}/refer/${studentData?.referral_code || ""}`
-                        )}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-grow sm:flex-grow-0 px-5 py-3 bg-[#25D366] hover:bg-[#20ba5a] text-white text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
-                      >
-                        <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.97C16.579 2.028 14.11 1.001 11.47 1c-5.449 0-9.873 4.369-9.877 9.8.002 1.83.493 3.618 1.42 5.2l-.33 1.202-.314 1.15 1.173-.305 1.285-.333zM18.001 14.77c-.328-.164-1.944-.959-2.244-1.069-.3-.109-.52-.164-.738.164-.219.328-.847 1.069-1.039 1.288-.192.218-.384.246-.712.081-1.095-.548-1.815-.992-2.529-1.611-.83-.718-1.287-1.503-1.451-1.777-.164-.274-.018-.423.118-.558.122-.121.274-.328.411-.492.137-.164.183-.274.274-.456.09-.182.046-.341-.022-.478-.069-.137-.738-1.78-.992-2.434-.26-.626-.525-.54-.738-.551-.192-.01-.41-.012-.629-.012-.219 0-.575.082-.876.411-.3.328-1.15 1.122-1.15 2.738 0 1.616 1.178 3.177 1.342 3.396.164.218 2.317 3.538 5.613 4.961.784.339 1.396.541 1.873.692.788.251 1.505.216 2.071.131.63-.094 1.944-.794 2.217-1.56.274-.767.274-1.424.192-1.56-.082-.136-.3-.218-.628-.382z"/>
-                        </svg>
-                        WhatsApp
-                      </a>
+                    <div>
+                      <p className="text-xs font-bold text-primary">{stage.label}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{stage.desc}</p>
                     </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {/* Split layout: Section 4 & Section 5 */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+              
+              {/* Section 4: Referral History Table */}
+              <Card className="lg:col-span-2 bg-white border border-hairline/80 shadow-sm rounded-3xl overflow-hidden">
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-hairline/65 pb-5">
+                  <div>
+                    <CardTitle>Referrals History</CardTitle>
+                    <CardDescription>Real-time status tracking for your referred admissions</CardDescription>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* Search */}
+                    <div className="relative w-full sm:w-48">
+                      <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                      <input 
+                        type="text" 
+                        placeholder="Search friend's name..."
+                        value={referralSearchQuery}
+                        onChange={(e) => setReferralSearchQuery(e.target.value)}
+                        className="pl-8 pr-4 py-1.5 border border-hairline rounded-full text-xs outline-none w-full bg-slate-50 focus:bg-white focus:border-primary transition-all text-slate-700 font-medium"
+                      />
+                    </div>
+
+                    {/* Filter */}
+                    <div className="flex items-center gap-1 border border-hairline bg-slate-50 rounded-full px-2.5 py-1.5 text-xs text-slate-500">
+                      <Funnel size={12} className="text-slate-400" />
+                      <select
+                        value={referralStatusFilter}
+                        onChange={(e) => setReferralStatusFilter(e.target.value)}
+                        className="bg-transparent outline-none text-[10px] font-bold uppercase cursor-pointer text-slate-600 border-none p-0"
+                      >
+                        <option value="All">All Stages</option>
+                        <option value="lead">Lead</option>
+                        <option value="contacted">Counseling</option>
+                        <option value="application_started">Application</option>
+                        <option value="offer_received">Offer Received</option>
+                        <option value="visa_approved">Visa Approved</option>
+                        <option value="enrolled">Enrolled</option>
+                        <option value="rewarded">Rewarded</option>
+                      </select>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {loadingReferrals ? (
+                    <div className="py-16 flex flex-col items-center justify-center text-slate-400">
+                      <SpinnerGap size={24} className="animate-spin text-primary mb-2" />
+                      <p className="text-xs">Loading referrals...</p>
+                    </div>
+                  ) : filteredReferrals.length === 0 ? (
+                    <div className="py-16 text-center text-slate-400 px-6">
+                      <ShareNetwork size={36} className="mx-auto text-slate-300 mb-2" />
+                      <p className="text-sm font-bold text-slate-600">No matching referrals</p>
+                      <p className="text-xs text-slate-400 mt-1">Adjust search parameters or check filters</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs divide-y divide-hairline text-slate-700 bg-white">
+                        <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400 sticky top-0">
+                          <tr>
+                            <th className="px-6 py-3.5">Student Name</th>
+                            <th className="px-6 py-3.5">Country</th>
+                            <th className="px-6 py-3.5">Status</th>
+                            <th className="px-6 py-3.5">Submitted Date</th>
+                            <th className="px-6 py-3.5">Current Stage</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-hairline text-slate-600">
+                          {filteredReferrals.map((ref) => {
+                            const reward = ref.referral_rewards ? (Array.isArray(ref.referral_rewards) ? ref.referral_rewards[0] : ref.referral_rewards) : null;
+                            
+                            const getStageLabel = (status: string) => {
+                              const mapping: { [key: string]: string } = {
+                                lead: "Lead Submitted",
+                                contacted: "Admissions Counseling",
+                                application_started: "Application Started",
+                                offer_received: "Offer Letter Received",
+                                visa_approved: "Visa Approved",
+                                enrolled: "Enrolled & Confirmed",
+                                rewarded: "Reward Fully Paid"
+                              };
+                              return mapping[status] || status.replace("_", " ");
+                            };
+
+                            return (
+                              <tr key={ref.id} className="hover:bg-slate-50/50 transition-colors">
+                                <td className="px-6 py-4">
+                                  <p className="font-bold text-primary">{ref.referred_name}</p>
+                                  <p className="text-[10px] text-slate-400">{ref.referred_email}</p>
+                                </td>
+                                <td className="px-6 py-4 font-semibold text-slate-600">
+                                  {ref.preferred_country}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className={`inline-block text-[9px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${
+                                    ref.status === "rewarded" || ref.status === "enrolled"
+                                      ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                      : ref.status === "lead"
+                                      ? "bg-slate-50 text-slate-500 border-slate-200"
+                                      : "bg-blue-50 text-blue-600 border-blue-100"
+                                  }`}>
+                                    {ref.status.replace("_", " ")}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-slate-400">
+                                  {new Date(ref.created_at).toLocaleDateString()}
+                                </td>
+                                <td className="px-6 py-4 font-medium text-slate-700">
+                                  {getStageLabel(ref.status)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Section 5: Rewards Information */}
+              <Card className="bg-gradient-to-br from-primary to-slate-900 border border-primary/20 p-6 md:p-8 rounded-3xl text-white shadow-xl relative overflow-hidden">
+                {/* Background decorative glow */}
+                <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-gold/10 blur-3xl z-0" />
+                
+                <div className="relative z-10 space-y-6">
+                  <div className="flex items-center gap-2">
+                    <Gift size={20} className="text-gold" weight="fill" />
+                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-300">Rewards & Milestones</h3>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                      <div>
+                        <p className="text-xs font-bold text-white">1 Enrollment</p>
+                        <p className="text-[10px] text-slate-400">First successful referral</p>
+                      </div>
+                      <span className="text-xs font-extrabold text-gold">₹1,000 Reward</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                      <div>
+                        <p className="text-xs font-bold text-white">3 Enrollments</p>
+                        <p className="text-[10px] text-slate-400">Milestone Bonus</p>
+                      </div>
+                      <span className="text-xs font-extrabold text-gold">Special Gift Bonus</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                      <div>
+                        <p className="text-xs font-bold text-white">5 Enrollments</p>
+                        <p className="text-[10px] text-slate-400">Annex Ambassador</p>
+                      </div>
+                      <span className="text-xs font-extrabold text-gold">Ambassador Prize</span>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-2 space-y-2.5">
+                    <p className="text-[9px] uppercase font-extrabold text-slate-400 tracking-wider">Eligibility Criteria</p>
+                    <ul className="text-[10px] text-slate-300 space-y-2 list-none">
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-gold shrink-0">•</span>
+                        <span>Referrals must be unique student registrations not already in active counseling.</span>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-gold shrink-0">•</span>
+                        <span>Payouts are approved and issued within 14 working days of formal university enrollment confirmation.</span>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-gold shrink-0">•</span>
+                        <span>Cashout options include bank transfer or student portal tuition discount codes.</span>
+                      </li>
+                    </ul>
                   </div>
                 </div>
               </Card>
 
-              {/* Stats Cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:col-span-3">
-                <Card className="p-4 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between min-h-[110px]">
-                  <div className="flex items-center justify-between text-slate-400">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Referred</span>
-                    <ShareNetwork size={16} />
-                  </div>
-                  <div className="mt-3">
-                    <span className="text-2xl font-bold font-display text-primary">{referralStats.total}</span>
-                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Leads submitted</p>
-                  </div>
-                </Card>
-
-                <Card className="p-4 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between min-h-[110px]">
-                  <div className="flex items-center justify-between text-slate-400">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Active Referrals</span>
-                    <Clock size={16} />
-                  </div>
-                  <div className="mt-3">
-                    <span className="text-2xl font-bold font-display text-primary">{referralStats.active}</span>
-                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">In process</p>
-                  </div>
-                </Card>
-
-                <Card className="p-4 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between min-h-[110px]">
-                  <div className="flex items-center justify-between text-slate-400">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Enrolled</span>
-                    <GraduationCap size={16} />
-                  </div>
-                  <div className="mt-3">
-                    <span className="text-2xl font-bold font-display text-emerald-600">{referralStats.enrolled}</span>
-                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Successful enrollments</p>
-                  </div>
-                </Card>
-
-                <Card className="p-4 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between min-h-[110px]">
-                  <div className="flex items-center justify-between text-slate-400">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rewards Earned</span>
-                    <Gift size={16} />
-                  </div>
-                  <div className="mt-3">
-                    <span className="text-2xl font-bold font-display text-primary">Rs. {referralStats.rewards.toLocaleString()}</span>
-                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Paid/Approved cashbacks</p>
-                  </div>
-                </Card>
-              </div>
-
             </div>
-
-            {/* History Table */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Referrals History</CardTitle>
-                <CardDescription>Real-time status tracking for your referred admissions</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loadingReferrals ? (
-                  <div className="py-12 flex flex-col items-center justify-center text-slate-400">
-                    <SpinnerGap size={24} className="animate-spin text-primary mb-2" />
-                    <p className="text-xs">Loading referrals...</p>
-                  </div>
-                ) : referrals.length === 0 ? (
-                  <div className="py-12 text-center text-slate-400 border border-dashed border-hairline bg-slate-50/50 rounded-2xl">
-                    <ShareNetwork size={36} className="mx-auto text-slate-300 mb-2" />
-                    <p className="text-sm">You haven't referred anyone yet.</p>
-                    <p className="text-xs text-slate-400 mt-1">Share your link to earn cash rewards when your friends enroll!</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto border border-hairline rounded-xl">
-                    <table className="w-full text-left text-xs divide-y divide-hairline text-slate-700 bg-white">
-                      <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400 sticky top-0">
-                        <tr>
-                          <th className="px-4 py-3">Friend's Name</th>
-                          <th className="px-4 py-3">Date Referred</th>
-                          <th className="px-4 py-3">Milestone Status</th>
-                          <th className="px-4 py-3">Reward Details</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-hairline text-slate-600">
-                        {referrals.map((ref) => {
-                          const reward = ref.referral_rewards ? (Array.isArray(ref.referral_rewards) ? ref.referral_rewards[0] : ref.referral_rewards) : null;
-                          return (
-                            <tr key={ref.id} className="hover:bg-slate-50/50 transition-colors">
-                              <td className="px-4 py-4 font-bold text-primary">
-                                {ref.referred_name}
-                              </td>
-                              <td className="px-4 py-4 text-slate-400">
-                                {new Date(ref.created_at).toLocaleDateString()}
-                              </td>
-                              <td className="px-4 py-4">
-                                <span className={`inline-block text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${
-                                  ref.status === "rewarded" || ref.status === "enrolled"
-                                    ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                                    : ref.status === "lead"
-                                    ? "bg-slate-50 text-slate-500 border-slate-200"
-                                    : "bg-blue-50 text-blue-600 border-blue-100"
-                                }`}>
-                                  {ref.status.replace("_", " ")}
-                                </span>
-                              </td>
-                              <td className="px-4 py-4">
-                                {reward ? (
-                                  <div className="flex flex-col">
-                                    <span className="font-bold text-slate-700">Rs. {reward.amount.toLocaleString()}</span>
-                                    <span className={`text-[8px] font-extrabold uppercase tracking-wider mt-0.5 ${
-                                      reward.status === "paid" ? "text-emerald-500" : reward.status === "approved" ? "text-blue-500" : "text-amber-500"
-                                    }`}>
-                                      {reward.status}
-                                    </span>
-                                  </div>
-                                ) : ref.status === "enrolled" ? (
-                                  <span className="text-[10px] text-amber-500 font-semibold flex items-center gap-1">
-                                    <Clock size={12} /> Pending Approval
-                                  </span>
-                                ) : (
-                                  <span className="text-slate-400 italic">Enrolls to earn</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </div>
         )}
 
