@@ -848,7 +848,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       bookings: "Dashboard",
       students: "Students",
       referrals: "Students",
-      eligibility: "Students",
+      eligibility: "Eligibility Leads",
       counselors: "Counselors Management",
       chat: "Messages",
       training: "Training & Placement",
@@ -983,6 +983,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const ALL_PERMISSIONS = [
     "Dashboard",
     "Students",
+    "Eligibility Leads",
     "Career Portal Students",
     "Training & Placement",
     "Meetings",
