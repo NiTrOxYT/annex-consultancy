@@ -105,4 +105,5 @@ The student portal dashboard contains:
 * **2026-06-21:** Implemented referral program student tab redesign, created trigger-based database referral status updates mapping standard student stages, and resolved phosphor icon imports compilation blocker.
 * **2026-06-22T02:55:52+05:30:** Implemented final approval requirements. Created `eligibility-leads`, `eligibility-notes`, and `eligibility-analytics` APIs. Implemented multi-step calculator wizard UI at `/study-abroad-eligibility` with email capture before results, admission chance categories, and booking/WhatsApp CTAs. Added Leads registry tab to Admin dashboard with workload cards, source quality table, daily follow-up queue, bulk actions, CSV exports, notes timeline, and reminders checklist.
 * **2026-06-22T03:11:31+05:30:** Added `Eligibility Leads` as a standalone permission key to the `ALL_PERMISSIONS` array reference, and mapped the eligibility dashboard tab authorization check to it.
+* **2026-06-22T03:16:28+05:30:** Scanned the codebase for hardcoded admin password checks. Added the server-side secure `ADMIN_PASSWORD` variable to `.env.local` and `.env.example` mapping to `annex-admin2026`.
 
