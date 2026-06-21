@@ -9,51 +9,53 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { AnnexLogo } from "@/components/branding/annex-logo";
 
-const navLinks = [
-  { label: "Home", href: "/" },
-  { label: "About", href: "/about" },
-  {
-    label: "Study Abroad",
-    href: "/study-abroad",
-    dropdown: [
-      { label: "United Kingdom", href: "/study-abroad/uk" },
-      { label: "Australia", href: "/study-abroad/australia" },
-      { label: "Europe", href: "/study-abroad/europe" },
-      { label: "Dubai", href: "/study-abroad/dubai" },
-      { label: "Italy", href: "/study-abroad/italy" },
-    ],
-  },
-  { label: "Eligibility Calculator", href: "/study-abroad-eligibility" },
+// Reorganized content data mapped by business value
+const destinationItems = {
+  international: [
+    { label: "United Kingdom", href: "/study-abroad/uk", desc: "Top Russell Group admissions & CAS validation." },
+    { label: "Australia", href: "/study-abroad/australia", desc: "Go8 university admissions & visa assistance." },
+    { label: "Europe", href: "/study-abroad/europe", desc: "English-taught degrees & tuition waivers." },
+    { label: "Dubai", href: "/study-abroad/dubai", desc: "Global branch campus study programs." },
+    { label: "Italy", href: "/study-abroad/italy", desc: "State universities & regional study grants." },
+  ],
+  domestic: [
+    { label: "Study in India", href: "/study-in-india", desc: "Admissions to premier medical & engineering institutes." }
+  ]
+};
 
-  { label: "Study in India", href: "/study-in-india" },
+const programItems = {
+  prep: [
+    { label: "IELTS Coaching", href: "/test-preparation/ielts", desc: "Strategic exam prep with certified trainers." },
+    { label: "PTE Coaching", href: "/test-preparation/pte", desc: "Pearson Test of English score-maximizer modules." },
+    { label: "CMAT Prep", href: "/test-preparation/cmat", desc: "Coaching for university entrance business math." },
+    { label: "Computer Courses", href: "/test-preparation/computer-courses", desc: "Programming & office productivity training." }
+  ],
+  career: [
+    { label: "Training & Placement", href: "/training-placement", desc: "Resume reviews, interview drills, & job placements." }
+  ]
+};
 
-  // ADD THIS
-  { label: "Training & Placement", href: "/training-placement" },
+const resourceItems = [
+  { label: "Success Stories", href: "/success-stories", desc: "Student placement records & visa success testimonials." },
+  { label: "Expert Resource Blog", href: "/blog", desc: "Latest overseas intake updates & study guides." }
+];
 
-  {
-    label: "Test Prep",
-    href: "/test-preparation",
-    dropdown: [
-      { label: "IELTS", href: "/test-preparation/ielts" },
-      { label: "PTE", href: "/test-preparation/pte" },
-      { label: "CMAT", href: "/test-preparation/cmat" },
-      { label: "Computer Courses", href: "/test-preparation/computer-courses" },
-    ],
-  },
-
-  { label: "Success Stories", href: "/success-stories" },
-  { label: "Blog", href: "/blog" },
+const portalItems = [
+  { label: "🎓 Student Portal", href: "/student-login", desc: "Track admissions, check visa status, & chat with counselors." },
+  { label: "💼 Career Portal", href: "/career-portal", desc: "Milestones, tasks, & corporate training dashboard." }
 ];
 
 export function Navigation() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = React.useState(false);
   const [activeDropdown, setActiveDropdown] = React.useState<string | null>(null);
+  const [openMobileSection, setOpenMobileSection] = React.useState<string | null>(null);
   const [isScrolled, setIsScrolled] = React.useState(false);
 
   React.useEffect(() => {
     setIsOpen(false);
     setActiveDropdown(null);
+    setOpenMobileSection(null);
   }, [pathname]);
 
   React.useEffect(() => {
@@ -65,6 +67,10 @@ export function Navigation() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const toggleMobileSection = (section: string) => {
+    setOpenMobileSection(openMobileSection === section ? null : section);
+  };
+
   return (
     <>
       {/* Floating Glass Pill Navigation Bar */}
@@ -73,9 +79,8 @@ export function Navigation() {
         isScrolled ? "pt-2" : "pt-6"
       )}>
         <div className="max-w-[1700px] mx-auto pointer-events-auto">
-          {/* Main floating pill */}
           <div className={cn(
-            "w-full flex items-center border border-hairline/80 px-8 rounded-full transition-all duration-300",
+            "w-full flex items-center justify-between border border-hairline/80 px-8 rounded-full transition-all duration-300",
             isScrolled
               ? "bg-white/95 backdrop-blur-2xl py-2.5 shadow-[0_12px_36px_rgba(15,23,42,0.08)] border-slate-200/90"
               : "bg-white/70 backdrop-blur-xl py-3.5 shadow-[0_8px_32px_rgba(15,23,42,0.04)]"
@@ -88,119 +93,302 @@ export function Navigation() {
               </Link>
             </div>
 
-            {/* Desktop Menu */}
-            <nav className="hidden xl:flex flex-1 justify-center items-center gap-8 2xl:gap-10 px-6">
-              {navLinks.map((link) => {
-                const isDropdownActive = link.dropdown?.some(sub => pathname === sub.href) || false;
-                const isActive = link.dropdown 
-                  ? isDropdownActive
-                  : (pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href + "/")));
+            {/* Desktop Menu links (Clean, uncluttered top-level layout) */}
+            <nav className="hidden xl:flex items-center gap-6 2xl:gap-8 px-6">
+              
+              {/* Destinations Mega Menu */}
+              <div
+                className="relative py-2"
+                onMouseEnter={() => setActiveDropdown("destinations")}
+                onMouseLeave={() => setActiveDropdown(null)}
+              >
+                <button className={cn(
+                  "flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer relative py-1 group/btn",
+                  activeDropdown === "destinations" || pathname.startsWith("/study") ? "text-primary font-semibold" : "text-slate-600 hover:text-primary"
+                )}>
+                  Destinations
+                  <CaretDown size={14} className={cn("text-slate-400 transition-transform duration-200", activeDropdown === "destinations" && "rotate-180")} />
+                  {pathname.startsWith("/study") && (
+                    <motion.div
+                      layoutId="activeNavLine"
+                      className="absolute bottom-0 left-0 right-0 h-[2px] bg-gold"
+                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                </button>
 
-                if (link.dropdown) {
-                  return (
-                    <div
-                      key={link.label}
-                      className="relative group py-2"
-                      onMouseEnter={() => setActiveDropdown(link.label)}
-                      onMouseLeave={() => setActiveDropdown(null)}
+                <AnimatePresence>
+                  {activeDropdown === "destinations" && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                      transition={{ duration: 0.2, ease: "easeOut" }}
+                      className="absolute left-1/2 -translate-x-1/2 top-full pt-2 pointer-events-auto z-50"
                     >
-                      <button className={cn(
-                        "flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer relative py-1 group/btn",
-                        isActive ? "text-primary font-semibold" : "text-slate-600 hover:text-primary"
-                      )}>
-                        {link.label}
-                        <CaretDown size={14} className="text-slate-400 group-hover:rotate-180 transition-transform duration-200" />
-                        
-                        {/* Hover line if not active */}
-                        {!isActive && (
-                          <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary/20 scale-x-0 group-hover/btn:scale-x-100 transition-transform duration-300 origin-center" />
-                        )}
-                        {/* Active indicator */}
-                        {isActive && (
-                          <motion.div
-                            layoutId="activeNavLine"
-                            className="absolute bottom-0 left-0 right-0 h-[2px] bg-gold"
-                            transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                          />
-                        )}
-                      </button>
-
-                      <AnimatePresence>
-                        {activeDropdown === link.label && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            transition={{ duration: 0.15, ease: "easeOut" }}
-                            className="absolute left-1/2 -translate-x-1/2 top-full pt-2 w-52 pointer-events-auto"
-                          >
-                            <div className="bg-white border border-hairline p-2.5 rounded-2xl shadow-lg flex flex-col gap-1">
-                              {link.dropdown.map((sub) => (
-                                <Link
-                                  key={sub.label}
-                                  href={sub.href}
-                                  className={cn(
-                                    "px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-primary hover:bg-subtle-gray transition-colors",
-                                    pathname === sub.href && "text-primary bg-subtle-gray"
-                                  )}
-                                >
+                      <div className="bg-white border border-hairline p-5 rounded-2xl shadow-xl flex gap-8 w-[480px]">
+                        <div className="flex-1 flex flex-col gap-3">
+                          <span className="text-[10px] font-mono-data text-slate-400 uppercase tracking-widest font-bold border-b border-hairline/60 pb-1.5 text-left">
+                            International Study
+                          </span>
+                          <div className="flex flex-col gap-1 text-left">
+                            {destinationItems.international.map(sub => (
+                              <Link
+                                key={sub.label}
+                                href={sub.href}
+                                className="group/item flex flex-col p-1.5 rounded-xl hover:bg-subtle-gray transition-colors"
+                              >
+                                <span className="text-xs font-bold text-slate-800 group-hover/item:text-primary transition-colors">
                                   {sub.label}
-                                </Link>
-                              ))}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  );
-                }
+                                </span>
+                                <span className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">
+                                  {sub.desc}
+                                </span>
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="w-[180px] shrink-0 flex flex-col gap-3 border-l border-hairline/60 pl-6">
+                          <span className="text-[10px] font-mono-data text-slate-400 uppercase tracking-widest font-bold border-b border-hairline/60 pb-1.5 text-left">
+                            Domestic Placements
+                          </span>
+                          <div className="text-left">
+                            {destinationItems.domestic.map(sub => (
+                              <Link
+                                key={sub.label}
+                                href={sub.href}
+                                className="group/item flex flex-col p-1.5 rounded-xl hover:bg-subtle-gray transition-colors"
+                              >
+                                <span className="text-xs font-bold text-slate-800 group-hover/item:text-primary transition-colors">
+                                  {sub.label}
+                                </span>
+                                <span className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                                  {sub.desc}
+                                </span>
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
-                return (
-                  <Link
-                    key={link.label}
-                    href={link.href}
-                    className={cn(
-                      "text-sm font-medium transition-colors relative py-1 group",
-                      isActive ? "text-primary font-semibold" : "text-slate-600 hover:text-primary"
-                    )}
-                  >
-                    {link.label}
-                    {/* Hover line if not active */}
-                    {!isActive && (
-                      <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary/20 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-center" />
-                    )}
-                    {/* Active indicator */}
-                    {isActive && (
-                      <motion.div
-                        layoutId="activeNavLine"
-                        className="absolute bottom-0 left-0 right-0 h-[2px] bg-gold"
-                        transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                      />
-                    )}
-                  </Link>
-                );
-              })}
+              {/* Programs Mega Menu */}
+              <div
+                className="relative py-2"
+                onMouseEnter={() => setActiveDropdown("programs")}
+                onMouseLeave={() => setActiveDropdown(null)}
+              >
+                <button className={cn(
+                  "flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer relative py-1 group/btn",
+                  activeDropdown === "programs" || pathname.startsWith("/test-preparation") || pathname === "/training-placement" ? "text-primary font-semibold" : "text-slate-600 hover:text-primary"
+                )}>
+                  Programs
+                  <CaretDown size={14} className={cn("text-slate-400 transition-transform duration-200", activeDropdown === "programs" && "rotate-180")} />
+                  {(pathname.startsWith("/test-preparation") || pathname === "/training-placement") && (
+                    <motion.div
+                      layoutId="activeNavLine"
+                      className="absolute bottom-0 left-0 right-0 h-[2px] bg-gold"
+                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                </button>
+
+                <AnimatePresence>
+                  {activeDropdown === "programs" && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                      transition={{ duration: 0.2, ease: "easeOut" }}
+                      className="absolute left-1/2 -translate-x-1/2 top-full pt-2 pointer-events-auto z-50"
+                    >
+                      <div className="bg-white border border-hairline p-5 rounded-2xl shadow-xl flex gap-8 w-[480px]">
+                        <div className="flex-1 flex flex-col gap-3">
+                          <span className="text-[10px] font-mono-data text-slate-400 uppercase tracking-widest font-bold border-b border-hairline/60 pb-1.5 text-left">
+                            Test Preparation
+                          </span>
+                          <div className="flex flex-col gap-1 text-left">
+                            {programItems.prep.map(sub => (
+                              <Link
+                                key={sub.label}
+                                href={sub.href}
+                                className="group/item flex flex-col p-1.5 rounded-xl hover:bg-subtle-gray transition-colors"
+                              >
+                                <span className="text-xs font-bold text-slate-800 group-hover/item:text-primary transition-colors">
+                                  {sub.label}
+                                </span>
+                                <span className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">
+                                  {sub.desc}
+                                </span>
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="w-[180px] shrink-0 flex flex-col gap-3 border-l border-hairline/60 pl-6">
+                          <span className="text-[10px] font-mono-data text-slate-400 uppercase tracking-widest font-bold border-b border-hairline/60 pb-1.5 text-left">
+                            Career Services
+                          </span>
+                          <div className="text-left">
+                            {programItems.career.map(sub => (
+                              <Link
+                                key={sub.label}
+                                href={sub.href}
+                                className="group/item flex flex-col p-1.5 rounded-xl hover:bg-subtle-gray transition-colors"
+                              >
+                                <span className="text-xs font-bold text-slate-800 group-hover/item:text-primary transition-colors">
+                                  {sub.label}
+                                </span>
+                                <span className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                                  {sub.desc}
+                                </span>
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Resources Dropdown */}
+              <div
+                className="relative py-2"
+                onMouseEnter={() => setActiveDropdown("resources")}
+                onMouseLeave={() => setActiveDropdown(null)}
+              >
+                <button className={cn(
+                  "flex items-center gap-1 text-sm font-medium transition-colors cursor-pointer relative py-1 group/btn",
+                  activeDropdown === "resources" || pathname === "/success-stories" || pathname === "/blog" ? "text-primary font-semibold" : "text-slate-600 hover:text-primary"
+                )}>
+                  Resources
+                  <CaretDown size={14} className={cn("text-slate-400 transition-transform duration-200", activeDropdown === "resources" && "rotate-180")} />
+                  {(pathname === "/success-stories" || pathname === "/blog") && (
+                    <motion.div
+                      layoutId="activeNavLine"
+                      className="absolute bottom-0 left-0 right-0 h-[2px] bg-gold"
+                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                </button>
+
+                <AnimatePresence>
+                  {activeDropdown === "resources" && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      transition={{ duration: 0.15, ease: "easeOut" }}
+                      className="absolute left-1/2 -translate-x-1/2 top-full pt-2 w-60 pointer-events-auto z-50"
+                    >
+                      <div className="bg-white border border-hairline p-2 rounded-2xl shadow-xl flex flex-col gap-1 text-left">
+                        {resourceItems.map((sub) => (
+                          <Link
+                            key={sub.label}
+                            href={sub.href}
+                            className="group/item flex flex-col p-2.5 rounded-xl hover:bg-subtle-gray transition-colors"
+                          >
+                            <span className="text-xs font-bold text-slate-800 group-hover/item:text-primary transition-colors">
+                              {sub.label}
+                            </span>
+                            <span className="text-[9px] text-slate-400 mt-0.5 line-clamp-1">
+                              {sub.desc}
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* About Link */}
+              <Link
+                href="/about"
+                className={cn(
+                  "text-sm font-medium transition-colors relative py-1 group",
+                  pathname === "/about" ? "text-primary font-semibold" : "text-slate-600 hover:text-primary"
+                )}
+              >
+                About
+                {pathname === "/about" && (
+                  <motion.div
+                    layoutId="activeNavLine"
+                    className="absolute bottom-0 left-0 right-0 h-[2px] bg-gold"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+              </Link>
+
             </nav>
 
-            <div className="hidden xl:flex items-center gap-2.5 shrink-0">
-              <Link href="/student-login">
+            {/* Header Action Buttons (CRO & Portal logins collapse) */}
+            <div className="hidden xl:flex items-center gap-4 shrink-0">
+              
+              {/* Unified Portals Dropdown */}
+              <div
+                className="relative py-2"
+                onMouseEnter={() => setActiveDropdown("portals")}
+                onMouseLeave={() => setActiveDropdown(null)}
+              >
+                <button className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-primary transition-colors cursor-pointer py-1.5 px-3 rounded-full hover:bg-subtle-gray transition-colors duration-200">
+                  Portals Login
+                  <CaretDown size={12} className={cn("text-slate-400 transition-transform duration-200", activeDropdown === "portals" && "rotate-180")} />
+                </button>
+
+                <AnimatePresence>
+                  {activeDropdown === "portals" && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      transition={{ duration: 0.15, ease: "easeOut" }}
+                      className="absolute right-0 top-full pt-2 w-64 pointer-events-auto z-50"
+                    >
+                      <div className="bg-white border border-hairline p-2 rounded-2xl shadow-xl flex flex-col gap-1 text-left">
+                        {portalItems.map((sub) => (
+                          <Link
+                            key={sub.label}
+                            href={sub.href}
+                            className="group/item flex flex-col p-2.5 rounded-xl hover:bg-subtle-gray transition-colors"
+                          >
+                            <span className="text-xs font-bold text-slate-800 group-hover/item:text-primary transition-colors">
+                              {sub.label}
+                            </span>
+                            <span className="text-[9px] text-slate-400 mt-0.5">
+                              {sub.desc}
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              <div className="w-[1px] h-4 bg-hairline/60" />
+
+              {/* Secondary CTA: Eligibility Calculator */}
+              <Link href="/study-abroad-eligibility">
                 <Button
+                  variant="outline"
                   size="sm"
-                  className="bg-gradient-to-r from-gold to-yellow-500 text-primary font-semibold shadow-md text-xs px-3 py-1.5"
+                  className="border-gold text-primary font-bold hover:bg-gold/5 hover:border-gold shadow-sm text-xs px-3.5 py-1.5"
                 >
-                  🎓 Student Portal
+                  📋 Check Eligibility
                 </Button>
               </Link>
-              <Link href="/career-portal">
-                <Button
-                  size="sm"
-                  className="bg-slate-900 hover:bg-slate-800 text-white font-semibold shadow-md text-xs px-3 py-1.5"
-                >
-                  💼 Career Portal
-                </Button>
-              </Link>
+
+              {/* Primary CTA: Consultation Bookings */}
               <Link href="/contact">
-                <Button size="sm" className="text-xs px-3 py-1.5">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="bg-primary text-white font-semibold shadow-md text-xs px-3.5 py-1.5"
+                >
                   Book Consultation
                 </Button>
               </Link>
@@ -213,11 +401,12 @@ export function Navigation() {
             >
               {isOpen ? <X size={20} /> : <List size={20} />}
             </button>
+
           </div>
         </div>
       </header>
 
-      {/* Mobile Menu Overlay */}
+      {/* Mobile Menu Overlay with Accordions */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -225,64 +414,170 @@ export function Navigation() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 bg-white/95 backdrop-blur-2xl z-30 lg:hidden flex flex-col pt-32 px-8 pb-12"
+            className="fixed inset-0 bg-white/95 backdrop-blur-2xl z-30 xl:hidden flex flex-col pt-32 px-6 pb-12"
           >
-            <div className="flex-grow flex flex-col gap-6 overflow-y-auto">
-              {navLinks.map((link, i) => (
-                <motion.div
-                  key={link.label}
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="flex flex-col gap-2"
+            <div className="flex-grow flex flex-col gap-3 overflow-y-auto pr-1">
+              
+              {/* Destinations Section */}
+              <div className="border-b border-hairline/60 py-2">
+                <button
+                  onClick={() => toggleMobileSection("destinations")}
+                  className="flex items-center justify-between w-full text-lg font-bold font-display tracking-tight text-slate-800 text-left py-2"
                 >
-                  {link.dropdown ? (
-                    <>
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                        {link.label}
-                      </span>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 pl-2">
-                        {link.dropdown.map((sub) => (
-                          <Link
-                            key={sub.label}
-                            href={sub.href}
-                            className="text-base font-semibold text-slate-600 hover:text-primary py-2.5 flex items-center min-h-[44px] w-full"
-                          >
-                            {sub.label}
-                          </Link>
-                        ))}
-                      </div>
-                    </>
-                  ) : (
-                    <Link
-                      href={link.href}
-                      className="text-xl font-bold font-display tracking-tight text-slate-700 hover:text-primary py-2.5 flex items-center min-h-[44px] w-full"
+                  <span>Destinations</span>
+                  <CaretDown size={18} className={cn("text-slate-400 transition-transform duration-200", openMobileSection === "destinations" && "rotate-180")} />
+                </button>
+                <AnimatePresence>
+                  {openMobileSection === "destinations" && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden pl-3 flex flex-col gap-1.5 mt-1 pb-3"
                     >
-                      {link.label}
-                    </Link>
+                      <span className="text-[9px] font-mono-data text-slate-400 uppercase tracking-widest font-bold block mt-1">
+                        International Placements
+                      </span>
+                      {destinationItems.international.map(sub => (
+                        <Link key={sub.label} href={sub.href} className="text-sm font-semibold text-slate-600 py-1.5 hover:text-primary">
+                          {sub.label}
+                        </Link>
+                      ))}
+                      <span className="text-[9px] font-mono-data text-slate-400 uppercase tracking-widest font-bold block mt-2">
+                        Domestic Placements
+                      </span>
+                      {destinationItems.domestic.map(sub => (
+                        <Link key={sub.label} href={sub.href} className="text-sm font-semibold text-slate-600 py-1.5 hover:text-primary">
+                          {sub.label}
+                        </Link>
+                      ))}
+                    </motion.div>
                   )}
-                </motion.div>
-              ))}
+                </AnimatePresence>
+              </div>
+
+              {/* Programs Section */}
+              <div className="border-b border-hairline/60 py-2">
+                <button
+                  onClick={() => toggleMobileSection("programs")}
+                  className="flex items-center justify-between w-full text-lg font-bold font-display tracking-tight text-slate-800 text-left py-2"
+                >
+                  <span>Programs</span>
+                  <CaretDown size={18} className={cn("text-slate-400 transition-transform duration-200", openMobileSection === "programs" && "rotate-180")} />
+                </button>
+                <AnimatePresence>
+                  {openMobileSection === "programs" && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden pl-3 flex flex-col gap-1.5 mt-1 pb-3"
+                    >
+                      <span className="text-[9px] font-mono-data text-slate-400 uppercase tracking-widest font-bold block mt-1">
+                        Test Preparation
+                      </span>
+                      {programItems.prep.map(sub => (
+                        <Link key={sub.label} href={sub.href} className="text-sm font-semibold text-slate-600 py-1.5 hover:text-primary">
+                          {sub.label}
+                        </Link>
+                      ))}
+                      <span className="text-[9px] font-mono-data text-slate-400 uppercase tracking-widest font-bold block mt-2">
+                        Career Placements
+                      </span>
+                      {programItems.career.map(sub => (
+                        <Link key={sub.label} href={sub.href} className="text-sm font-semibold text-slate-600 py-1.5 hover:text-primary">
+                          {sub.label}
+                        </Link>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Resources Section */}
+              <div className="border-b border-hairline/60 py-2">
+                <button
+                  onClick={() => toggleMobileSection("resources")}
+                  className="flex items-center justify-between w-full text-lg font-bold font-display tracking-tight text-slate-800 text-left py-2"
+                >
+                  <span>Resources</span>
+                  <CaretDown size={18} className={cn("text-slate-400 transition-transform duration-200", openMobileSection === "resources" && "rotate-180")} />
+                </button>
+                <AnimatePresence>
+                  {openMobileSection === "resources" && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden pl-3 flex flex-col gap-1 mt-1 pb-3"
+                    >
+                      {resourceItems.map(sub => (
+                        <Link key={sub.label} href={sub.href} className="text-sm font-semibold text-slate-600 py-1.5 hover:text-primary">
+                          {sub.label}
+                        </Link>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Portals Section Accordion */}
+              <div className="border-b border-hairline/60 py-2">
+                <button
+                  onClick={() => toggleMobileSection("portals")}
+                  className="flex items-center justify-between w-full text-lg font-bold font-display tracking-tight text-slate-800 text-left py-2"
+                >
+                  <span>Portals Access</span>
+                  <CaretDown size={18} className={cn("text-slate-400 transition-transform duration-200", openMobileSection === "portals" && "rotate-180")} />
+                </button>
+                <AnimatePresence>
+                  {openMobileSection === "portals" && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden pl-3 flex flex-col gap-1 mt-1 pb-3"
+                    >
+                      {portalItems.map(sub => (
+                        <Link key={sub.label} href={sub.href} className="text-sm font-semibold text-slate-600 py-1.5 hover:text-primary">
+                          {sub.label}
+                        </Link>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Simple About Link */}
+              <div className="py-3">
+                <Link
+                  href="/about"
+                  className="text-lg font-bold font-display tracking-tight text-slate-800"
+                >
+                  About Us
+                </Link>
+              </div>
+
             </div>
 
+            {/* CTAs Stack at bottom of mobile menu */}
             <motion.div
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: navLinks.length * 0.05 }}
-              className="flex flex-col gap-2.5 border-t border-hairline pt-6 mt-6"
+              transition={{ delay: 0.2 }}
+              className="flex flex-col gap-3 border-t border-hairline/60 pt-6 mt-6 shrink-0"
             >
-              <Link href="/student-login" className="w-full">
-                <Button variant="outline" size="md" className="w-full text-center">
-                  Student Portal Login
-                </Button>
-              </Link>
-              <Link href="/career-portal" className="w-full">
-                <Button variant="outline" size="md" className="w-full text-center bg-slate-900 text-white border-none hover:bg-slate-800">
-                  Career Portal Login
+              <Link href="/study-abroad-eligibility" className="w-full">
+                <Button variant="outline" size="md" className="w-full text-center border-gold text-primary font-bold bg-gold/5">
+                  📋 Check Eligibility Calculator
                 </Button>
               </Link>
               <Link href="/contact" className="w-full">
-                <Button variant="primary" size="md" className="w-full text-center">
+                <Button variant="primary" size="md" className="w-full text-center bg-primary text-white">
                   Book Consultation
                 </Button>
               </Link>
