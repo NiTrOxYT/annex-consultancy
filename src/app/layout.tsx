@@ -16,13 +16,42 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Annex Education Consultancy | Premium Study Abroad & Test Prep",
-  description: "Annex is a premium, modern education consultancy providing expert study abroad guidance for the UK, Australia, Europe, Dubai, and Italy, along with IELTS, PTE, and CMAT test preparation.",
+  metadataBase: new URL("https://annex-consultancy.vercel.app"),
+  title: "Annex Consultancy | Study Abroad Experts for UK, Australia, Europe & Italy",
+  description: "Premium education consultancy helping students secure admissions, scholarships, visas, and placements at leading global universities.",
+  alternates: {
+    canonical: "https://annex-consultancy.vercel.app",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
   openGraph: {
-    title: "Annex Education Consultancy",
-    description: "Premium global education placement and admissions counseling.",
-    type: "website",
+    title: "Annex Consultancy | Study Abroad Experts for UK, Australia, Europe & Italy",
+    description: "Premium education consultancy helping students secure admissions, scholarships, visas, and placements at leading global universities.",
+    url: "https://annex-consultancy.vercel.app",
+    siteName: "Annex Consultancy",
     locale: "en_US",
+    type: "website",
+    images: [
+      {
+        url: "https://annex-consultancy.vercel.app/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Annex Consultancy",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Annex Consultancy | Study Abroad Experts for UK, Australia, Europe & Italy",
+    description: "Premium education consultancy helping students secure admissions, scholarships, visas, and placements at leading global universities.",
+    images: ["https://annex-consultancy.vercel.app/og-image.png"],
+  },
+  icons: {
+    icon: "/branding/annex-logo.png",
+    shortcut: "/branding/annex-logo.png",
+    apple: "/branding/annex-logo.png",
   },
 };
 

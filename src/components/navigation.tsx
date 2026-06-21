@@ -23,6 +23,7 @@ const navLinks = [
       { label: "Italy", href: "/study-abroad/italy" },
     ],
   },
+  { label: "Eligibility Calculator", href: "/study-abroad-eligibility" },
 
   { label: "Study in India", href: "/study-in-india" },
 

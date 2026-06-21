@@ -192,6 +192,181 @@ export default function Home() {
           </section>
         </SectionReveal>
 
+        {/* Study Abroad Eligibility Calculator Banner */}
+        <SectionReveal>
+          <section className="py-24 bg-white border-b border-hairline overflow-hidden">
+            <div className="max-w-7xl mx-auto px-6 lg:px-8">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                
+                {/* Left Column: The Value Pitch */}
+                <div className="lg:col-span-5 flex flex-col items-start text-left">
+                  <h2 className="font-display font-bold text-3xl md:text-5xl text-primary tracking-tight leading-[1.1] mb-6">
+                    Know your admission chances. Instantly.
+                  </h2>
+                  <p className="text-base text-slate-500 leading-relaxed max-w-[45ch] mb-8">
+                    Assess your profile against global standards to get matched universities, admission chance categories, and scholarship estimates.
+                  </p>
+                  
+                  {/* Checklist */}
+                  <ul className="flex flex-col gap-4 mb-8 w-full">
+                    <li className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
+                        <Checks size={12} weight="bold" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-primary leading-tight">Academic Match Score</h4>
+                        <p className="text-xs text-slate-500 mt-0.5">Instant feedback calibrated against your GPA and academic qualifications.</p>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
+                        <Checks size={12} weight="bold" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-primary leading-tight">Admission Chances Categorization</h4>
+                        <p className="text-xs text-slate-500 mt-0.5">Clear classification of target universities into Safe, Target, and Ambitious matches.</p>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
+                        <Checks size={12} weight="bold" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-primary leading-tight">Scholarship Projections</h4>
+                        <p className="text-xs text-slate-500 mt-0.5">Accurate projections for tuition fee waivers and academic grants.</p>
+                      </div>
+                    </li>
+                  </ul>
+                  
+                  <Link href="/study-abroad-eligibility" className="w-full sm:w-auto">
+                    <Button variant="primary" size="lg" className="w-full sm:w-auto">
+                      Check Your Eligibility
+                    </Button>
+                  </Link>
+                </div>
+                
+                {/* Right Column: Premium Mockup Card */}
+                <div className="lg:col-span-7 relative w-full flex justify-center">
+                  <motion.div
+                    whileHover={{ y: -6 }}
+                    transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                    className="relative w-full max-w-xl bg-subtle-gray border border-hairline/80 p-2 rounded-[2rem] shadow-[0_24px_48px_-15px_rgba(15,23,42,0.08)]"
+                  >
+                    <div className="relative w-full bg-slate-900 border border-hairline/40 rounded-[calc(2rem-0.5rem)] text-white p-6 md:p-8 h-full shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] overflow-hidden">
+                      {/* Background Ambient Glow */}
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-[radial-gradient(circle_at_center,rgba(212,175,55,0.08),transparent)] pointer-events-none" />
+                      
+                      {/* Mockup Header */}
+                      <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-6">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full bg-gold animate-pulse" />
+                          <span className="font-mono-data text-[10px] text-slate-400 tracking-wider uppercase font-semibold">
+                            ANNEX CORE ENGINE v2.4
+                          </span>
+                        </div>
+                        <span className="text-[9px] font-mono-data px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold uppercase tracking-wider">
+                          ACTIVE ASSESSMENT
+                        </span>
+                      </div>
+                      
+                      {/* Mockup Body Content */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center mb-8">
+                        {/* Circular Score Gauge */}
+                        <div className="flex flex-col items-center justify-center p-4 bg-white/5 border border-white/5 rounded-2xl">
+                          <div className="relative w-32 h-32 flex items-center justify-center">
+                            {/* SVG Gauge */}
+                            <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+                              <circle
+                                cx="64"
+                                cy="64"
+                                r="48"
+                                className="stroke-white/5"
+                                strokeWidth="8"
+                                fill="transparent"
+                              />
+                              <circle
+                                cx="64"
+                                cy="64"
+                                r="48"
+                                className="stroke-gold"
+                                strokeWidth="8"
+                                fill="transparent"
+                                strokeDasharray={2 * Math.PI * 48}
+                                strokeDashoffset={2 * Math.PI * 48 * (1 - 0.88)}
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                            <div className="text-center z-10">
+                              <span className="font-display font-extrabold text-3xl text-white tracking-tight leading-none block">
+                                88%
+                              </span>
+                              <span className="font-mono-data text-[8px] text-slate-400 tracking-widest uppercase font-bold mt-1 block">
+                                MATCH SCORE
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Chance & Scholarship Projections */}
+                        <div className="flex flex-col gap-3 text-left">
+                          <div className="p-3 bg-white/5 border border-white/5 rounded-xl flex flex-col gap-1">
+                            <span className="text-[10px] font-mono-data text-slate-400 font-bold uppercase tracking-wider">
+                              Chance Classification
+                            </span>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                Safe
+                              </span>
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gold/20 text-gold border border-gold/30">
+                                Target
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-slate-300 mt-1">
+                              Matched with 6 premium universities
+                            </span>
+                          </div>
+                          
+                          <div className="p-3 bg-white/5 border border-white/5 rounded-xl flex flex-col gap-1">
+                            <span className="text-[10px] font-mono-data text-slate-400 font-bold uppercase tracking-wider">
+                              Est. Scholarship Waiver
+                            </span>
+                            <span className="text-lg font-bold font-display text-gold tracking-tight">
+                              £6,500 - £12,000
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              Based on GPA and course alignment
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Verified Checks Footer inside mockup */}
+                      <div className="border-t border-white/5 pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
+                        <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                          <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-400">
+                            <span className="text-emerald-500">✓</span> Academic Calibration
+                          </span>
+                          <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-400">
+                            <span className="text-emerald-500">✓</span> Test Score Alignment
+                          </span>
+                          <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-400">
+                            <span className="text-emerald-500">✓</span> Budget Matrix Matched
+                          </span>
+                        </div>
+                        <Link href="/study-abroad-eligibility" className="group flex items-center gap-1 text-xs font-mono-data font-bold text-gold hover:text-white transition-colors uppercase tracking-wider">
+                          Calculate <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
+                        </Link>
+                      </div>
+                      
+                    </div>
+                  </motion.div>
+                </div>
+                
+              </div>
+            </div>
+          </section>
+        </SectionReveal>
+
         {/* Study Destinations Section */}
         <SectionReveal>
           <section className="py-24 bg-white">
