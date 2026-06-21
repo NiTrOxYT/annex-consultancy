@@ -8,7 +8,7 @@ import {
   PaperPlaneRight, Paperclip, ArrowSquareOut, WarningCircle, 
   UploadSimple, Check, X, SpinnerGap, Bell, ArrowLeft,
   CalendarCheck, ShieldWarning, ChatCircleDots, Gear, Checks, Download,
-  VideoCamera, Phone, MapPin
+  VideoCamera, Phone, MapPin, ShareNetwork, Gift
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "@/lib/supabase";
@@ -48,7 +48,57 @@ export default function StudentDashboard() {
   const [isImpersonating, setIsImpersonating] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [studentData, setStudentData] = React.useState<any>(null);
-  const [activeTab, setActiveTab] = React.useState<"dashboard" | "documents" | "offers" | "visa" | "chat" | "appointments" | "profile" | "notifications">("dashboard");
+  const [activeTab, setActiveTab] = React.useState<"dashboard" | "documents" | "offers" | "visa" | "chat" | "appointments" | "profile" | "notifications" | "referrals">("dashboard");
+  const [referrals, setReferrals] = React.useState<any[]>([]);
+  const [referralStats, setReferralStats] = React.useState({
+    total: 0,
+    active: 0,
+    enrolled: 0,
+    rewards: 0
+  });
+  const [loadingReferrals, setLoadingReferrals] = React.useState(false);
+
+  const loadReferralData = React.useCallback(async (id: string) => {
+    setLoadingReferrals(true);
+    try {
+      const res = await fetch(`/api/referrals?studentId=${id}`);
+      if (!res.ok) throw new Error("Failed to fetch referrals");
+      const data = await res.json();
+      if (data.success) {
+        const list = data.referrals || [];
+        setReferrals(list);
+        
+        let total = list.length;
+        let active = 0;
+        let enrolled = 0;
+        let rewards = 0;
+        
+        list.forEach((ref: any) => {
+          if (["contacted", "application_started", "offer_received", "visa_approved"].includes(ref.status)) {
+            active++;
+          } else if (ref.status === "enrolled") {
+            enrolled++;
+          } else if (ref.status === "rewarded") {
+            enrolled++;
+            if (ref.referral_rewards) {
+              const rewardsList = Array.isArray(ref.referral_rewards) ? ref.referral_rewards : [ref.referral_rewards];
+              rewardsList.forEach((rew: any) => {
+                if (rew.status === "approved" || rew.status === "paid") {
+                  rewards += Number(rew.amount || 0);
+                }
+              });
+            }
+          }
+        });
+        
+        setReferralStats({ total, active, enrolled, rewards });
+      }
+    } catch (err: any) {
+      console.error("Error loading referrals:", err.message);
+    } finally {
+      setLoadingReferrals(false);
+    }
+  }, []);
   const [studentPrefs, setStudentPrefs] = React.useState<any>(null);
   const [notificationLogs, setNotificationLogs] = React.useState<any[]>([]);
   const [savingPrefs, setSavingPrefs] = React.useState(false);
@@ -408,6 +458,9 @@ export default function StudentDashboard() {
       } catch (histErr: any) {
         console.error("Error loading notification history:", histErr.message);
       }
+
+      // 11. Fetch Referrals history & stats
+      await loadReferralData(id);
     } catch (err: any) {
       console.error("Error loading student data:", err.message);
     }
@@ -867,6 +920,7 @@ export default function StudentDashboard() {
             { id: "visa", label: "Visa Timeline", icon: Calendar },
             { id: "chat", label: "Counselor Chat", icon: ChatCircleDots },
             { id: "appointments", label: "Scheduled Meetings", icon: CalendarCheck },
+            { id: "referrals", label: "Referrals", icon: ShareNetwork },
             { id: "profile", label: "My Profile", icon: Gear },
             { id: "notifications", label: "Notification Settings", icon: Bell }
           ].map(tab => {
@@ -2309,6 +2363,198 @@ export default function StudentDashboard() {
                 </CardContent>
               </Card>
             </div>
+          </div>
+        )}
+
+        {/* TAB 9: REFERRALS */}
+        {activeTab === "referrals" && (
+          <div className="space-y-8 animate-fade-in">
+            <div className="max-w-3xl">
+              <h1 className="font-display font-bold text-2xl md:text-3xl text-primary tracking-tight mb-2">
+                Referral Program
+              </h1>
+              <p className="text-slate-500 text-sm">
+                Refer your friends to study abroad through Annex Consultancy. Earn rewards when they enroll!
+              </p>
+            </div>
+
+            {/* Top Cards: Referral Code & Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              
+              {/* Copy Code card */}
+              <Card className="md:col-span-3 bg-white border border-hairline/80 shadow-sm p-6 md:p-8 rounded-3xl">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-bold text-primary">Your Referral Code</h3>
+                    <p className="text-slate-500 text-xs max-w-xl">
+                      Share this unique code or direct link with friends. They will get a consultation slot, and you will track their admissions journey.
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <div className="bg-slate-50 border border-hairline rounded-2xl px-5 py-3 text-center sm:text-left">
+                      <span className="text-[10px] text-slate-400 font-extrabold uppercase block tracking-wider">Referral Code</span>
+                      <span className="text-lg font-bold text-primary font-mono select-all">
+                        {studentData?.referral_code || "GENERATING..."}
+                      </span>
+                    </div>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                      <button
+                        onClick={() => {
+                          const link = `${window.location.origin}/refer/${studentData?.referral_code || ""}`;
+                          navigator.clipboard.writeText(link);
+                          alert("Referral link copied to clipboard!");
+                        }}
+                        className="flex-grow sm:flex-grow-0 px-5 py-3 bg-primary text-white text-xs font-bold rounded-2xl hover:bg-primary/95 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                      >
+                        <ArrowSquareOut size={16} />
+                        Copy Link
+                      </button>
+                      
+                      <a
+                        href={`https://wa.me/?text=${encodeURIComponent(
+                          `Hey! I'm studying through Annex Consultancy. Use my link to register and explore global education options: ${window.location.origin}/refer/${studentData?.referral_code || ""}`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-grow sm:flex-grow-0 px-5 py-3 bg-[#25D366] hover:bg-[#20ba5a] text-white text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                      >
+                        <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.97C16.579 2.028 14.11 1.001 11.47 1c-5.449 0-9.873 4.369-9.877 9.8.002 1.83.493 3.618 1.42 5.2l-.33 1.202-.314 1.15 1.173-.305 1.285-.333zM18.001 14.77c-.328-.164-1.944-.959-2.244-1.069-.3-.109-.52-.164-.738.164-.219.328-.847 1.069-1.039 1.288-.192.218-.384.246-.712.081-1.095-.548-1.815-.992-2.529-1.611-.83-.718-1.287-1.503-1.451-1.777-.164-.274-.018-.423.118-.558.122-.121.274-.328.411-.492.137-.164.183-.274.274-.456.09-.182.046-.341-.022-.478-.069-.137-.738-1.78-.992-2.434-.26-.626-.525-.54-.738-.551-.192-.01-.41-.012-.629-.012-.219 0-.575.082-.876.411-.3.328-1.15 1.122-1.15 2.738 0 1.616 1.178 3.177 1.342 3.396.164.218 2.317 3.538 5.613 4.961.784.339 1.396.541 1.873.692.788.251 1.505.216 2.071.131.63-.094 1.944-.794 2.217-1.56.274-.767.274-1.424.192-1.56-.082-.136-.3-.218-.628-.382z"/>
+                        </svg>
+                        WhatsApp
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Stats Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:col-span-3">
+                <Card className="p-4 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between min-h-[110px]">
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Referred</span>
+                    <ShareNetwork size={16} />
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-2xl font-bold font-display text-primary">{referralStats.total}</span>
+                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Leads submitted</p>
+                  </div>
+                </Card>
+
+                <Card className="p-4 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between min-h-[110px]">
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Active Referrals</span>
+                    <Clock size={16} />
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-2xl font-bold font-display text-primary">{referralStats.active}</span>
+                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">In process</p>
+                  </div>
+                </Card>
+
+                <Card className="p-4 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between min-h-[110px]">
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Enrolled</span>
+                    <GraduationCap size={16} />
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-2xl font-bold font-display text-emerald-600">{referralStats.enrolled}</span>
+                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Successful enrollments</p>
+                  </div>
+                </Card>
+
+                <Card className="p-4 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between min-h-[110px]">
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rewards Earned</span>
+                    <Gift size={16} />
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-2xl font-bold font-display text-primary">Rs. {referralStats.rewards.toLocaleString()}</span>
+                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Paid/Approved cashbacks</p>
+                  </div>
+                </Card>
+              </div>
+
+            </div>
+
+            {/* History Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Referrals History</CardTitle>
+                <CardDescription>Real-time status tracking for your referred admissions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingReferrals ? (
+                  <div className="py-12 flex flex-col items-center justify-center text-slate-400">
+                    <SpinnerGap size={24} className="animate-spin text-primary mb-2" />
+                    <p className="text-xs">Loading referrals...</p>
+                  </div>
+                ) : referrals.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 border border-dashed border-hairline bg-slate-50/50 rounded-2xl">
+                    <ShareNetwork size={36} className="mx-auto text-slate-300 mb-2" />
+                    <p className="text-sm">You haven't referred anyone yet.</p>
+                    <p className="text-xs text-slate-400 mt-1">Share your link to earn cash rewards when your friends enroll!</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto border border-hairline rounded-xl">
+                    <table className="w-full text-left text-xs divide-y divide-hairline text-slate-700 bg-white">
+                      <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-3">Friend's Name</th>
+                          <th className="px-4 py-3">Date Referred</th>
+                          <th className="px-4 py-3">Milestone Status</th>
+                          <th className="px-4 py-3">Reward Details</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-hairline text-slate-600">
+                        {referrals.map((ref) => {
+                          const reward = ref.referral_rewards ? (Array.isArray(ref.referral_rewards) ? ref.referral_rewards[0] : ref.referral_rewards) : null;
+                          return (
+                            <tr key={ref.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-4 py-4 font-bold text-primary">
+                                {ref.referred_name}
+                              </td>
+                              <td className="px-4 py-4 text-slate-400">
+                                {new Date(ref.created_at).toLocaleDateString()}
+                              </td>
+                              <td className="px-4 py-4">
+                                <span className={`inline-block text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${
+                                  ref.status === "rewarded" || ref.status === "enrolled"
+                                    ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                    : ref.status === "lead"
+                                    ? "bg-slate-50 text-slate-500 border-slate-200"
+                                    : "bg-blue-50 text-blue-600 border-blue-100"
+                                }`}>
+                                  {ref.status.replace("_", " ")}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4">
+                                {reward ? (
+                                  <div className="flex flex-col">
+                                    <span className="font-bold text-slate-700">Rs. {reward.amount.toLocaleString()}</span>
+                                    <span className={`text-[8px] font-extrabold uppercase tracking-wider mt-0.5 ${
+                                      reward.status === "paid" ? "text-emerald-500" : reward.status === "approved" ? "text-blue-500" : "text-amber-500"
+                                    }`}>
+                                      {reward.status}
+                                    </span>
+                                  </div>
+                                ) : ref.status === "enrolled" ? (
+                                  <span className="text-[10px] text-amber-500 font-semibold flex items-center gap-1">
+                                    <Clock size={12} /> Pending Approval
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 italic">Enrolls to earn</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
 

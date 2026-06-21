@@ -7,7 +7,7 @@ import {
   Download, MagnifyingGlass, Funnel, ArrowSquareOut, Globe, 
   Warning, WarningCircle, Check, X, SpinnerGap, GraduationCap, Star, Copy,
   User, Paperclip, PaperPlaneRight, Gear, UploadSimple, Lock, Key, Clock, Checks,
-  ChatCircleDots, Briefcase, Bell
+  ChatCircleDots, Briefcase, Bell, ShareNetwork, Gift
 } from "@phosphor-icons/react";
 import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
@@ -117,7 +117,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const [checkingAuth, setCheckingAuth] = React.useState(true);
   
   // Dashboard Tabs
-  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat" | "counselors" | "settings" | "training" | "experts" | "notifications" | "roles">((initialTab as any) || "bookings");
+  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat" | "counselors" | "settings" | "training" | "experts" | "notifications" | "roles" | "referrals">((initialTab as any) || "bookings");
 
   const [userType, setUserType] = React.useState<"super-admin" | "counselor" | null>(null);
   const [userPermissions, setUserPermissions] = React.useState<string[]>([]);
@@ -139,6 +139,21 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const [notifHistorySearch, setNotifHistorySearch] = React.useState("");
   const [notifHistoryTypeFilter, setNotifHistoryTypeFilter] = React.useState("All");
   const [notifHistoryStatusFilter, setNotifHistoryStatusFilter] = React.useState("All");
+
+  // Referrals Administrative state
+  const [referrals, setReferrals] = React.useState<any[]>([]);
+  const [loadingReferrals, setLoadingReferrals] = React.useState(false);
+  const [referralSearch, setReferralSearch] = React.useState("");
+  const [referralStatusFilter, setReferralStatusFilter] = React.useState("All");
+  
+  const [isRewardModalOpen, setIsRewardModalOpen] = React.useState(false);
+  const [rewardAmount, setRewardAmount] = React.useState("10000");
+  const [selectedReferral, setSelectedReferral] = React.useState<any | null>(null);
+  const [issuingReward, setIssuingReward] = React.useState(false);
+  const [updatingReferralStatus, setUpdatingReferralStatus] = React.useState<string | null>(null);
+
+  const [referralAnalytics, setReferralAnalytics] = React.useState<any>(null);
+  const [loadingReferralAnalytics, setLoadingReferralAnalytics] = React.useState(false);
 
   // Selected student notification preferences
   const [selectedStudentPrefs, setSelectedStudentPrefs] = React.useState<any | null>(null);
@@ -511,6 +526,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     const mapping: { [key: string]: string } = {
       bookings: "Dashboard",
       students: "Students",
+      referrals: "Students",
       counselors: "Counselors Management",
       chat: "Messages",
       training: "Training & Placement",
@@ -533,6 +549,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const allTabsList = [
     { id: "bookings", label: `Consultations (${bookings.length})` },
     { id: "students", label: `Students (${students.length})` },
+    { id: "referrals", label: `Referrals (${referrals.length})` },
     { id: "counselors", label: `Counselors (${counselors.length})` },
     { id: "chat", label: "Messaging" },
     { id: "training", label: `Training & Placement (${trainingStudents.length})` },
@@ -1113,6 +1130,25 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       console.error("Error loading career experts:", err.message);
     }
     
+    // 12. Fetch Referrals & Analytics (Admin)
+    try {
+      const token = getAdminCredentials();
+      const res = await fetch("/api/admin/referrals", {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setReferrals(data.referrals || []);
+          setReferralAnalytics(data.analytics || null);
+        }
+      }
+    } catch (err: any) {
+      console.error("Error loading referrals in fetchAllData:", err.message);
+    }
+    
     setLoading(false);
   }, [fetchConversations]);
 
@@ -1297,6 +1333,104 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     setTimeout(() => {
       setToastMessage(null);
     }, 4000);
+  };
+
+  const fetchReferralsData = React.useCallback(async () => {
+    setLoadingReferrals(true);
+    setLoadingReferralAnalytics(true);
+    try {
+      const token = getAdminCredentials();
+      const res = await fetch(`/api/admin/referrals?status=${referralStatusFilter}&search=${encodeURIComponent(referralSearch)}`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      if (!res.ok) throw new Error("Failed to fetch referrals data");
+      const data = await res.json();
+      if (data.success) {
+        setReferrals(data.referrals || []);
+        setReferralAnalytics(data.analytics || null);
+      }
+    } catch (err: any) {
+      console.error("Error loading referrals data:", err.message);
+    } finally {
+      setLoadingReferrals(false);
+      setLoadingReferralAnalytics(false);
+    }
+  }, [referralStatusFilter, referralSearch]);
+
+  React.useEffect(() => {
+    if (isAuthenticated && activeTab === "referrals") {
+      fetchReferralsData();
+    }
+  }, [isAuthenticated, activeTab, fetchReferralsData]);
+
+  const handleUpdateReferralStatus = async (referralId: string, newStatus: string) => {
+    setUpdatingReferralStatus(referralId);
+    try {
+      const token = getAdminCredentials();
+      const res = await fetch("/api/admin/referrals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: "update-status",
+          referralId,
+          status: newStatus
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update referral status");
+      
+      setToastMessage("Referral status updated successfully!");
+      setTimeout(() => setToastMessage(null), 3000);
+      
+      fetchReferralsData();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    } finally {
+      setUpdatingReferralStatus(null);
+    }
+  };
+
+  const handleIssueReferralReward = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedReferral) return;
+    
+    setIssuingReward(true);
+    try {
+      const token = getAdminCredentials();
+      const res = await fetch("/api/admin/referrals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: "issue-reward",
+          referralId: selectedReferral.id,
+          rewardAmount: Number(rewardAmount),
+          rewardType: "Cash",
+          notes: `Referral reward issued by counselor/admin for ${selectedReferral.referred_name}`
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to issue reward");
+      
+      setToastMessage("Reward issued successfully!");
+      setTimeout(() => setToastMessage(null), 3000);
+      
+      setIsRewardModalOpen(false);
+      setSelectedReferral(null);
+      
+      fetchReferralsData();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    } finally {
+      setIssuingReward(false);
+    }
   };
 
   // ----------------------------------------------------
@@ -6818,6 +6952,279 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
           </section>
         )}
 
+        {/* ===================== REFERRALS TAB ===================== */}
+        {activeTab === "referrals" && (
+          <section className="flex flex-col gap-8 animate-fade-in text-slate-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-display font-bold text-2xl text-primary leading-tight">Referral Management</h2>
+                <p className="text-xs text-slate-400 mt-1">Track student-submitted leads, transition lifecycle stages, and approve cash rewards.</p>
+              </div>
+              <Button variant="secondary" size="sm" onClick={fetchReferralsData} className="flex items-center gap-1.5">
+                <SpinnerGap className={loadingReferrals ? "animate-spin" : ""} size={14} /> Refresh Data
+              </Button>
+            </div>
+
+            {/* Analytics Dashboard */}
+            {loadingReferralAnalytics ? (
+              <div className="py-8 flex flex-col items-center justify-center text-slate-400">
+                <SpinnerGap size={24} className="animate-spin text-primary mb-2" />
+                <p className="text-xs">Calculating analytics metrics...</p>
+              </div>
+            ) : referralAnalytics ? (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {/* Stats Cards */}
+                <Card className="p-5 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between min-h-[110px]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Referrals</span>
+                  <div className="mt-3">
+                    <span className="text-2xl font-bold font-display text-primary">{referralAnalytics.totalReferrals}</span>
+                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Leads submitted</p>
+                  </div>
+                </Card>
+
+                <Card className="p-5 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between min-h-[110px]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Conversion Rate</span>
+                  <div className="mt-3">
+                    <span className="text-2xl font-bold font-display text-primary">{referralAnalytics.conversionRate}%</span>
+                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Enrollment conversion</p>
+                  </div>
+                </Card>
+
+                <Card className="p-5 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between min-h-[110px]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rewards Approved/Paid</span>
+                  <div className="mt-3">
+                    <span className="text-2xl font-bold font-display text-emerald-600">Rs. {referralAnalytics.rewardsPaid.toLocaleString()}</span>
+                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Approved cashback payout</p>
+                  </div>
+                </Card>
+
+                <Card className="p-5 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between min-h-[110px]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Active Referrers</span>
+                  <div className="mt-3">
+                    <span className="text-2xl font-bold font-display text-primary">{referralAnalytics.activeReferrers}</span>
+                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Students referring</p>
+                  </div>
+                </Card>
+
+                {/* Funnel Stage Chart */}
+                <Card className="md:col-span-2 p-5 bg-white border border-hairline/80 rounded-2xl">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Referral Stage Funnel</h4>
+                  <div className="space-y-3">
+                    {referralAnalytics.funnelStages?.map((stage: any) => (
+                      <div key={stage.stage} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-slate-600">{stage.stage}</span>
+                          <span className="text-primary">{stage.count} ({stage.percentage}%)</span>
+                        </div>
+                        <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                          <div 
+                            className="bg-primary h-full rounded-full transition-all" 
+                            style={{ width: `${stage.percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+
+                {/* Monthly Trend Chart */}
+                <Card className="p-5 bg-white border border-hairline/80 rounded-2xl">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Monthly Trend</h4>
+                  {referralAnalytics.monthlyTrend && referralAnalytics.monthlyTrend.length > 0 ? (
+                    <div className="space-y-3">
+                      {referralAnalytics.monthlyTrend.map((trend: any) => (
+                        <div key={trend.month} className="flex items-center justify-between py-1 border-b border-hairline/40 last:border-0 text-xs">
+                          <span className="text-slate-500 font-semibold">{trend.month}</span>
+                          <div className="flex-grow mx-4">
+                            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                              <div 
+                                className="bg-gold h-full rounded-full" 
+                                style={{ 
+                                  width: `${referralAnalytics.totalReferrals > 0 ? (trend.count / referralAnalytics.totalReferrals) * 100 : 0}%` 
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <span className="text-primary font-bold">{trend.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-slate-400 text-xs text-center py-6">No historical data available</p>
+                  )}
+                </Card>
+
+                {/* Top Referrers */}
+                <Card className="p-5 bg-white border border-hairline/80 rounded-2xl">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Top Referrers List</h4>
+                  {referralAnalytics.topReferrers && referralAnalytics.topReferrers.length > 0 ? (
+                    <div className="divide-y divide-hairline">
+                      {referralAnalytics.topReferrers.map((ref: any, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between py-2 first:pt-0 last:pb-0 text-xs">
+                          <div>
+                            <p className="font-bold text-primary">{ref.referrerName}</p>
+                            <p className="text-[10px] text-slate-400 truncate max-w-[150px]">{ref.referrerEmail}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="font-bold text-slate-700">{ref.referralsCount} referrals</span>
+                            <p className="text-[10px] text-emerald-600 font-semibold">Rs. {ref.rewardsTotal.toLocaleString()}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-slate-400 text-xs text-center py-6">No referrers active yet</p>
+                  )}
+                </Card>
+              </div>
+            ) : null}
+
+            {/* Filter and Table Audit */}
+            <Card>
+              <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-hairline/65 pb-5">
+                <div>
+                  <CardTitle>Referrals Register</CardTitle>
+                  <CardDescription>Comprehensive log of referred student entries</CardDescription>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Search input */}
+                  <div className="relative w-full sm:w-60">
+                    <MagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <input 
+                      type="text" 
+                      placeholder="Search referrer or lead name..."
+                      value={referralSearch}
+                      onChange={(e) => setReferralSearch(e.target.value)}
+                      className="pl-10 pr-4 py-2 border border-hairline rounded-full text-xs outline-none w-full bg-slate-50 focus:bg-white focus:border-primary transition-all"
+                    />
+                  </div>
+
+                  {/* Status filter */}
+                  <div className="flex items-center gap-1.5 border border-hairline bg-slate-50 rounded-full px-3 py-1.5 text-xs text-slate-500">
+                    <Funnel size={14} className="text-slate-400" />
+                    <select
+                      value={referralStatusFilter}
+                      onChange={(e) => setReferralStatusFilter(e.target.value)}
+                      className="bg-transparent outline-none text-xs font-semibold cursor-pointer text-slate-600"
+                    >
+                      <option value="All">All Milestones</option>
+                      <option value="lead">Lead</option>
+                      <option value="contacted">Contacted</option>
+                      <option value="application_started">Application Started</option>
+                      <option value="offer_received">Offer Received</option>
+                      <option value="visa_approved">Visa Approved</option>
+                      <option value="enrolled">Enrolled</option>
+                      <option value="rewarded">Rewarded</option>
+                    </select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {loadingReferrals ? (
+                  <div className="py-16 flex flex-col items-center justify-center text-slate-400">
+                    <SpinnerGap size={32} className="animate-spin text-primary mb-2" />
+                    <p className="text-xs font-semibold">Loading referrals directory...</p>
+                  </div>
+                ) : referrals.length === 0 ? (
+                  <div className="py-16 text-center text-slate-400">
+                    <Users size={40} className="mx-auto text-slate-300 mb-2.5" />
+                    <p className="text-sm font-semibold">No referrals matches found</p>
+                    <p className="text-xs text-slate-400 mt-1">Adjust search parameters or check filter criteria</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs divide-y divide-hairline text-slate-700 bg-white">
+                      <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400 sticky top-0">
+                        <tr>
+                          <th className="px-6 py-3.5">Referred Lead</th>
+                          <th className="px-6 py-3.5">Referrer Student</th>
+                          <th className="px-6 py-3.5">Intake preferences</th>
+                          <th className="px-6 py-3.5">Date Referred</th>
+                          <th className="px-6 py-3.5">Lifecycle status</th>
+                          <th className="px-6 py-3.5">Rewards Status</th>
+                          <th className="px-6 py-3.5 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-hairline text-slate-600">
+                        {referrals.map((ref) => {
+                          const reward = ref.referral_rewards ? (Array.isArray(ref.referral_rewards) ? ref.referral_rewards[0] : ref.referral_rewards) : null;
+                          return (
+                            <tr key={ref.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-6 py-4.5">
+                                <p className="font-bold text-primary">{ref.referred_name}</p>
+                                <p className="text-[10px] text-slate-400">{ref.referred_email}</p>
+                                {ref.referred_phone && <p className="text-[10px] text-slate-400">{ref.referred_phone}</p>}
+                              </td>
+                              <td className="px-6 py-4.5">
+                                <p className="font-semibold text-slate-700">{ref.students?.name || "Deleted Student"}</p>
+                                <p className="text-[10px] text-slate-400">{ref.students?.email}</p>
+                                <span className="inline-block text-[9px] font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded mt-1">{ref.referral_code}</span>
+                              </td>
+                              <td className="px-6 py-4.5">
+                                <p className="font-medium text-slate-700">{ref.preferred_country}</p>
+                                <p className="text-[10px] text-slate-400">{ref.preferred_intake}</p>
+                              </td>
+                              <td className="px-6 py-4.5 text-slate-400">
+                                {new Date(ref.created_at).toLocaleDateString()}
+                              </td>
+                              <td className="px-6 py-4.5">
+                                <select
+                                  value={ref.status}
+                                  onChange={(e) => handleUpdateReferralStatus(ref.id, e.target.value)}
+                                  disabled={updatingReferralStatus === ref.id}
+                                  className="border border-hairline rounded-xl px-2.5 py-1 text-xs outline-none bg-white font-semibold text-slate-700"
+                                >
+                                  <option value="lead">Lead</option>
+                                  <option value="contacted">Contacted</option>
+                                  <option value="application_started">Application Started</option>
+                                  <option value="offer_received">Offer Received</option>
+                                  <option value="visa_approved">Visa Approved</option>
+                                  <option value="enrolled">Enrolled</option>
+                                  <option value="rewarded">Rewarded</option>
+                                </select>
+                              </td>
+                              <td className="px-6 py-4.5">
+                                {reward ? (
+                                  <div className="flex flex-col">
+                                    <span className="font-bold text-slate-700">Rs. {reward.reward_amount.toLocaleString()}</span>
+                                    <span className={`text-[8px] font-extrabold uppercase tracking-wider mt-0.5 ${
+                                      reward.status === "paid" ? "text-emerald-500" : reward.status === "approved" ? "text-blue-500" : "text-amber-500"
+                                    }`}>
+                                      {reward.status}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 italic">None issued</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4.5 text-right">
+                                {["enrolled", "rewarded"].includes(ref.status) && (!ref.referral_rewards || ref.referral_rewards.length === 0) ? (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedReferral(ref);
+                                      setIsRewardModalOpen(true);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-full hover:bg-primary/95 transition-all cursor-pointer shadow-sm"
+                                  >
+                                    <Gift size={12} />
+                                    Issue Reward
+                                  </button>
+                                ) : (
+                                  <span className="text-slate-400 text-xs italic">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </section>
+        )}
+
         {/* ===================== ROLES & PERMISSIONS TAB ===================== */}
         {activeTab === "roles" && (
           <section className="flex flex-col gap-6 animate-fade-in text-slate-700">
@@ -10165,6 +10572,69 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               <Button onClick={() => setIsAuditModalOpen(false)} variant="ghost" size="sm">Close Workspace</Button>
             </div>
 
+          </Card>
+        </div>
+      )}
+      {/* Issue Referral Reward Modal */}
+      {isRewardModalOpen && selectedReferral && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <Card className="max-w-md w-full animate-scale-in">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-hairline/60 pb-3">
+              <div>
+                <CardTitle>Issue Referral Reward</CardTitle>
+                <CardDescription>Approve a cashback/cash reward for the referrer</CardDescription>
+              </div>
+              <button 
+                onClick={() => { setIsRewardModalOpen(false); setSelectedReferral(null); }}
+                className="p-1 rounded-full hover:bg-slate-100 transition-colors text-slate-500 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <form onSubmit={handleIssueReferralReward} className="space-y-4">
+                <div className="p-3 bg-slate-50 border border-hairline rounded-2xl text-xs space-y-1 text-slate-700">
+                  <div>
+                    <span className="text-slate-400 font-semibold">Referrer:</span>{" "}
+                    <span className="font-bold text-primary">{selectedReferral.students?.name} ({selectedReferral.students?.email})</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-semibold">Referred Lead:</span>{" "}
+                    <span className="font-bold text-primary">{selectedReferral.referred_name} ({selectedReferral.referred_email})</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 text-slate-700">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Reward Amount (NPR)</label>
+                  <input 
+                    type="number" 
+                    required
+                    min={1}
+                    value={rewardAmount}
+                    onChange={(e) => setRewardAmount(e.target.value)}
+                    className="w-full border border-hairline px-4 py-2.5 rounded-full text-sm outline-none focus:border-primary bg-white text-slate-800"
+                  />
+                </div>
+
+                <div className="flex gap-3 justify-end pt-2">
+                  <Button 
+                    type="button" 
+                    variant="secondary"
+                    onClick={() => { setIsRewardModalOpen(false); setSelectedReferral(null); }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={issuingReward}
+                    className="flex items-center gap-1.5"
+                  >
+                    {issuingReward ? "Processing..." : "Approve & Issue"}
+                    {issuingReward && <SpinnerGap size={14} className="animate-spin text-white" />}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
           </Card>
         </div>
       )}
