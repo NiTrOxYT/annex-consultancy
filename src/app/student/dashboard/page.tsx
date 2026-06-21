@@ -2539,184 +2539,176 @@ export default function StudentDashboard() {
               </div>
             </Card>
 
-            {/* Split layout: Section 4 & Section 5 */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-              
-              {/* Section 4: Referral History Table */}
-              <Card className="lg:col-span-2 bg-white border border-hairline/80 shadow-sm rounded-3xl overflow-hidden">
-                <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-hairline/65 pb-5">
-                  <div>
-                    <CardTitle>Referrals History</CardTitle>
-                    <CardDescription>Real-time status tracking for your referred admissions</CardDescription>
+            {/* Section 4: Referral History Table */}
+            <Card className="w-full bg-white border border-hairline/80 shadow-sm rounded-3xl overflow-hidden">
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-hairline/65 pb-5">
+                <div>
+                  <CardTitle>Referrals History</CardTitle>
+                  <CardDescription>Real-time status tracking for your referred admissions</CardDescription>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Search */}
+                  <div className="relative w-full sm:w-48">
+                    <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                    <input 
+                      type="text" 
+                      placeholder="Search friend's name..."
+                      value={referralSearchQuery}
+                      onChange={(e) => setReferralSearchQuery(e.target.value)}
+                      className="pl-8 pr-4 py-1.5 border border-hairline rounded-full text-xs outline-none w-full bg-slate-50 focus:bg-white focus:border-primary transition-all text-slate-700 font-medium"
+                    />
                   </div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    {/* Search */}
-                    <div className="relative w-full sm:w-48">
-                      <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                      <input 
-                        type="text" 
-                        placeholder="Search friend's name..."
-                        value={referralSearchQuery}
-                        onChange={(e) => setReferralSearchQuery(e.target.value)}
-                        className="pl-8 pr-4 py-1.5 border border-hairline rounded-full text-xs outline-none w-full bg-slate-50 focus:bg-white focus:border-primary transition-all text-slate-700 font-medium"
-                      />
-                    </div>
 
-                    {/* Filter */}
-                    <div className="flex items-center gap-1 border border-hairline bg-slate-50 rounded-full px-2.5 py-1.5 text-xs text-slate-500">
-                      <Funnel size={12} className="text-slate-400" />
-                      <select
-                        value={referralStatusFilter}
-                        onChange={(e) => setReferralStatusFilter(e.target.value)}
-                        className="bg-transparent outline-none text-[10px] font-bold uppercase cursor-pointer text-slate-600 border-none p-0"
-                      >
-                        <option value="All">All Stages</option>
-                        <option value="lead">Lead</option>
-                        <option value="contacted">Counseling</option>
-                        <option value="application_started">Application</option>
-                        <option value="offer_received">Offer Received</option>
-                        <option value="visa_approved">Visa Approved</option>
-                        <option value="enrolled">Enrolled</option>
-                        <option value="rewarded">Rewarded</option>
-                      </select>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {loadingReferrals ? (
-                    <div className="py-16 flex flex-col items-center justify-center text-slate-400">
-                      <SpinnerGap size={24} className="animate-spin text-primary mb-2" />
-                      <p className="text-xs">Loading referrals...</p>
-                    </div>
-                  ) : filteredReferrals.length === 0 ? (
-                    <div className="py-16 text-center text-slate-400 px-6">
-                      <ShareNetwork size={36} className="mx-auto text-slate-300 mb-2" />
-                      <p className="text-sm font-bold text-slate-600">No matching referrals</p>
-                      <p className="text-xs text-slate-400 mt-1">Adjust search parameters or check filters</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs divide-y divide-hairline text-slate-700 bg-white">
-                        <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400 sticky top-0">
-                          <tr>
-                            <th className="px-6 py-3.5">Student Name</th>
-                            <th className="px-6 py-3.5">Country</th>
-                            <th className="px-6 py-3.5">Status</th>
-                            <th className="px-6 py-3.5">Submitted Date</th>
-                            <th className="px-6 py-3.5">Current Stage</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-hairline text-slate-600">
-                          {filteredReferrals.map((ref) => {
-                            const reward = ref.referral_rewards ? (Array.isArray(ref.referral_rewards) ? ref.referral_rewards[0] : ref.referral_rewards) : null;
-                            
-                            const getStageLabel = (status: string) => {
-                              const mapping: { [key: string]: string } = {
-                                lead: "Lead Submitted",
-                                contacted: "Admissions Counseling",
-                                application_started: "Application Started",
-                                offer_received: "Offer Letter Received",
-                                visa_approved: "Visa Approved",
-                                enrolled: "Enrolled & Confirmed",
-                                rewarded: "Reward Fully Paid"
-                              };
-                              return mapping[status] || status.replace("_", " ");
-                            };
-
-                            return (
-                              <tr key={ref.id} className="hover:bg-slate-50/50 transition-colors">
-                                <td className="px-6 py-4">
-                                  <p className="font-bold text-primary">{ref.referred_name}</p>
-                                  <p className="text-[10px] text-slate-400">{ref.referred_email}</p>
-                                </td>
-                                <td className="px-6 py-4 font-semibold text-slate-600">
-                                  {ref.preferred_country}
-                                </td>
-                                <td className="px-6 py-4">
-                                  <span className={`inline-block text-[9px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${
-                                    ref.status === "rewarded" || ref.status === "enrolled"
-                                      ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                                      : ref.status === "lead"
-                                      ? "bg-slate-50 text-slate-500 border-slate-200"
-                                      : "bg-blue-50 text-blue-600 border-blue-100"
-                                  }`}>
-                                    {ref.status.replace("_", " ")}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 text-slate-400">
-                                  {new Date(ref.created_at).toLocaleDateString()}
-                                </td>
-                                <td className="px-6 py-4 font-medium text-slate-700">
-                                  {getStageLabel(ref.status)}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Section 5: Rewards Information */}
-              <Card className="bg-gradient-to-br from-primary to-slate-900 border border-primary/20 p-6 md:p-8 rounded-3xl text-white shadow-xl relative overflow-hidden">
-                {/* Background decorative glow */}
-                <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-gold/10 blur-3xl z-0" />
-                
-                <div className="relative z-10 space-y-6">
-                  <div className="flex items-center gap-2">
-                    <Gift size={20} className="text-gold" weight="fill" />
-                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-300">Rewards & Milestones</h3>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                      <div>
-                        <p className="text-xs font-bold text-white">1 Enrollment</p>
-                        <p className="text-[10px] text-slate-400">First successful referral</p>
-                      </div>
-                      <span className="text-xs font-extrabold text-gold">₹1,000 Reward</span>
-                    </div>
-                    
-                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                      <div>
-                        <p className="text-xs font-bold text-white">3 Enrollments</p>
-                        <p className="text-[10px] text-slate-400">Milestone Bonus</p>
-                      </div>
-                      <span className="text-xs font-extrabold text-gold">Special Gift Bonus</span>
-                    </div>
-                    
-                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                      <div>
-                        <p className="text-xs font-bold text-white">5 Enrollments</p>
-                        <p className="text-[10px] text-slate-400">Annex Ambassador</p>
-                      </div>
-                      <span className="text-xs font-extrabold text-gold">Ambassador Prize</span>
-                    </div>
-                  </div>
-                  
-                  <div className="pt-2 space-y-2.5">
-                    <p className="text-[9px] uppercase font-extrabold text-slate-400 tracking-wider">Eligibility Criteria</p>
-                    <ul className="text-[10px] text-slate-300 space-y-2 list-none">
-                      <li className="flex items-start gap-1.5">
-                        <span className="text-gold shrink-0">•</span>
-                        <span>Referrals must be unique student registrations not already in active counseling.</span>
-                      </li>
-                      <li className="flex items-start gap-1.5">
-                        <span className="text-gold shrink-0">•</span>
-                        <span>Payouts are approved and issued within 14 working days of formal university enrollment confirmation.</span>
-                      </li>
-                      <li className="flex items-start gap-1.5">
-                        <span className="text-gold shrink-0">•</span>
-                        <span>Cashout options include bank transfer or student portal tuition discount codes.</span>
-                      </li>
-                    </ul>
+                  {/* Filter */}
+                  <div className="flex items-center gap-1 border border-hairline bg-slate-50 rounded-full px-2.5 py-1.5 text-xs text-slate-500">
+                    <Funnel size={12} className="text-slate-400" />
+                    <select
+                      value={referralStatusFilter}
+                      onChange={(e) => setReferralStatusFilter(e.target.value)}
+                      className="bg-transparent outline-none text-[10px] font-bold uppercase cursor-pointer text-slate-600 border-none p-0"
+                    >
+                      <option value="All">All Stages</option>
+                      <option value="lead">Lead</option>
+                      <option value="contacted">Counseling</option>
+                      <option value="application_started">Application</option>
+                      <option value="offer_received">Offer Received</option>
+                      <option value="visa_approved">Visa Approved</option>
+                      <option value="enrolled">Enrolled</option>
+                      <option value="rewarded">Rewarded</option>
+                    </select>
                   </div>
                 </div>
-              </Card>
+              </CardHeader>
+              <CardContent className="p-0">
+                {loadingReferrals ? (
+                  <div className="py-16 flex flex-col items-center justify-center text-slate-400">
+                    <SpinnerGap size={24} className="animate-spin text-primary mb-2" />
+                    <p className="text-xs">Loading referrals...</p>
+                  </div>
+                ) : filteredReferrals.length === 0 ? (
+                  <div className="py-16 text-center text-slate-400 px-6">
+                    <ShareNetwork size={36} className="mx-auto text-slate-300 mb-2" />
+                    <p className="text-sm font-bold text-slate-600">No matching referrals</p>
+                    <p className="text-xs text-slate-400 mt-1">Adjust search parameters or check filters</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs divide-y divide-hairline text-slate-700 bg-white">
+                      <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400 sticky top-0">
+                        <tr>
+                          <th className="px-6 py-3.5 whitespace-nowrap">Student Name</th>
+                          <th className="px-6 py-3.5 whitespace-nowrap">Country</th>
+                          <th className="px-6 py-3.5 whitespace-nowrap">Status</th>
+                          <th className="px-6 py-3.5 whitespace-nowrap">Submitted Date</th>
+                          <th className="px-6 py-3.5 whitespace-nowrap">Current Stage</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-hairline text-slate-600">
+                        {filteredReferrals.map((ref) => {
+                          const getStageLabel = (status: string) => {
+                            const mapping: { [key: string]: string } = {
+                              lead: "Lead Submitted",
+                              contacted: "Admissions Counseling",
+                              application_started: "Application Started",
+                              offer_received: "Offer Letter Received",
+                              visa_approved: "Visa Approved",
+                              enrolled: "Enrolled & Confirmed",
+                              rewarded: "Reward Fully Paid"
+                            };
+                            return mapping[status] || status.replace("_", " ");
+                          };
 
-            </div>
+                          return (
+                            <tr key={ref.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <p className="font-bold text-primary">{ref.referred_name}</p>
+                                <p className="text-[10px] text-slate-400">{ref.referred_email}</p>
+                              </td>
+                              <td className="px-6 py-4 font-semibold text-slate-600 whitespace-nowrap">
+                                {ref.preferred_country}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-block text-[9px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${
+                                  ref.status === "rewarded" || ref.status === "enrolled"
+                                    ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                    : ref.status === "lead"
+                                    ? "bg-slate-50 text-slate-500 border-slate-200"
+                                    : "bg-blue-50 text-blue-600 border-blue-100"
+                                }`}>
+                                  {ref.status.replace("_", " ")}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-slate-400 whitespace-nowrap">
+                                {new Date(ref.created_at).toLocaleDateString()}
+                              </td>
+                              <td className="px-6 py-4 font-medium text-slate-700 whitespace-nowrap">
+                                {getStageLabel(ref.status)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Section 5: Rewards Information (Full Width Banner) */}
+            <Card className="bg-gradient-to-br from-primary to-slate-900 border border-primary/20 p-8 rounded-3xl text-white shadow-xl relative overflow-hidden">
+              <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-gold/5 blur-3xl z-0" />
+              <div className="relative z-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Left Column: Title */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Gift size={24} className="text-gold" weight="fill" />
+                    <h3 className="text-sm font-extrabold uppercase tracking-wider text-gold">Rewards & Milestones</h3>
+                  </div>
+                  <h4 className="text-xl font-bold font-display leading-tight">Refer & Earn Tiered Rewards</h4>
+                  <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+                    Every successful enrollment triggers payouts and Ambassador milestone prizes.
+                  </p>
+                </div>
+                
+                {/* Middle Column: Reward Tiers */}
+                <div className="space-y-4 border-t lg:border-t-0 lg:border-x border-white/10 pt-6 lg:pt-0 lg:px-8">
+                  <p className="text-[10px] uppercase font-extrabold text-slate-400 tracking-wider">Reward Tiers</p>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                      <span className="text-xs font-medium text-slate-300">1 Enrollment</span>
+                      <span className="text-xs font-bold text-gold">₹1,000 Reward</span>
+                    </div>
+                    <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                      <span className="text-xs font-medium text-slate-300">3 Enrollments</span>
+                      <span className="text-xs font-bold text-gold">Special Gift Bonus</span>
+                    </div>
+                    <div className="flex items-center justify-between pb-2">
+                      <span className="text-xs font-medium text-slate-300">5 Enrollments</span>
+                      <span className="text-xs font-bold text-gold">Ambassador Prize</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Right Column: Eligibility */}
+                <div className="space-y-4 pt-6 lg:pt-0">
+                  <p className="text-[10px] uppercase font-extrabold text-slate-400 tracking-wider">Eligibility & Payouts</p>
+                  <ul className="text-[10px] text-slate-300 space-y-2 list-none">
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-gold shrink-0">•</span>
+                      <span className="leading-relaxed">Referrals must be unique student registrations not already in active counseling.</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-gold shrink-0">•</span>
+                      <span className="leading-relaxed">Payouts are approved and issued within 14 working days of university enrollment.</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-gold shrink-0">•</span>
+                      <span className="leading-relaxed">Cashout options include bank transfer or tuition discount codes.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </Card>
           </div>
         )}
 
