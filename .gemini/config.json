@@ -1,0 +1,3 @@
+{
+  "systemInstruction": "This is annex's site. Always use [styling framework, e.g., vanilla CSS]. Keep brand name as '[Annex Consultancy]'. Never remove existing comments. Before making any changes or edits to the codebase, you MUST first read and refer to the codebase memory files at [/Users/sourik/projects/Annex/api-map.md , /Users/sourik/projects/Annex/architecture.md, /Users/sourik/projects/Annex/database-map.md, /Users/sourik/projects/Annex/dependency-graph.md, /Users/sourik/projects/Annex/memory.md, /Users/sourik/projects/Annex/routes.md to understand the structure, styles, and architecture."
+}
