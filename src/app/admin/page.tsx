@@ -105,9 +105,299 @@ interface SuccessStory {
   created_at: string;
 }
 
+interface LeadDetailsPanelProps {
+  lead: any;
+  details: any;
+  loading: boolean;
+  counselors: any[];
+  noteText: string;
+  setNoteText: (val: string) => void;
+  addingNote: boolean;
+  onAddNote: (e: React.FormEvent) => void;
+  onClose: () => void;
+  onUpdateField: (leadId: string, fieldName: string, fieldValue: any) => void;
+  onCompleteReminder: (reminderId: string, title: string, note: string) => void;
+}
+
+function LeadDetailsPanel({
+  lead,
+  details,
+  loading,
+  counselors,
+  noteText,
+  setNoteText,
+  addingNote,
+  onAddNote,
+  onClose,
+  onUpdateField,
+  onCompleteReminder
+}: LeadDetailsPanelProps) {
+  const [detailsTab, setDetailsTab] = React.useState<"profile" | "notes" | "reminders" | "activities">("profile");
+
+  return (
+    <Card className="h-auto sticky top-28 shadow-lg overflow-hidden flex flex-col">
+      {/* Header */}
+      <CardHeader className="bg-slate-50 border-b border-hairline p-4 flex flex-row items-center justify-between">
+        <div className="truncate">
+          <CardTitle className="text-sm font-bold text-primary truncate">{lead.name}</CardTitle>
+          <CardDescription className="text-[10px] font-mono-data truncate mt-0.5">{lead.email}</CardDescription>
+        </div>
+        <button onClick={onClose} className="p-1 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
+          <X size={14} />
+        </button>
+      </CardHeader>
+
+      {/* Tabs Menu */}
+      <div className="flex border-b border-hairline bg-slate-50/50 p-1">
+        {(["profile", "notes", "reminders", "activities"] as const).map(t => (
+          <button
+            key={t}
+            onClick={() => setDetailsTab(t)}
+            className={`flex-1 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-colors cursor-pointer ${
+              detailsTab === t ? "bg-white text-primary shadow-[0_1px_2px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-primary"
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      <CardContent className="p-4 max-h-[500px] overflow-y-auto space-y-4">
+        {loading ? (
+          <div className="p-8 text-center text-slate-400 text-xs">Loading lead records...</div>
+        ) : (
+          <>
+            {detailsTab === "profile" && (
+              <div className="space-y-4">
+                {/* Details Section */}
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-[9px] uppercase font-bold text-slate-400">Intake / Country</span>
+                    <div className="font-semibold text-slate-700 mt-0.5">{lead.preferred_country}</div>
+                    <div className="text-[10px] text-slate-500 font-mono-data">Intake: {lead.intake}</div>
+                  </div>
+                  <div>
+                    <span className="text-[9px] uppercase font-bold text-slate-400">Course Preference</span>
+                    <div className="font-semibold text-slate-700 mt-0.5 truncate">{lead.preferred_course}</div>
+                  </div>
+                  <div>
+                    <span className="text-[9px] uppercase font-bold text-slate-400">Academic Score</span>
+                    <div className="font-semibold text-slate-700 mt-0.5">{lead.qualification}</div>
+                    <div className="text-[10px] text-slate-500 font-mono-data">Grade: {lead.percentage}%</div>
+                  </div>
+                  <div>
+                    <span className="text-[9px] uppercase font-bold text-slate-400">Target Budget</span>
+                    <div className="font-semibold text-slate-700 mt-0.5 font-mono-data">
+                      {lead.currency} {Number(lead.budget).toLocaleString()}
+                    </div>
+                  </div>
+                  {lead.test_type && (
+                    <div>
+                      <span className="text-[9px] uppercase font-bold text-slate-400">English Test</span>
+                      <div className="font-semibold text-slate-700 mt-0.5 font-mono-data">
+                        {lead.test_type} ({lead.test_score})
+                      </div>
+                    </div>
+                  )}
+                  {lead.utm_source && (
+                    <div>
+                      <span className="text-[9px] uppercase font-bold text-slate-400">Attribution Source</span>
+                      <div className="font-semibold text-slate-700 mt-0.5 truncate font-mono-data">
+                        {lead.utm_source} / {lead.utm_medium || "direct"}
+                      </div>
+                    </div>
+                  )}
+                  {lead.first_contacted_at && (
+                    <div className="col-span-2 border-t border-slate-100 pt-2">
+                      <span className="text-[9px] uppercase font-bold text-slate-400 block">Response Time metrics</span>
+                      <span className="text-[10px] text-slate-600">
+                        First Contacted: <span className="font-semibold">{new Date(lead.first_contacted_at).toLocaleString()}</span>
+                      </span>
+                      <span className="block text-[10px] text-slate-600 mt-0.5">
+                        Attained outreach in <span className="font-bold text-gold font-mono-data">{lead.response_time_minutes} minutes</span>.
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Matches list */}
+                <div className="border-t border-slate-100 pt-3">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Matching Universities</h4>
+                  <div className="space-y-2">
+                    {details?.matches?.map((m: any, idx: number) => (
+                      <div key={idx} className="p-2 rounded-xl bg-slate-50 border border-hairline flex justify-between items-center gap-2">
+                        <span className="text-[11px] font-semibold text-primary truncate max-w-[180px]">
+                          {m.university_name_snapshot}
+                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold font-mono-data ${
+                            m.admission_chance === "Safe" 
+                              ? "bg-emerald-50 text-emerald-600" 
+                              : m.admission_chance === "Target"
+                              ? "bg-amber-50 text-amber-600"
+                              : "bg-orange-50 text-orange-600"
+                          }`}>
+                            {m.admission_chance}
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-500 font-mono-data">{m.match_score}%</span>
+                        </div>
+                      </div>
+                    ))}
+                    {(!details?.matches || details.matches.length === 0) && (
+                      <div className="text-center py-2 text-slate-400 text-[10px] italic">No active matches logged</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT: NOTES */}
+            {detailsTab === "notes" && (
+              <div className="space-y-4">
+                <form onSubmit={onAddNote} className="space-y-2">
+                  <textarea
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    required
+                    placeholder="Type counselor note here..."
+                    className="w-full p-2.5 border border-hairline rounded-xl text-xs focus:outline-none focus:border-gold resize-none min-h-[70px]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={addingNote || !noteText.trim()}
+                    className="w-full py-2 bg-primary hover:bg-primary/95 text-white font-bold text-xs rounded-xl shadow-sm transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    {addingNote ? "Adding Note..." : "Add Note"}
+                  </button>
+                </form>
+
+                <div className="space-y-3 pt-2">
+                  {details?.notes?.map((n: any) => (
+                    <div key={n.id} className="p-3 bg-slate-50 border border-hairline rounded-xl space-y-1 relative">
+                      <span className="text-[9px] font-bold text-primary block truncate">
+                        {n.counselor?.full_name || "System Admin"}
+                      </span>
+                      <p className="text-xs text-slate-600 leading-normal">{n.note}</p>
+                      <span className="text-[8px] text-slate-400 block font-mono-data text-right">
+                        {new Date(n.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                  {(!details?.notes || details.notes.length === 0) && (
+                    <div className="text-center py-6 text-slate-400 text-xs italic">No notes logged yet.</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT: REMINDERS */}
+            {detailsTab === "reminders" && (
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Outreach Checklists</h4>
+                <div className="space-y-3">
+                  {details?.reminders?.map((rem: any) => (
+                    <div 
+                      key={rem.id} 
+                      className={`p-3 border rounded-2xl flex flex-col justify-between gap-2 shadow-sm ${
+                        rem.completed ? "bg-slate-50/50 border-slate-100 opacity-60" : "bg-white border-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={rem.completed}
+                            disabled={rem.completed}
+                            onChange={() => {
+                              const note = prompt("Enter completion note:");
+                              if (note !== null) onCompleteReminder(rem.id, rem.title, note);
+                            }}
+                            className="rounded border-slate-300 focus:ring-gold disabled:opacity-50"
+                          />
+                          <span className={`text-xs font-semibold text-primary ${rem.completed ? "line-through text-slate-400" : ""}`}>
+                            {rem.title}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-[9px] text-slate-400 font-mono-data flex justify-between items-center mt-1 border-t border-slate-50 pt-1.5">
+                        <span>DUE: {new Date(rem.due_at).toLocaleDateString()}</span>
+                        {rem.completed && (
+                          <span className="text-emerald-500 font-bold">COMPLETED</span>
+                        )}
+                      </div>
+                      {rem.completed && rem.completion_note && (
+                        <div className="text-[9px] bg-slate-100/50 p-1.5 rounded text-slate-500 mt-0.5">
+                          Note: {rem.completion_note}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {(!details?.reminders || details.reminders.length === 0) && (
+                    <div className="text-center py-6 text-slate-400 text-xs italic">No reminders defined</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT: ACTIVITIES & ASSIGNMENTS */}
+            {detailsTab === "activities" && (
+              <div className="space-y-4">
+                {/* Counselor assignments list */}
+                {details?.assignments?.length > 0 && (
+                  <div>
+                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Counselor Transfer Logs</h4>
+                    <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1">
+                      {details.assignments.map((asg: any) => (
+                        <div key={asg.id} className="p-2.5 bg-slate-50 border border-hairline rounded-xl text-[10px]">
+                          <span className="font-semibold text-primary">Transfer: </span>
+                          <span className="text-slate-500">
+                            {asg.old_counselor?.full_name || "Unassigned"} → {asg.new_counselor?.full_name || "Unassigned"}
+                          </span>
+                          <div className="text-[8px] text-slate-400 font-mono-data mt-1 flex justify-between">
+                            <span>By: {asg.assigned_by_counselor?.full_name || "Super Admin"}</span>
+                            <span>{new Date(asg.assigned_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Audit trail */}
+                <div>
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Activity Timeline Logs</h4>
+                  <div className="space-y-3 relative border-l-2 border-slate-100 pl-3.5 ml-2 pt-1 max-h-[220px] overflow-y-auto pr-1">
+                    {details?.activities?.map((act: any) => (
+                      <div key={act.id} className="space-y-0.5 relative mb-3 last:mb-0">
+                        {/* Timeline dot */}
+                        <div className="absolute -left-[20.5px] top-1 w-2.5 h-2.5 rounded-full bg-slate-200 border-2 border-white" />
+                        <span className="text-[10px] font-bold text-primary flex items-center gap-1.5">
+                          {act.activity_type}
+                        </span>
+                        <p className="text-[10px] text-slate-500 leading-normal">{act.description}</p>
+                        <span className="text-[8px] text-slate-400 block font-mono-data">
+                          {new Date(act.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                    {(!details?.activities || details.activities.length === 0) && (
+                      <div className="text-center py-6 text-slate-400 text-xs italic">No activity timeline logged</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 interface AdminDashboardProps {
   initialTab?: string;
 }
+
 
 export default function AdminDashboard({ initialTab }: AdminDashboardProps = {}) {
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
@@ -117,7 +407,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const [checkingAuth, setCheckingAuth] = React.useState(true);
   
   // Dashboard Tabs
-  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat" | "counselors" | "settings" | "training" | "experts" | "notifications" | "roles" | "referrals">((initialTab as any) || "bookings");
+  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat" | "counselors" | "settings" | "training" | "experts" | "notifications" | "roles" | "referrals" | "eligibility">((initialTab as any) || "bookings");
 
   const [userType, setUserType] = React.useState<"super-admin" | "counselor" | null>(null);
   const [userPermissions, setUserPermissions] = React.useState<string[]>([]);
@@ -158,6 +448,37 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   // Selected student notification preferences
   const [selectedStudentPrefs, setSelectedStudentPrefs] = React.useState<any | null>(null);
   const [selectedStudentHistory, setSelectedStudentHistory] = React.useState<any[]>([]);
+
+  // Eligibility Leads states
+  const [eligibilityLeads, setEligibilityLeads] = React.useState<any[]>([]);
+  const [eligibilityCount, setEligibilityCount] = React.useState(0);
+  const [eligibilityLoading, setEligibilityLoading] = React.useState(false);
+  const [eligibilitySearch, setEligibilitySearch] = React.useState("");
+  const [eligibilityStatusFilter, setEligibilityStatusFilter] = React.useState("All");
+  const [eligibilityPriorityFilter, setEligibilityPriorityFilter] = React.useState("All");
+  const [eligibilityScoreFilter, setEligibilityScoreFilter] = React.useState("All");
+  const [eligibilityCounselorFilter, setEligibilityCounselorFilter] = React.useState("All");
+  const [eligibilityCountryFilter, setEligibilityCountryFilter] = React.useState("All");
+  const [eligibilityIntakeFilter, setEligibilityIntakeFilter] = React.useState("All");
+  const [eligibilityPage, setEligibilityPage] = React.useState(1);
+  const [eligibilityLimit, setEligibilityLimit] = React.useState(50);
+  const [eligibilityTotalPages, setEligibilityTotalPages] = React.useState(1);
+
+  const [selectedLead, setSelectedLead] = React.useState<any | null>(null);
+  const [selectedLeadDetails, setSelectedLeadDetails] = React.useState<any | null>(null);
+  const [loadingLeadDetails, setLoadingLeadDetails] = React.useState(false);
+  const [bulkSelectedLeadIds, setBulkSelectedLeadIds] = React.useState<string[]>([]);
+  
+  const [leadNoteText, setLeadNoteText] = React.useState("");
+  const [addingLeadNote, setAddingLeadNote] = React.useState(false);
+  
+  const [analyticsData, setAnalyticsData] = React.useState<any | null>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = React.useState(false);
+
+  const [eligibilityTabMode, setEligibilityTabMode] = React.useState<"all" | "queue" | "analytics">("all");
+  const [followupQueue, setFollowupQueue] = React.useState<{ overdue: any[]; dueToday: any[]; dueTomorrow: any[] } | null>(null);
+  const [loadingQueue, setLoadingQueue] = React.useState(false);
+
   const [savingStudentPrefs, setSavingStudentPrefs] = React.useState(false);
   const [triggeringNotif, setTriggeringNotif] = React.useState<string | null>(null);
 
@@ -527,6 +848,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       bookings: "Dashboard",
       students: "Students",
       referrals: "Students",
+      eligibility: "Students",
       counselors: "Counselors Management",
       chat: "Messages",
       training: "Training & Placement",
@@ -550,6 +872,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     { id: "bookings", label: `Consultations (${bookings.length})` },
     { id: "students", label: `Students (${students.length})` },
     { id: "referrals", label: `Referrals (${referrals.length})` },
+    { id: "eligibility", label: `Eligibility Leads (${eligibilityCount})` },
     { id: "counselors", label: `Counselors (${counselors.length})` },
     { id: "chat", label: "Messaging" },
     { id: "training", label: `Training & Placement (${trainingStudents.length})` },
@@ -1334,6 +1657,291 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       setToastMessage(null);
     }, 4000);
   };
+
+  // Eligibility Dashboard Handlers
+  const fetchEligibilityData = React.useCallback(async () => {
+    setEligibilityLoading(true);
+    try {
+      const token = getAdminCredentials();
+      const params = new URLSearchParams();
+      if (eligibilityStatusFilter && eligibilityStatusFilter !== "All") params.append("status", eligibilityStatusFilter);
+      if (eligibilityScoreFilter && eligibilityScoreFilter !== "All") params.append("score", eligibilityScoreFilter);
+      if (eligibilityPriorityFilter && eligibilityPriorityFilter !== "All") params.append("priority", eligibilityPriorityFilter);
+      if (eligibilityCounselorFilter && eligibilityCounselorFilter !== "All") params.append("counselorId", eligibilityCounselorFilter);
+      if (eligibilityCountryFilter && eligibilityCountryFilter !== "All") params.append("country", eligibilityCountryFilter);
+      if (eligibilityIntakeFilter && eligibilityIntakeFilter !== "All") params.append("intake", eligibilityIntakeFilter);
+      if (eligibilitySearch) params.append("search", eligibilitySearch);
+      params.append("page", String(eligibilityPage));
+      params.append("limit", String(eligibilityLimit));
+
+      const res = await fetch(`/api/admin/eligibility-leads?${params.toString()}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to fetch eligibility leads");
+      const data = await res.json();
+      if (data.success) {
+        setEligibilityLeads(data.leads || []);
+        setEligibilityTotalPages(data.totalPages || 1);
+        setEligibilityCount(data.count || 0);
+      }
+    } catch (err: any) {
+      console.error("Error loading eligibility data:", err.message);
+    } finally {
+      setEligibilityLoading(false);
+    }
+  }, [
+    eligibilityStatusFilter,
+    eligibilityScoreFilter,
+    eligibilityPriorityFilter,
+    eligibilityCounselorFilter,
+    eligibilityCountryFilter,
+    eligibilityIntakeFilter,
+    eligibilitySearch,
+    eligibilityPage,
+    eligibilityLimit
+  ]);
+
+  const fetchEligibilityAnalytics = React.useCallback(async () => {
+    setLoadingAnalytics(true);
+    try {
+      const token = getAdminCredentials();
+      const res = await fetch("/api/admin/eligibility-analytics", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to fetch analytics");
+      const data = await res.json();
+      if (data.success) {
+        setAnalyticsData(data);
+      }
+    } catch (err: any) {
+      console.error("Error loading eligibility analytics:", err.message);
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  }, []);
+
+  const fetchLeadDetails = async (leadId: string) => {
+    setLoadingLeadDetails(true);
+    try {
+      const token = getAdminCredentials();
+      const res = await fetch(`/api/admin/eligibility-leads?id=${leadId}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to fetch lead details");
+      const data = await res.json();
+      if (data.success) {
+        setSelectedLeadDetails(data);
+      }
+    } catch (err: any) {
+      console.error("Error loading lead details:", err.message);
+    } finally {
+      setLoadingLeadDetails(false);
+    }
+  };
+
+  const fetchFollowupQueue = React.useCallback(async () => {
+    setLoadingQueue(true);
+    try {
+      const token = getAdminCredentials();
+      const cId = counselorProfile?.id || (eligibilityCounselorFilter !== "All" ? eligibilityCounselorFilter : "");
+      if (!cId) {
+        setFollowupQueue({ overdue: [], dueToday: [], dueTomorrow: [] });
+        return;
+      }
+      const res = await fetch(`/api/admin/followups-today?counselorId=${cId}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to fetch queue");
+      const data = await res.json();
+      if (data.success) {
+        setFollowupQueue({
+          overdue: data.overdue || [],
+          dueToday: data.dueToday || [],
+          dueTomorrow: data.dueTomorrow || []
+        });
+      }
+    } catch (err: any) {
+      console.error("Error loading followup queue:", err.message);
+    } finally {
+      setLoadingQueue(false);
+    }
+  }, [counselorProfile, eligibilityCounselorFilter]);
+
+  const handleUpdateLeadField = async (leadId: string, fieldName: string, fieldValue: any) => {
+    try {
+      const token = getAdminCredentials();
+      const res = await fetch("/api/admin/eligibility-leads", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          id: leadId,
+          [fieldName]: fieldValue
+        })
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to update lead");
+      }
+      showToast(`Updated lead ${fieldName} successfully`);
+      fetchEligibilityData();
+      fetchEligibilityAnalytics();
+      if (selectedLead && selectedLead.id === leadId) {
+        fetchLeadDetails(leadId);
+      }
+    } catch (err: any) {
+      showToast(err.message);
+    }
+  };
+
+  const handleBulkUpdate = async (fieldName: string, fieldValue: any) => {
+    if (bulkSelectedLeadIds.length === 0) {
+      showToast("No leads selected");
+      return;
+    }
+    try {
+      const token = getAdminCredentials();
+      const res = await fetch("/api/admin/eligibility-leads", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ids: bulkSelectedLeadIds,
+          [fieldName]: fieldValue
+        })
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed bulk update");
+      }
+      showToast(`Updated ${bulkSelectedLeadIds.length} leads successfully`);
+      setBulkSelectedLeadIds([]);
+      fetchEligibilityData();
+      fetchEligibilityAnalytics();
+    } catch (err: any) {
+      showToast(err.message);
+    }
+  };
+
+  const handleAddLeadNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLead || !leadNoteText.trim()) return;
+    setAddingLeadNote(true);
+    try {
+      const token = getAdminCredentials();
+      const res = await fetch("/api/admin/eligibility-notes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          leadId: selectedLead.id,
+          note: leadNoteText
+        })
+      });
+      if (!res.ok) throw new Error("Failed to add note");
+      const data = await res.json();
+      if (data.success) {
+        showToast("Note added successfully");
+        setLeadNoteText("");
+        fetchLeadDetails(selectedLead.id);
+      }
+    } catch (err: any) {
+      showToast(err.message);
+    } finally {
+      setAddingLeadNote(false);
+    }
+  };
+
+  const handleAddNoteLead = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedLead) {
+      handleAddLeadNote(e);
+    }
+  };
+
+  const handleCompleteReminder = async (reminderId: string, reminderTitle: string, note: string) => {
+    try {
+      const { error } = await supabase
+        .from("eligibility_reminders")
+        .update({
+          completed: true,
+          completed_at: new Date().toISOString(),
+          completed_by: counselorProfile?.id || null,
+          completion_note: note || "Completed by Counselor"
+        })
+        .eq("id", reminderId);
+
+      if (error) throw error;
+
+      if (selectedLead) {
+        await supabase.from("eligibility_activities").insert({
+          lead_id: selectedLead.id,
+          activity_type: "Reminder Completed",
+          description: `Reminder "${reminderTitle}" marked as completed. Note: ${note}`,
+          created_by: counselorProfile?.id || null
+        });
+        showToast("Reminder completed");
+        fetchLeadDetails(selectedLead.id);
+        fetchEligibilityAnalytics();
+        if (eligibilityTabMode === "queue") {
+          fetchFollowupQueue();
+        }
+      }
+    } catch (err: any) {
+      showToast(err.message);
+    }
+  };
+
+  const handleExportCSV = () => {
+    const leadsToExport = eligibilityLeads.filter(l => 
+      bulkSelectedLeadIds.length === 0 || bulkSelectedLeadIds.includes(l.id)
+    );
+
+    if (leadsToExport.length === 0) {
+      showToast("No leads selected for export");
+      return;
+    }
+
+    const headers = ["Name", "Email", "Phone", "Qualification", "Academic %", "Budget", "Currency", "Country", "Course", "Intake", "Score", "Lead Level", "Priority", "Status", "Counselor", "Source", "Date Created"];
+    const rows = leadsToExport.map(l => [
+      l.name,
+      l.email,
+      l.phone,
+      l.qualification,
+      l.percentage,
+      l.budget,
+      l.currency,
+      l.preferred_country,
+      l.preferred_course,
+      l.intake,
+      l.lead_score_value,
+      l.lead_score,
+      l.priority,
+      l.lead_status,
+      l.assigned_counselor?.full_name || "Unassigned",
+      l.utm_source || "Direct",
+      new Date(l.created_at).toLocaleDateString()
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","))].join("\n");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Annex_Eligibility_Leads_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${leadsToExport.length} leads successfully`);
+  };
+
 
   const fetchReferralsData = React.useCallback(async () => {
     setLoadingReferrals(true);
@@ -7225,8 +7833,744 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
           </section>
         )}
 
+        {/* ===================== ELIGIBILITY LEADS TAB ===================== */}
+        {activeTab === "eligibility" && (
+          <section className="flex flex-col gap-6 animate-fade-in text-slate-700">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="font-display font-bold text-2xl text-primary">Eligibility Leads Workspace</h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Manage qualification assessments, counselor workloads, and track inbound study-abroad calculators conversion.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <nav className="flex bg-slate-100 p-1 rounded-xl">
+                  <button 
+                    onClick={() => setEligibilityTabMode("all")}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
+                      eligibilityTabMode === "all" ? "bg-white text-primary shadow-[0_1px_3px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-primary"
+                    }`}
+                  >
+                    All Leads
+                  </button>
+                  <button 
+                    onClick={() => setEligibilityTabMode("queue")}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
+                      eligibilityTabMode === "queue" ? "bg-white text-primary shadow-[0_1px_3px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-primary"
+                    }`}
+                  >
+                    Follow-up Queue
+                  </button>
+                  <button 
+                    onClick={() => setEligibilityTabMode("analytics")}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
+                      eligibilityTabMode === "analytics" ? "bg-white text-primary shadow-[0_1px_3px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-primary"
+                    }`}
+                  >
+                    Attribution & Workloads
+                  </button>
+                </nav>
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  onClick={() => {
+                    fetchEligibilityData();
+                    fetchEligibilityAnalytics();
+                    if (eligibilityTabMode === "queue") fetchFollowupQueue();
+                    if (selectedLead) fetchLeadDetails(selectedLead.id);
+                  }}
+                  className="flex items-center gap-1.5"
+                >
+                  <SpinnerGap className={eligibilityLoading || loadingAnalytics || loadingQueue ? "animate-spin" : ""} size={14} /> 
+                  Refresh
+                </Button>
+              </div>
+            </div>
+
+            {/* COUNSELOR WORKLOAD OVERVIEW WIDGET (Always visible except in analytics tab) */}
+            {eligibilityTabMode !== "analytics" && (
+              <div className="bg-slate-50 border border-hairline rounded-3xl p-6">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
+                  <Users size={16} />
+                  Counselor Workloads
+                </h3>
+                {loadingAnalytics ? (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {[1, 2, 3, 4].map(n => (
+                      <div key={n} className="h-28 rounded-2xl bg-slate-200 animate-pulse" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    {analyticsData?.counselorWorkloads?.map((w: any) => (
+                      <div key={w.id} className="p-4 bg-white border border-hairline rounded-2xl shadow-sm flex flex-col justify-between">
+                        <div>
+                          <div className="text-xs font-bold text-primary truncate">{w.name}</div>
+                          <div className="text-[10px] text-slate-400 truncate mb-2">{w.email}</div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 mt-2 border-t border-slate-100 pt-2">
+                          <div className="text-center">
+                            <div className="text-xs font-bold text-primary font-mono-data">{w.totalActive}</div>
+                            <div className="text-[8px] text-slate-400 uppercase font-semibold">Active</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-xs font-bold text-red-500 font-mono-data">{w.hotLeads}</div>
+                            <div className="text-[8px] text-slate-400 uppercase font-semibold">Hot</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-xs font-bold text-orange-500 font-mono-data">{w.overdue}</div>
+                            <div className="text-[8px] text-slate-400 uppercase font-semibold">Overdue</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-xs font-bold text-indigo-500 font-mono-data">{w.today}</div>
+                            <div className="text-[8px] text-slate-400 uppercase font-semibold">Today</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB CONTENT: ANALYTICS OVERVIEW */}
+            {eligibilityTabMode === "analytics" && (
+              <div className="space-y-6">
+                {/* Global Response Time KPIs */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="p-6 bg-slate-50 border border-hairline rounded-3xl text-center">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Average First Response</span>
+                    <div className="text-4xl font-extrabold text-primary font-mono-data my-1">
+                      {analyticsData?.responseTimes?.average || 0} min
+                    </div>
+                    <p className="text-[10px] text-slate-400">Target response window: &lt;15 mins</p>
+                  </div>
+                  <div className="p-6 bg-slate-50 border border-hairline rounded-3xl text-center">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Fastest Counselor</span>
+                    <div className="text-2xl font-bold text-emerald-600 truncate my-1">
+                      {analyticsData?.responseTimes?.fastest?.name || "N/A"}
+                    </div>
+                    <span className="text-[10px] font-mono-data text-slate-500">
+                      Avg: {analyticsData?.responseTimes?.fastest?.time || 0} mins
+                    </span>
+                  </div>
+                  <div className="p-6 bg-slate-50 border border-hairline rounded-3xl text-center">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Slowest Counselor</span>
+                    <div className="text-2xl font-bold text-red-500 truncate my-1">
+                      {analyticsData?.responseTimes?.slowest?.name || "N/A"}
+                    </div>
+                    <span className="text-[10px] font-mono-data text-slate-500">
+                      Avg: {analyticsData?.responseTimes?.slowest?.time || 0} mins
+                    </span>
+                  </div>
+                </div>
+
+                {/* Attribution funnel and lead source quality charts */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Funnel */}
+                  <div className="lg:col-span-1 p-6 bg-slate-50 border border-hairline rounded-3xl">
+                    <h3 className="text-sm font-bold text-primary uppercase tracking-wider mb-4">Conversion Funnel</h3>
+                    <div className="space-y-4">
+                      <div className="flex justify-between text-xs border-b border-hairline pb-2">
+                        <span className="text-slate-500">Total Leads Checked</span>
+                        <span className="font-bold text-primary font-mono-data">{analyticsData?.funnel?.total || 0}</span>
+                      </div>
+                      <div className="flex justify-between text-xs border-b border-hairline pb-2">
+                        <span className="text-slate-500">New (No Outreach)</span>
+                        <span className="font-bold text-primary font-mono-data">{analyticsData?.funnel?.new || 0}</span>
+                      </div>
+                      <div className="flex justify-between text-xs border-b border-hairline pb-2">
+                        <span className="text-slate-500">Contacted (Outreach Started)</span>
+                        <span className="font-bold text-primary font-mono-data">{analyticsData?.funnel?.contacted || 0}</span>
+                      </div>
+                      <div className="flex justify-between text-xs border-b border-hairline pb-2">
+                        <span className="text-slate-500">Qualified Profiles</span>
+                        <span className="font-bold text-primary font-mono-data">{analyticsData?.funnel?.qualified || 0}</span>
+                      </div>
+                      <div className="flex justify-between text-xs border-b border-hairline pb-2">
+                        <span className="text-slate-500">Unqualified Profiles</span>
+                        <span className="font-bold text-primary font-mono-data">{analyticsData?.funnel?.unqualified || 0}</span>
+                      </div>
+                      <div className="flex justify-between text-xs font-bold text-indigo-600 border-b border-hairline pb-2">
+                        <span>Converted Students</span>
+                        <span className="font-mono-data">{analyticsData?.funnel?.converted || 0}</span>
+                      </div>
+                      <div className="pt-2 flex justify-between text-sm font-bold text-gold">
+                        <span>Lead Conversion Rate</span>
+                        <span className="font-mono-data">{analyticsData?.funnel?.conversionRate || 0}%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sources Quality */}
+                  <div className="lg:col-span-2 p-6 bg-slate-50 border border-hairline rounded-3xl">
+                    <h3 className="text-sm font-bold text-primary uppercase tracking-wider mb-4">Lead Source Quality</h3>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-hairline text-slate-400 font-bold uppercase tracking-wider">
+                            <th className="pb-3">Source Channel</th>
+                            <th className="pb-3 text-center">Lead Count</th>
+                            <th className="pb-3 text-center">Conversion Rate</th>
+                            <th className="pb-3 text-center">Enrollment Rate</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {analyticsData?.sourceQuality?.map((s: any) => (
+                            <tr key={s.source} className="hover:bg-white/50 transition-colors">
+                              <td className="py-3 font-semibold text-primary">{s.source}</td>
+                              <td className="py-3 text-center font-mono-data">{s.leadCount}</td>
+                              <td className="py-3 text-center font-mono-data text-emerald-600 font-bold">{s.conversionRate}%</td>
+                              <td className="py-3 text-center font-mono-data text-indigo-600 font-bold">{s.enrollmentRate}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT: DAILY FOLLOW-UP QUEUE */}
+            {eligibilityTabMode === "queue" && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                <div className="lg:col-span-8 space-y-6">
+                  {loadingQueue ? (
+                    <div className="p-8 text-center text-slate-400">Loading daily queue...</div>
+                  ) : !followupQueue || (followupQueue.overdue.length === 0 && followupQueue.dueToday.length === 0 && followupQueue.dueTomorrow.length === 0) ? (
+                    <div className="p-12 border border-dashed border-slate-200 rounded-3xl text-center text-slate-400">
+                      No pending follow-ups assigned for today. Workload is up to date!
+                    </div>
+                  ) : (
+                    <div className="space-y-8">
+                      {/* Overdue Queue */}
+                      {followupQueue.overdue.length > 0 && (
+                        <div className="bg-red-50/30 border border-red-100 rounded-3xl p-6">
+                          <h3 className="text-xs font-bold text-red-600 uppercase tracking-widest mb-4 flex items-center gap-1.5">
+                            <Warning size={16} />
+                            Overdue Actions ({followupQueue.overdue.length})
+                          </h3>
+                          <div className="space-y-4">
+                            {followupQueue.overdue.map((rem: any) => (
+                              <div key={rem.id} className="bg-white border border-red-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                                <div>
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase block font-mono-data">DUE: {new Date(rem.due_at).toLocaleDateString()}</span>
+                                  <h4 className="text-sm font-bold text-primary mt-0.5">{rem.title}</h4>
+                                  <p className="text-xs text-slate-500 mt-1">
+                                    Lead: <span className="font-semibold text-primary">{rem.eligibility_leads?.name}</span> ({rem.eligibility_leads?.phone})
+                                  </p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => setSelectedLead(rem.eligibility_leads)}
+                                    className="px-3 py-1.5 text-[10px] font-bold uppercase bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+                                  >
+                                    View Lead
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const note = prompt("Enter completion note:");
+                                      if (note !== null) handleCompleteReminder(rem.id, rem.title, note);
+                                    }}
+                                    className="px-3 py-1.5 text-[10px] font-bold uppercase bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                                  >
+                                    Complete
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Due Today Queue */}
+                      {followupQueue.dueToday.length > 0 && (
+                        <div className="bg-blue-50/20 border border-blue-100 rounded-3xl p-6">
+                          <h3 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-4 flex items-center gap-1.5">
+                            <Clock size={16} />
+                            Due Today ({followupQueue.dueToday.length})
+                          </h3>
+                          <div className="space-y-4">
+                            {followupQueue.dueToday.map((rem: any) => (
+                              <div key={rem.id} className="bg-white border border-slate-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                                <div>
+                                  <h4 className="text-sm font-bold text-primary">{rem.title}</h4>
+                                  <p className="text-xs text-slate-500 mt-1">
+                                    Lead: <span className="font-semibold text-primary">{rem.eligibility_leads?.name}</span> ({rem.eligibility_leads?.phone})
+                                  </p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => setSelectedLead(rem.eligibility_leads)}
+                                    className="px-3 py-1.5 text-[10px] font-bold uppercase bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+                                  >
+                                    View Lead
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const note = prompt("Enter completion note:");
+                                      if (note !== null) handleCompleteReminder(rem.id, rem.title, note);
+                                    }}
+                                    className="px-3 py-1.5 text-[10px] font-bold uppercase bg-primary hover:bg-primary/95 text-white rounded-lg transition-colors"
+                                  >
+                                    Complete
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Due Tomorrow Queue */}
+                      {followupQueue.dueTomorrow.length > 0 && (
+                        <div className="border border-slate-100 rounded-3xl p-6">
+                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-1.5">
+                            <Calendar size={16} />
+                            Due Tomorrow ({followupQueue.dueTomorrow.length})
+                          </h3>
+                          <div className="space-y-4">
+                            {followupQueue.dueTomorrow.map((rem: any) => (
+                              <div key={rem.id} className="bg-white border border-slate-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                                <div>
+                                  <h4 className="text-sm font-bold text-primary">{rem.title}</h4>
+                                  <p className="text-xs text-slate-500 mt-1">
+                                    Lead: <span className="font-semibold text-primary">{rem.eligibility_leads?.name}</span> ({rem.eligibility_leads?.phone})
+                                  </p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => setSelectedLead(rem.eligibility_leads)}
+                                    className="px-3 py-1.5 text-[10px] font-bold uppercase bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+                                  >
+                                    View Lead
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const note = prompt("Enter completion note:");
+                                      if (note !== null) handleCompleteReminder(rem.id, rem.title, note);
+                                    }}
+                                    className="px-3 py-1.5 text-[10px] font-bold uppercase bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+                                  >
+                                    Complete
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Lead Detail sidebar block */}
+                <div className="lg:col-span-4">
+                  {selectedLead ? (
+                    <LeadDetailsPanel 
+                      lead={selectedLead}
+                      details={selectedLeadDetails}
+                      loading={loadingLeadDetails}
+                      counselors={counselors}
+                      noteText={leadNoteText}
+                      setNoteText={setLeadNoteText}
+                      addingNote={addingLeadNote}
+                      onAddNote={handleAddNoteLead}
+                      onClose={() => setSelectedLead(null)}
+                      onUpdateField={handleUpdateLeadField}
+                      onCompleteReminder={handleCompleteReminder}
+                    />
+                  ) : (
+                    <div className="border border-dashed border-slate-200 rounded-3xl p-8 text-center text-slate-400 text-xs">
+                      Select a lead from the queue list to show detailed academic profile, notes, and activity timeline.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT: ALL LEADS REGISTRY */}
+            {eligibilityTabMode === "all" && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                <div className="lg:col-span-8 space-y-6">
+                  {/* Filters toolbar */}
+                  <div className="bg-slate-50 border border-hairline rounded-3xl p-6 space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                      <div className="relative w-full sm:max-w-xs">
+                        <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={eligibilitySearch}
+                          onChange={(e) => {
+                            setEligibilitySearch(e.target.value);
+                            setEligibilityPage(1);
+                          }}
+                          placeholder="Search name, email, phone..."
+                          className="w-full pl-9 pr-4 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:border-gold bg-white"
+                        />
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-end">
+                        <button
+                          onClick={handleExportCSV}
+                          className="px-3.5 py-2 border border-hairline hover:bg-slate-100 text-slate-600 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Download size={14} />
+                          Export CSV
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase">Status</label>
+                        <select
+                          value={eligibilityStatusFilter}
+                          onChange={(e) => { setEligibilityStatusFilter(e.target.value); setEligibilityPage(1); }}
+                          className="px-2.5 py-1.5 border border-hairline rounded-lg text-xs bg-white focus:outline-none cursor-pointer"
+                        >
+                          <option value="All">All Statuses</option>
+                          <option value="New">New</option>
+                          <option value="Contacted">Contacted</option>
+                          <option value="Qualified">Qualified</option>
+                          <option value="Unqualified">Unqualified</option>
+                          <option value="Converted">Converted</option>
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase">Priority</label>
+                        <select
+                          value={eligibilityPriorityFilter}
+                          onChange={(e) => { setEligibilityPriorityFilter(e.target.value); setEligibilityPage(1); }}
+                          className="px-2.5 py-1.5 border border-hairline rounded-lg text-xs bg-white focus:outline-none cursor-pointer"
+                        >
+                          <option value="All">All Priorities</option>
+                          <option value="High">High</option>
+                          <option value="Medium">Medium</option>
+                          <option value="Low">Low</option>
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase">Lead Level</label>
+                        <select
+                          value={eligibilityScoreFilter}
+                          onChange={(e) => { setEligibilityScoreFilter(e.target.value); setEligibilityPage(1); }}
+                          className="px-2.5 py-1.5 border border-hairline rounded-lg text-xs bg-white focus:outline-none cursor-pointer"
+                        >
+                          <option value="All">All levels</option>
+                          <option value="Hot">Hot</option>
+                          <option value="Warm">Warm</option>
+                          <option value="Cold">Cold</option>
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase">Counselor</label>
+                        <select
+                          value={eligibilityCounselorFilter}
+                          onChange={(e) => { setEligibilityCounselorFilter(e.target.value); setEligibilityPage(1); }}
+                          className="px-2.5 py-1.5 border border-hairline rounded-lg text-xs bg-white focus:outline-none cursor-pointer"
+                        >
+                          <option value="All">All Counselors</option>
+                          {counselors.map((c: any) => (
+                            <option key={c.id} value={c.id}>{c.full_name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase">Country</label>
+                        <select
+                          value={eligibilityCountryFilter}
+                          onChange={(e) => { setEligibilityCountryFilter(e.target.value); setEligibilityPage(1); }}
+                          className="px-2.5 py-1.5 border border-hairline rounded-lg text-xs bg-white focus:outline-none cursor-pointer"
+                        >
+                          <option value="All">All Countries</option>
+                          <option value="United Kingdom">United Kingdom</option>
+                          <option value="United States">United States</option>
+                          <option value="Canada">Canada</option>
+                          <option value="Australia">Australia</option>
+                          <option value="Germany">Germany</option>
+                          <option value="Ireland">Ireland</option>
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase">Intake</label>
+                        <select
+                          value={eligibilityIntakeFilter}
+                          onChange={(e) => { setEligibilityIntakeFilter(e.target.value); setEligibilityPage(1); }}
+                          className="px-2.5 py-1.5 border border-hairline rounded-lg text-xs bg-white focus:outline-none cursor-pointer"
+                        >
+                          <option value="All">All Intakes</option>
+                          <option value="Sept 2026">Sept 2026</option>
+                          <option value="Jan 2027">Jan 2027</option>
+                          <option value="Sept 2027">Sept 2027</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bulk Actions Bar */}
+                  {bulkSelectedLeadIds.length > 0 && (
+                    <div className="p-4 bg-primary text-white rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-md animate-fade-in">
+                      <span className="text-xs font-bold font-mono-data">
+                        {bulkSelectedLeadIds.length} leads selected
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <select
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handleBulkUpdate("lead_status", e.target.value);
+                              e.target.value = "";
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-xs bg-white/10 text-white border border-white/20 focus:outline-none cursor-pointer"
+                        >
+                          <option value="" className="text-slate-800">Change Status...</option>
+                          <option value="New" className="text-slate-800">New</option>
+                          <option value="Contacted" className="text-slate-800">Contacted</option>
+                          <option value="Qualified" className="text-slate-800">Qualified</option>
+                          <option value="Unqualified" className="text-slate-800">Unqualified</option>
+                          <option value="Converted" className="text-slate-800">Converted</option>
+                        </select>
+
+                        <select
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handleBulkUpdate("assigned_counselor_id", e.target.value === "Unassigned" ? null : e.target.value);
+                              e.target.value = "";
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-xs bg-white/10 text-white border border-white/20 focus:outline-none cursor-pointer"
+                        >
+                          <option value="" className="text-slate-800">Assign Counselor...</option>
+                          <option value="Unassigned" className="text-slate-800">Unassign</option>
+                          {counselors.map((c: any) => (
+                            <option key={c.id} value={c.id} className="text-slate-800">{c.full_name}</option>
+                          ))}
+                        </select>
+
+                        <button 
+                          onClick={() => setBulkSelectedLeadIds([])}
+                          className="text-white/60 hover:text-white text-xs font-semibold cursor-pointer"
+                        >
+                          Clear Selection
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Leads Data Table */}
+                  <Card>
+                    <CardContent className="p-0">
+                      {eligibilityLoading ? (
+                        <div className="p-12 text-center text-slate-400">Loading lead registry...</div>
+                      ) : eligibilityLeads.length === 0 ? (
+                        <div className="p-12 text-center text-slate-400 text-sm">
+                          No leads found matching filters.
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full text-left text-xs text-slate-600">
+                            <thead>
+                              <tr className="border-b border-hairline bg-slate-50/50 text-slate-400 font-bold uppercase tracking-wider">
+                                <th className="p-4 w-10">
+                                  <input
+                                    type="checkbox"
+                                    checked={bulkSelectedLeadIds.length === eligibilityLeads.length}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setBulkSelectedLeadIds(eligibilityLeads.map(l => l.id));
+                                      } else {
+                                        setBulkSelectedLeadIds([]);
+                                      }
+                                    }}
+                                    className="rounded border-slate-300 focus:ring-gold"
+                                  />
+                                </th>
+                                <th className="p-4">Name / Contact</th>
+                                <th className="p-4">Qualification / Score</th>
+                                <th className="p-4">Country & Course</th>
+                                <th className="p-4 text-center">Score / priority</th>
+                                <th className="p-4">Status</th>
+                                <th className="p-4">Assigned Counselor</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {eligibilityLeads.map(lead => {
+                                const isSelected = selectedLead?.id === lead.id;
+                                const isChecked = bulkSelectedLeadIds.includes(lead.id);
+
+                                return (
+                                  <tr 
+                                    key={lead.id}
+                                    className={`hover:bg-slate-50/80 transition-colors ${
+                                      isSelected ? "bg-slate-50" : ""
+                                    }`}
+                                  >
+                                    <td className="p-4">
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setBulkSelectedLeadIds(prev => [...prev, lead.id]);
+                                          } else {
+                                            setBulkSelectedLeadIds(prev => prev.filter(id => id !== lead.id));
+                                          }
+                                        }}
+                                        className="rounded border-slate-300 focus:ring-gold"
+                                      />
+                                    </td>
+                                    <td 
+                                      className="p-4 cursor-pointer"
+                                      onClick={() => setSelectedLead(lead)}
+                                    >
+                                      <div className="font-bold text-primary">{lead.name}</div>
+                                      <div className="text-[10px] text-slate-400 mt-0.5">{lead.email}</div>
+                                      <div className="text-[10px] text-slate-400 font-mono-data">{lead.phone}</div>
+                                    </td>
+                                    <td 
+                                      className="p-4 cursor-pointer"
+                                      onClick={() => setSelectedLead(lead)}
+                                    >
+                                      <div className="font-semibold text-slate-700">{lead.qualification}</div>
+                                      <div className="text-[10px] text-slate-400 mt-0.5">Grade: {lead.percentage}%</div>
+                                      {lead.test_type && (
+                                        <div className="text-[10px] text-slate-400 font-mono-data">{lead.test_type}: {lead.test_score}</div>
+                                      )}
+                                    </td>
+                                    <td 
+                                      className="p-4 cursor-pointer"
+                                      onClick={() => setSelectedLead(lead)}
+                                    >
+                                      <div className="font-semibold text-slate-700">{lead.preferred_country}</div>
+                                      <div className="text-[10px] text-slate-400 mt-0.5">{lead.preferred_course}</div>
+                                      <div className="text-[10px] text-slate-400 font-mono-data">Intake: {lead.intake}</div>
+                                    </td>
+                                    <td className="p-4 text-center">
+                                      <span className={`inline-block px-2 py-0.5 rounded font-bold text-[9px] font-mono-data mr-1 ${
+                                        lead.lead_score === "Hot" 
+                                          ? "bg-red-50 text-red-600 border border-red-100" 
+                                          : lead.lead_score === "Warm" 
+                                          ? "bg-amber-50 text-amber-600 border border-amber-100" 
+                                          : "bg-blue-50 text-blue-600 border border-blue-100"
+                                      }`}>
+                                        {lead.lead_score} ({lead.lead_score_value}%)
+                                      </span>
+                                      <span className={`inline-block px-2 py-0.5 rounded font-bold text-[9px] uppercase tracking-wider ${
+                                        lead.priority === "High"
+                                          ? "bg-red-500 text-white"
+                                          : lead.priority === "Medium"
+                                          ? "bg-amber-500 text-white"
+                                          : "bg-slate-200 text-slate-600"
+                                      }`}>
+                                        {lead.priority}
+                                      </span>
+                                    </td>
+                                    <td className="p-4">
+                                      <select
+                                        value={lead.lead_status}
+                                        onChange={(e) => handleUpdateLeadField(lead.id, "lead_status", e.target.value)}
+                                        className={`px-2.5 py-1 rounded text-[10px] font-bold focus:outline-none cursor-pointer border ${
+                                          lead.lead_status === "New" 
+                                            ? "bg-blue-50 text-blue-600 border-blue-100"
+                                            : lead.lead_status === "Contacted"
+                                            ? "bg-amber-50 text-amber-600 border-amber-100"
+                                            : lead.lead_status === "Qualified"
+                                            ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                            : lead.lead_status === "Unqualified"
+                                            ? "bg-slate-100 text-slate-500 border-slate-200"
+                                            : "bg-indigo-50 text-indigo-600 border-indigo-100"
+                                        }`}
+                                      >
+                                        <option value="New">New</option>
+                                        <option value="Contacted">Contacted</option>
+                                        <option value="Qualified">Qualified</option>
+                                        <option value="Unqualified">Unqualified</option>
+                                        <option value="Converted">Converted</option>
+                                      </select>
+                                    </td>
+                                    <td className="p-4">
+                                      <select
+                                        value={lead.assigned_counselor_id || ""}
+                                        onChange={(e) => handleUpdateLeadField(lead.id, "assigned_counselor_id", e.target.value || null)}
+                                        className="px-2 py-1 border border-hairline rounded text-[10px] focus:outline-none cursor-pointer bg-white"
+                                      >
+                                        <option value="">Unassigned</option>
+                                        {counselors.map((c: any) => (
+                                          <option key={c.id} value={c.id}>{c.full_name}</option>
+                                        ))}
+                                      </select>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Pagination Footer */}
+                  {eligibilityTotalPages > 1 && (
+                    <div className="flex justify-between items-center text-xs text-slate-400 pt-2 font-mono-data">
+                      <span>PAGE {eligibilityPage} OF {eligibilityTotalPages} ({eligibilityCount} LEADS)</span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEligibilityPage(p => Math.max(1, p - 1))}
+                          disabled={eligibilityPage === 1 || eligibilityLoading}
+                          className="px-3 py-1.5 border border-hairline rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer font-bold"
+                        >
+                          Prev
+                        </button>
+                        <button
+                          onClick={() => setEligibilityPage(p => Math.min(eligibilityTotalPages, p + 1))}
+                          disabled={eligibilityPage === eligibilityTotalPages || eligibilityLoading}
+                          className="px-3 py-1.5 border border-hairline rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer font-bold"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Lead Detail sidebar block */}
+                <div className="lg:col-span-4">
+                  {selectedLead ? (
+                    <LeadDetailsPanel 
+                      lead={selectedLead}
+                      details={selectedLeadDetails}
+                      loading={loadingLeadDetails}
+                      counselors={counselors}
+                      noteText={leadNoteText}
+                      setNoteText={setLeadNoteText}
+                      addingNote={addingLeadNote}
+                      onAddNote={handleAddNoteLead}
+                      onClose={() => setSelectedLead(null)}
+                      onUpdateField={handleUpdateLeadField}
+                      onCompleteReminder={handleCompleteReminder}
+                    />
+                  ) : (
+                    <div className="border border-dashed border-slate-200 rounded-3xl p-8 text-center text-slate-400 text-xs">
+                      Select a lead row from the table list to show detailed academic profile, notes, and activity timeline.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
         {/* ===================== ROLES & PERMISSIONS TAB ===================== */}
         {activeTab === "roles" && (
+
           <section className="flex flex-col gap-6 animate-fade-in text-slate-700">
             <div className="flex items-center justify-between">
               <div>
