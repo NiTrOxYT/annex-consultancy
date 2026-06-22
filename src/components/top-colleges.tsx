@@ -40,10 +40,13 @@ interface University {
 
 interface TopCollegesSectionProps {
   country: string; // e.g. 'uk', 'australia', 'europe', 'dubai', 'italy', 'india', 'abroad', 'all'
+  featuredOnly?: boolean;
+  limit?: number;
+  showControls?: boolean;
 }
 
 // Full seed/fallback data set mirroring original static data
-const FALLBACK_UNIVERSITIES: Omit<University, "id" | "created_at" | "views_count" | "clicks_count">[] = [
+const FALLBACK_UNIVERSITIES: Omit<University, "id" | "created_at" | "views_count" | "clicks_count">[] = []; /* [
   // UK
   {
     name: "University of Westminster",
@@ -410,11 +413,11 @@ const FALLBACK_UNIVERSITIES: Omit<University, "id" | "created_at" | "views_count
     featured: true,
     published: true
   }
-];
+] */ ;
 
 const categories = ["Engineering", "MBA", "MBBS", "BCA", "BBA", "Nursing"];
 
-export function TopCollegesSection({ country }: TopCollegesSectionProps) {
+export function TopCollegesSection({ country, featuredOnly = false, limit, showControls = true }: TopCollegesSectionProps) {
   const [dbUnis, setDbUnis] = React.useState<University[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [selectedCategory, setSelectedCategory] = React.useState("Engineering");
@@ -427,41 +430,29 @@ export function TopCollegesSection({ country }: TopCollegesSectionProps) {
     async function loadUniversities() {
       setLoading(true);
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from("universities")
           .select("*")
           .eq("published", true);
 
+        if (featuredOnly) {
+          query = query.eq("featured", true);
+        }
+
+        const { data, error } = await query;
+
         if (error) throw error;
-        if (data && data.length > 0) {
+        if (data) {
           setDbUnis(data);
-        } else {
-          // Use seeded fallbacks converted to complete type
-          const formattedFallback = FALLBACK_UNIVERSITIES.map((f, i) => ({
-            ...f,
-            id: `fallback-${i}`,
-            created_at: new Date().toISOString(),
-            views_count: 0,
-            clicks_count: 0
-          }));
-          setDbUnis(formattedFallback);
         }
       } catch (err) {
-        console.error("Failed to load universities from database, using fallbacks:", err);
-        const formattedFallback = FALLBACK_UNIVERSITIES.map((f, i) => ({
-          ...f,
-          id: `fallback-${i}`,
-          created_at: new Date().toISOString(),
-          views_count: 0,
-          clicks_count: 0
-        }));
-        setDbUnis(formattedFallback);
+        console.error("Failed to load universities from database:", err);
       } finally {
         setLoading(false);
       }
     }
     loadUniversities();
-  }, []);
+  }, [featuredOnly]);
 
   // Filtering by Country (Case Insensitive mapping)
   const filteredByCountry = React.useMemo(() => {
@@ -496,29 +487,39 @@ export function TopCollegesSection({ country }: TopCollegesSectionProps) {
 
   // Filtering by Category, Search Query, and Sorting by Ranking
   const displayUnis = React.useMemo(() => {
-    return filteredByCountry
-      .filter(uni => {
-        const matchesCategory = uni.category.toLowerCase() === selectedCategory.toLowerCase();
+    let result = filteredByCountry;
+
+    if (showControls) {
+      result = result.filter(uni => {
+        const matchesCategory = uni.category && uni.category.toLowerCase() === selectedCategory.toLowerCase();
         const matchesSearch = 
           uni.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          uni.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (uni.city && uni.city.toLowerCase().includes(searchQuery.toLowerCase())) ||
           uni.country.toLowerCase().includes(searchQuery.toLowerCase());
         
         return matchesCategory && matchesSearch;
-      })
-      .sort((a, b) => {
-        const rankA = a.ranking === null || a.ranking === undefined ? Infinity : a.ranking;
-        const rankB = b.ranking === null || b.ranking === undefined ? Infinity : b.ranking;
-        
-        if (sortByRank === "asc") {
-          return rankA - rankB;
-        } else {
-          if (rankA === Infinity) return 1;
-          if (rankB === Infinity) return -1;
-          return rankB - rankA;
-        }
       });
-  }, [filteredByCountry, selectedCategory, searchQuery, sortByRank]);
+    }
+
+    result = [...result].sort((a, b) => {
+      const rankA = a.ranking === null || a.ranking === undefined ? Infinity : a.ranking;
+      const rankB = b.ranking === null || b.ranking === undefined ? Infinity : b.ranking;
+      
+      if (sortByRank === "asc") {
+        return rankA - rankB;
+      } else {
+        if (rankA === Infinity) return 1;
+        if (rankB === Infinity) return -1;
+        return rankB - rankA;
+      }
+    });
+
+    if (limit) {
+      result = result.slice(0, limit);
+    }
+
+    return result;
+  }, [filteredByCountry, selectedCategory, searchQuery, sortByRank, showControls, limit]);
 
   // Analytics Increment for views
   const handleOpenModal = async (uni: University) => {
@@ -575,44 +576,48 @@ export function TopCollegesSection({ country }: TopCollegesSectionProps) {
           </div>
           
           {/* Controls */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-2 border border-hairline bg-white rounded-full max-w-xs focus-within:ring-2 focus-within:ring-primary/20">
-              <MagnifyingGlass size={16} className="text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="Search colleges..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="text-xs focus:outline-none w-40 text-slate-800"
-              />
+          {showControls && (
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-2 border border-hairline bg-white rounded-full max-w-xs focus-within:ring-2 focus-within:ring-primary/20">
+                <MagnifyingGlass size={16} className="text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search colleges..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="text-xs focus:outline-none w-40 text-slate-800"
+                />
+              </div>
+              
+              <button 
+                onClick={() => setSortByRank(prev => prev === "asc" ? "desc" : "asc")}
+                className="px-4 py-2 bg-subtle-gray border border-hairline rounded-full text-xs font-semibold text-slate-600 hover:text-primary flex items-center gap-1.5 transition-colors cursor-pointer select-none"
+              >
+                <Trophy size={14} className="text-gold" /> 
+                Rank: {sortByRank === "asc" ? "Best First" : "Lowest First"}
+              </button>
             </div>
-            
-            <button 
-              onClick={() => setSortByRank(prev => prev === "asc" ? "desc" : "asc")}
-              className="px-4 py-2 bg-subtle-gray border border-hairline rounded-full text-xs font-semibold text-slate-600 hover:text-primary flex items-center gap-1.5 transition-colors cursor-pointer select-none"
-            >
-              <Trophy size={14} className="text-gold" /> 
-              Rank: {sortByRank === "asc" ? "Best First" : "Lowest First"}
-            </button>
-          </div>
+          )}
         </div>
 
         {/* Tab-based Category Selector */}
-        <div className="flex flex-wrap gap-2 mb-8 border-b border-hairline/60 pb-4">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                selectedCategory === cat 
-                  ? "bg-primary text-white shadow-sm" 
-                  : "bg-subtle-gray text-slate-500 hover:bg-slate-100/60 hover:text-primary border border-hairline"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+        {showControls && (
+          <div className="flex flex-wrap gap-2 mb-8 border-b border-hairline/60 pb-4">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                  selectedCategory === cat 
+                    ? "bg-primary text-white shadow-sm" 
+                    : "bg-subtle-gray text-slate-500 hover:bg-slate-100/60 hover:text-primary border border-hairline"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Main Grid View */}
         {loading ? (
@@ -729,6 +734,21 @@ export function TopCollegesSection({ country }: TopCollegesSectionProps) {
                 </div>
               </Card>
             ))}
+          </div>
+        )}
+
+        {!showControls && (
+          <div className="flex justify-center mt-12">
+            <Link href="/study-abroad">
+              <Button 
+                variant="gold" 
+                size="lg" 
+                className="text-xs font-bold uppercase tracking-widest px-8 py-4 flex items-center gap-2"
+              >
+                Explore All Partner Universities
+                <ArrowRight size={14} />
+              </Button>
+            </Link>
           </div>
         )}
 

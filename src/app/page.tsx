@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { AnimatedCounter } from "@/components/animated-counter";
 import { SectionReveal } from "@/components/section-reveal";
+import { TopCollegesSection } from "@/components/top-colleges";
 
 // Seed images
 const HERO_IMAGE = "/images/hero.webp";
@@ -532,6 +533,11 @@ export default function Home() {
               </div>
             </div>
           </section>
+        </SectionReveal>
+
+        {/* Featured Universities Section */}
+        <SectionReveal>
+          <TopCollegesSection country="all" featuredOnly={true} limit={6} showControls={false} />
         </SectionReveal>
 
         {/* Student Success Stories (Carousel / Quote Wall) */}

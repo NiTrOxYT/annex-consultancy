@@ -37,6 +37,8 @@ Supabase PostgreSQL database schemas:
 * `public.eligibility_reminders` — Day 1, 3, 7, 14 outreach follow-up reminders.
 * `public.eligibility_activities` — Audit trail logs for lead actions.
 * `public.eligibility_notes` — Counselor timeline notes on leads.
+* `public.universities` — Main repository of institutions with matching criteria parameters (`min_percentage`, `min_ielts`, `min_pte`, `min_toefl`, `annual_fees`, `degree_level`, `scholarship_available`, `featured`, `published`).
+
 
 ---
 
@@ -75,6 +77,7 @@ The student portal dashboard contains:
 * **Duplicate Lead Protection:** Updates current lead profiles and assessments if submitted within a 30-day window instead of polluting CRM.
 * **Least-loaded Router:** Routes new leads to active counselors with the lowest active student count.
 * **Referrals Auto-Sync:** Automated trigger functions updating referral status as referred student progresses.
+* **Single Source of Truth matching:** Universities database table holds structured matching parameters. No hardcoded or mock fallback datasets. The eligibility API routes profile assessments through a 100-point scoring algorithm with regex fallback patterns.
 
 ---
 
@@ -109,5 +112,7 @@ The student portal dashboard contains:
 * **2026-06-22T03:28:00+05:30:** Integrated the Study Abroad Eligibility Calculator onto the home page (`src/app/page.tsx`) using a high-end visual mockup card demonstrating admission chances (Safe, Target, Ambitious) and scholarship estimates. Added the link to the floating glass pill navigation menu (`src/components/navigation.tsx`). Verified compilation and builds cleanly.
 * **2026-06-22T03:33:00+05:30:** Configured Open Graph, Twitter, Canonical, Robots, and metadataBase parameters in the root layout (`src/app/layout.tsx`). Aligned all favicon/icon paths under `public/` and `src/app/` to point to `public/branding/annex-logo.png`. Audited metadata and deleted conflicting `src/app/opengraph-image.png`. Verified compilation and production builds cleanly.
 * **2026-06-22T03:39:00+05:30:** Redesigned and rebuilt the navigation bar (`src/components/navigation.tsx`) based on business value page classification. Consolidated 11 top-level links/buttons into 4 clean dropdowns (mega menus for Destinations and Programs, standard dropdown for Resources, and unified Portals logins) with clear CTA conversion priorities: Primary Revenue (Book Consultation solid button) and Lead Generation (Check Eligibility outline gold button). Verified compilation and production builds cleanly.
+* **2026-06-22T16:04:00+05:30:** Rebuilt the university matching engine to make `public.universities` the single source of truth. Added migration `011_university_matching_criteria.sql` to introduce numeric criteria columns (`min_percentage`, `min_ielts`, `min_pte`, `min_toefl`, `annual_fees`, `degree_level`, `scholarship_available`) and corresponding indexes. Upgraded the backend eligibility checking API (`/api/eligibility/check`) to run dynamic matches using a 100-point weighted scoring engine with regex fallbacks. Rebuilt Admin CMS modal in `src/app/admin/page.tsx` with inputs for all new parameters. Refactored `<TopCollegesSection>` in `src/components/top-colleges.tsx` to remove fallback arrays and support `featuredOnly`, `limit`, and `showControls` properties, and integrated the featured colleges grid on the homepage. Verified compilation and production builds cleanly.
+
 
 

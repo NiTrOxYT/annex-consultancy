@@ -74,6 +74,13 @@ interface University {
   created_at: string;
   views_count: number;
   clicks_count: number;
+  min_percentage?: number | null;
+  min_ielts?: number | null;
+  min_pte?: number | null;
+  min_toefl?: number | null;
+  degree_level?: string | null;
+  annual_fees?: number | null;
+  scholarship_available?: boolean | null;
 }
 
 interface Post {
@@ -803,7 +810,14 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     website_url: "",
     description: "",
     featured: false,
-    published: true
+    published: true,
+    min_percentage: "",
+    min_ielts: "",
+    min_pte: "",
+    min_toefl: "",
+    degree_level: "Bachelors",
+    annual_fees: "",
+    scholarship_available: false
   });
 
   // Blog CMS Tab states
@@ -2080,6 +2094,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       const generatedSlug = uniForm.slug || uniForm.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
       const rankingVal = uniForm.ranking ? parseInt(uniForm.ranking) : null;
       const ratingVal = uniForm.rating ? parseFloat(uniForm.rating) : 4.5;
+      const minPercentageVal = uniForm.min_percentage ? parseFloat(uniForm.min_percentage) : 0;
+      const minIeltsVal = uniForm.min_ielts ? parseFloat(uniForm.min_ielts) : 0;
+      const minPteVal = uniForm.min_pte ? parseInt(uniForm.min_pte, 10) : 0;
+      const minToeflVal = uniForm.min_toefl ? parseInt(uniForm.min_toefl, 10) : 0;
+      const annualFeesVal = uniForm.annual_fees ? parseFloat(uniForm.annual_fees) : 0;
 
       const payload = {
         name: uniForm.name,
@@ -2099,7 +2118,14 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
         website_url: uniForm.website_url || null,
         description: uniForm.description || null,
         featured: uniForm.featured,
-        published: uniForm.published
+        published: uniForm.published,
+        min_percentage: minPercentageVal,
+        min_ielts: minIeltsVal,
+        min_pte: minPteVal,
+        min_toefl: minToeflVal,
+        degree_level: uniForm.degree_level || "Bachelors",
+        annual_fees: annualFeesVal,
+        scholarship_available: uniForm.scholarship_available
       };
 
       if (editingUni) {
@@ -4923,7 +4949,14 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       website_url: "",
                       description: "",
                       featured: false,
-                      published: true
+                      published: true,
+                      min_percentage: "",
+                      min_ielts: "",
+                      min_pte: "",
+                      min_toefl: "",
+                      degree_level: "Bachelors",
+                      annual_fees: "",
+                      scholarship_available: false
                     });
                     setIsUniModalOpen(true);
                   }} 
@@ -5116,7 +5149,14 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                       website_url: uni.website_url || "",
                                       description: uni.description || "",
                                       featured: uni.featured || false,
-                                      published: uni.published || false
+                                      published: uni.published || false,
+                                      min_percentage: uni.min_percentage ? uni.min_percentage.toString() : "",
+                                      min_ielts: uni.min_ielts ? uni.min_ielts.toString() : "",
+                                      min_pte: uni.min_pte ? uni.min_pte.toString() : "",
+                                      min_toefl: uni.min_toefl ? uni.min_toefl.toString() : "",
+                                      degree_level: uni.degree_level || "Bachelors",
+                                      annual_fees: uni.annual_fees ? uni.annual_fees.toString() : "",
+                                      scholarship_available: uni.scholarship_available || false
                                     });
                                     setIsUniModalOpen(true);
                                   }}
@@ -9753,6 +9793,84 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Min Percentage (%)</label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    max="100"
+                    value={uniForm.min_percentage} 
+                    onChange={(e) => setUniForm({ ...uniForm, min_percentage: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    placeholder="e.g. 60"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Annual Fee (Numeric)</label>
+                  <input 
+                    type="number" 
+                    value={uniForm.annual_fees} 
+                    onChange={(e) => setUniForm({ ...uniForm, annual_fees: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    placeholder="e.g. 15000"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Degree Level *</label>
+                  <select 
+                    value={uniForm.degree_level} 
+                    onChange={(e) => setUniForm({ ...uniForm, degree_level: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-800 focus:outline-none cursor-pointer"
+                  >
+                    <option value="High School">High School</option>
+                    <option value="Bachelors">Bachelors Degree</option>
+                    <option value="Masters">Masters Degree</option>
+                    <option value="Doctorate">Doctorate / PhD</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Min IELTS Cutoff</label>
+                  <input 
+                    type="number" 
+                    step="0.1" 
+                    min="0"
+                    max="9"
+                    value={uniForm.min_ielts} 
+                    onChange={(e) => setUniForm({ ...uniForm, min_ielts: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    placeholder="e.g. 6.5"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Min PTE Cutoff</label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    max="90"
+                    value={uniForm.min_pte} 
+                    onChange={(e) => setUniForm({ ...uniForm, min_pte: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    placeholder="e.g. 58"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Min TOEFL Cutoff</label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    max="120"
+                    value={uniForm.min_toefl} 
+                    onChange={(e) => setUniForm({ ...uniForm, min_toefl: e.target.value })} 
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    placeholder="e.g. 80"
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Total Fees Range</label>
@@ -9819,6 +9937,16 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     className="w-4 h-4 text-primary cursor-pointer border-hairline rounded" 
                   />
                   <label htmlFor="featured" className="text-[10px] font-bold text-primary uppercase tracking-wider cursor-pointer">Featured Partner</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    id="scholarship_available" 
+                    checked={uniForm.scholarship_available} 
+                    onChange={(e) => setUniForm({ ...uniForm, scholarship_available: e.target.checked })} 
+                    className="w-4 h-4 text-primary cursor-pointer border-hairline rounded" 
+                  />
+                  <label htmlFor="scholarship_available" className="text-[10px] font-bold text-primary uppercase tracking-wider cursor-pointer">Scholarship Available</label>
                 </div>
                 <div className="flex items-center gap-2">
                   <input 

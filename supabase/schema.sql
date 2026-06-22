@@ -65,6 +65,13 @@ CREATE TABLE IF NOT EXISTS public.universities (
     description TEXT,
     featured BOOLEAN DEFAULT false,
     published BOOLEAN DEFAULT true,
+    min_percentage NUMERIC DEFAULT 0,
+    min_ielts NUMERIC DEFAULT 0,
+    min_pte INTEGER DEFAULT 0,
+    min_toefl INTEGER DEFAULT 0,
+    degree_level TEXT DEFAULT 'Bachelors',
+    annual_fees NUMERIC DEFAULT 0,
+    scholarship_available BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     views_count INTEGER DEFAULT 0,
     clicks_count INTEGER DEFAULT 0

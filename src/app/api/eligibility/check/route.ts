@@ -18,6 +18,13 @@ interface University {
   cutoff: string | null;
   logo_url: string | null;
   intake: string | null;
+  min_percentage: number | null;
+  min_ielts: number | null;
+  min_pte: number | null;
+  min_toefl: number | null;
+  degree_level: string | null;
+  annual_fees: number | null;
+  scholarship_available: boolean | null;
 }
 
 export async function POST(request: Request) {
@@ -160,38 +167,88 @@ export async function POST(request: Request) {
       universitiesList.forEach((uni: University) => {
         let matchScoreVal = 0;
 
-        // Cutoff matching (35 points)
-        let cutoffMeet = true;
-        if (uni.cutoff && scoreVal) {
+        // 1. Academic Percentage (30 points)
+        let academicMeet = true;
+        if (uni.min_percentage && Number(uni.min_percentage) > 0) {
+          academicMeet = pct >= Number(uni.min_percentage);
+        } else if (uni.cutoff) {
+          const pctMatch = uni.cutoff.match(/(\d+)%/);
+          if (pctMatch) {
+            const minPct = parseFloat(pctMatch[1]);
+            academicMeet = pct >= minPct;
+          }
+        }
+        matchScoreVal += academicMeet ? 30 : 5;
+
+        // 2. English Proficiency Cutoff: IELTS / PTE / TOEFL (25 points)
+        let englishMeet = true;
+        const hasStructuredEnglish = (uni.min_ielts && Number(uni.min_ielts) > 0) || 
+                                    (uni.min_pte && Number(uni.min_pte) > 0) || 
+                                    (uni.min_toefl && Number(uni.min_toefl) > 0);
+
+        if (hasStructuredEnglish) {
+          if (testType === "IELTS" && uni.min_ielts && scoreVal) {
+            englishMeet = scoreVal >= Number(uni.min_ielts);
+          } else if (testType === "PTE" && uni.min_pte && scoreVal) {
+            englishMeet = scoreVal >= Number(uni.min_pte);
+          } else if (testType === "TOEFL" && uni.min_toefl && scoreVal) {
+            englishMeet = scoreVal >= Number(uni.min_toefl);
+          } else if (!scoreVal && ((uni.min_ielts && Number(uni.min_ielts) > 0) || (uni.min_pte && Number(uni.min_pte) > 0) || (uni.min_toefl && Number(uni.min_toefl) > 0))) {
+            englishMeet = false;
+          }
+        } else if (uni.cutoff && scoreVal) {
           const ieltsMatch = uni.cutoff.match(/IELTS\s*(\d+(\.\d+)?)/i);
           if (ieltsMatch) {
             const minScore = parseFloat(ieltsMatch[1]);
-            cutoffMeet = scoreVal >= minScore;
+            englishMeet = scoreVal >= minScore;
           }
         }
-        matchScoreVal += cutoffMeet ? 35 : 10;
+        matchScoreVal += englishMeet ? 25 : 5;
 
-        // Fees budget matching (35 points)
-        let feesMeet = true;
-        if (uni.total_fees) {
-          // Extract numeric digits from fees string
+        // 3. Budget (20 points)
+        let budgetMeet = true;
+        if (uni.annual_fees && Number(uni.annual_fees) > 0) {
+          budgetMeet = bdgt >= Number(uni.annual_fees);
+        } else if (uni.total_fees) {
           const cleanFee = uni.total_fees.replace(/,/g, "");
           const feeDigits = cleanFee.match(/\d+/);
           if (feeDigits) {
             const parsedFee = parseInt(feeDigits[0], 10);
-            feesMeet = bdgt >= parsedFee;
+            budgetMeet = bdgt >= parsedFee;
           }
         }
-        matchScoreVal += feesMeet ? 35 : 10;
+        matchScoreVal += budgetMeet ? 20 : 5;
 
-        // Course interest category mapping (30 points)
-        const categoryMatch = uni.category && preferredCourse && 
-          (uni.category.toLowerCase().includes(preferredCourse.toLowerCase()) || 
-           preferredCourse.toLowerCase().includes(uni.category.toLowerCase()));
-        matchScoreVal += categoryMatch ? 30 : 10;
+        // 4. Course Type (10 points)
+        const courseTypeMatch = uni.course_type && uni.course_type.toLowerCase() === mappedCourseType.toLowerCase();
+        matchScoreVal += courseTypeMatch ? 10 : 2;
 
-        // Caps score at 100
-        matchScoreVal = Math.min(matchScoreVal, 100);
+        // 5. Country (5 points)
+        const countryMatch = uni.country && uni.country.toLowerCase() === preferredCountry.toLowerCase();
+        matchScoreVal += countryMatch ? 5 : 1;
+
+        // 6. Degree Level (5 points)
+        let degreeLevelMatch = true;
+        if (uni.degree_level) {
+          const targetDegree = mappedCourseType === "Undergraduate" ? "Bachelors" : "Masters";
+          degreeLevelMatch = uni.degree_level.toLowerCase().includes(targetDegree.toLowerCase()) || 
+                             targetDegree.toLowerCase().includes(uni.degree_level.toLowerCase()) ||
+                             uni.degree_level.toLowerCase().includes(qualification.toLowerCase()) ||
+                             qualification.toLowerCase().includes(uni.degree_level.toLowerCase());
+        }
+        matchScoreVal += degreeLevelMatch ? 5 : 1;
+
+        // 7. Intake (5 points)
+        let intakeMatch = true;
+        if (uni.intake && intake) {
+          const uniIntakeClean = uni.intake.toLowerCase();
+          const studentIntakeParts = intake.toLowerCase().split(/\s+/);
+          intakeMatch = studentIntakeParts.some((part: string) => uniIntakeClean.includes(part));
+        }
+        matchScoreVal += intakeMatch ? 5 : 1;
+
+        // Caps score at 100 and floors at 10
+        matchScoreVal = Math.max(Math.min(matchScoreVal, 100), 10);
 
         // Derive chance category
         let chance: "Safe" | "Target" | "Ambitious" = "Ambitious";
