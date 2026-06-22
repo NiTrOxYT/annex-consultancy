@@ -749,10 +749,10 @@ function CalculatorContent() {
                 </div>
 
                 {/* Desktop Preview Cards (Hidden on mobile) */}
-                <div className="hidden md:flex flex-col gap-4 relative">
+                <div className="hidden md:flex flex-col gap-4 relative min-h-[400px]">
                   {/* Premium Unlock Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-white via-white/80 to-transparent backdrop-blur-[2px] z-10 flex flex-col items-center justify-end pb-8 pt-12 text-center rounded-2xl">
-                    <div className="bg-white/90 border border-hairline shadow-lg p-6 rounded-2xl max-w-sm flex flex-col items-center">
+                  <div className="absolute inset-0 bg-white/80 backdrop-blur-md z-10 flex flex-col items-center justify-center p-4 text-center rounded-2xl">
+                    <div className="bg-white border border-hairline shadow-xl p-6 rounded-2xl max-w-sm flex flex-col items-center">
                       <span className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center text-gold mb-3">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256">
                           <path d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM112,56a16,16,0,0,1,32,0V80H112ZM208,208H48V96H208V208Z" />
