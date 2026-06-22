@@ -43,6 +43,31 @@ export async function GET(request: Request) {
 
     const enrolledEmailsSet = new Set((enrolledStudents || []).map(s => s.email.toLowerCase()));
 
+    // Fetch preview logs for conversion tracking
+    const { data: previewLogs, error: previewErr } = await db
+      .from("eligibility_preview_logs")
+      .select("session_id, event_type");
+
+    let previewViewedCount = 0;
+    let resultsUnlockedCount = 0;
+    let previewConversionRate = 0;
+
+    if (!previewErr && previewLogs) {
+      const viewedSessions = new Set();
+      const unlockedSessions = new Set();
+
+      previewLogs.forEach(log => {
+        if (log.event_type === "preview_viewed") viewedSessions.add(log.session_id);
+        if (log.event_type === "results_unlocked") unlockedSessions.add(log.session_id);
+      });
+
+      previewViewedCount = viewedSessions.size;
+      resultsUnlockedCount = unlockedSessions.size;
+      previewConversionRate = previewViewedCount > 0 
+        ? Math.round((resultsUnlockedCount / previewViewedCount) * 100) 
+        : 0;
+    }
+
     // --- AGGREGATIONS ---
 
     // A. Funnel Metrics
@@ -70,7 +95,10 @@ export async function GET(request: Request) {
       qualified: qualifiedLeads,
       unqualified: unqualifiedLeads,
       converted: convertedLeads,
-      conversionRate: totalLeads > 0 ? Math.round((convertedLeads / totalLeads) * 100) : 0
+      conversionRate: totalLeads > 0 ? Math.round((convertedLeads / totalLeads) * 100) : 0,
+      previewViewedCount,
+      resultsUnlockedCount,
+      previewConversionRate
     };
 
     // B. Response Time Metrics
@@ -217,12 +245,61 @@ export async function GET(request: Request) {
       };
     });
 
+    // Shortlist requests analytics
+    const { data: shortlistRequests } = await db
+      .from("shortlist_requests")
+      .select(`
+        *,
+        lead:eligibility_leads(preferred_country, preferred_course, lead_status)
+      `);
+
+    const sRequests = shortlistRequests || [];
+    const totalRequests = sRequests.length;
+    const generatedRequests = sRequests.filter(r => r.status === "Generated" || r.status === "Delivered" || r.generated_at).length;
+    const deliveredRequests = sRequests.filter(r => r.status === "Delivered" || r.delivered_at).length;
+    const deliveryRate = totalRequests > 0 ? Math.round((deliveredRequests / totalRequests) * 100) : 0;
+
+    const convertedRequests = sRequests.filter(r => r.lead?.lead_status === "Converted").length;
+    const consultationConversionRate = totalRequests > 0 ? Math.round((convertedRequests / totalRequests) * 100) : 0;
+
+    const countryCounts: { [key: string]: number } = {};
+    const courseCounts: { [key: string]: number } = {};
+    sRequests.forEach(r => {
+      if (r.lead) {
+        const country = r.lead.preferred_country || "Unknown";
+        const course = r.lead.preferred_course || "Unknown";
+        countryCounts[country] = (countryCounts[country] || 0) + 1;
+        courseCounts[course] = (courseCounts[course] || 0) + 1;
+      }
+    });
+
+    const topCountries = Object.entries(countryCounts)
+      .map(([country, count]) => ({ country, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const topCourses = Object.entries(courseCounts)
+      .map(([course, count]) => ({ course, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const shortlistAnalytics = {
+      totalRequests,
+      generatedRequests,
+      deliveredRequests,
+      deliveryRate,
+      consultationConversionRate,
+      topCountries,
+      topCourses
+    };
+
     return NextResponse.json({
       success: true,
       funnel,
       responseTimes,
       counselorWorkloads,
-      sourceQuality
+      sourceQuality,
+      shortlistAnalytics
     });
   } catch (err: any) {
     console.error("API GET Eligibility Analytics Error:", err);

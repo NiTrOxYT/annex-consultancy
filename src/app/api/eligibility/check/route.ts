@@ -47,12 +47,21 @@ export async function POST(request: Request) {
       utmSource,
       utmMedium,
       utmCampaign,
-      referrer
+      referrer,
+      previewOnly
     } = body;
 
+    const isPreview = previewOnly === true;
+
     // 1. Inputs validation
-    if (!name || !phone || !email || !qualification || !percentage || !budget || !preferredCountry || !preferredCourse || !intake) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (isPreview) {
+      if (!qualification || !percentage || !budget || !preferredCountry || !preferredCourse || !intake) {
+        return NextResponse.json({ error: "Missing required fields for preview matches" }, { status: 400 });
+      }
+    } else {
+      if (!name || !phone || !email || !qualification || !percentage || !budget || !preferredCountry || !preferredCourse || !intake) {
+        return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      }
     }
 
     const pct = Number(percentage);
@@ -69,44 +78,50 @@ export async function POST(request: Request) {
     // 2. Least-loaded counselor assignment routing
     let assignedCounselorId: string | null = null;
     let counselorWhatsApp: string | null = null;
+    let assignedCounselorName: string | null = null;
+    let assignedCounselorPhone: string | null = null;
 
-    const { data: counselors, error: counselorErr } = await db
-      .from("counselors")
-      .select("id, phone, is_active")
-      .eq("is_active", true);
+    if (!isPreview) {
+      const { data: counselors, error: counselorErr } = await db
+        .from("counselors")
+        .select("id, full_name, phone, is_active")
+        .eq("is_active", true);
 
-    if (!counselorErr && counselors && counselors.length > 0) {
-      // Query standard student workload per active counselor
-      const { data: studentCounts } = await db
-        .from("students")
-        .select("counselor_id");
+      if (!counselorErr && counselors && counselors.length > 0) {
+        // Query standard student workload per active counselor
+        const { data: studentCounts } = await db
+          .from("students")
+          .select("counselor_id");
 
-      const workloadMap: { [key: string]: number } = {};
-      counselors.forEach(c => { workloadMap[c.id] = 0; });
+        const workloadMap: { [key: string]: number } = {};
+        counselors.forEach(c => { workloadMap[c.id] = 0; });
 
-      if (studentCounts) {
-        studentCounts.forEach((s: any) => {
-          if (s.counselor_id && workloadMap[s.counselor_id] !== undefined) {
-            workloadMap[s.counselor_id]++;
-          }
-        });
-      }
-
-      // Find counselor with lowest active load
-      let leastLoadedId = counselors[0].id;
-      let minLoad = workloadMap[counselors[0].id];
-
-      for (let i = 1; i < counselors.length; i++) {
-        const cId = counselors[i].id;
-        if (workloadMap[cId] < minLoad) {
-          minLoad = workloadMap[cId];
-          leastLoadedId = cId;
+        if (studentCounts) {
+          studentCounts.forEach((s: any) => {
+            if (s.counselor_id && workloadMap[s.counselor_id] !== undefined) {
+              workloadMap[s.counselor_id]++;
+            }
+          });
         }
-      }
 
-      assignedCounselorId = leastLoadedId;
-      const matchedCounselor = counselors.find(c => c.id === leastLoadedId);
-      counselorWhatsApp = matchedCounselor?.phone || null;
+        // Find counselor with lowest active load
+        let leastLoadedId = counselors[0].id;
+        let minLoad = workloadMap[counselors[0].id];
+
+        for (let i = 1; i < counselors.length; i++) {
+          const cId = counselors[i].id;
+          if (workloadMap[cId] < minLoad) {
+            minLoad = workloadMap[cId];
+            leastLoadedId = cId;
+          }
+        }
+
+        assignedCounselorId = leastLoadedId;
+        const matchedCounselor = counselors.find(c => c.id === leastLoadedId);
+        counselorWhatsApp = matchedCounselor?.phone || null;
+        assignedCounselorName = matchedCounselor?.full_name || null;
+        assignedCounselorPhone = matchedCounselor?.phone || null;
+      }
     }
 
     // 3. Lead score & Priority derivation
@@ -268,6 +283,14 @@ export async function POST(request: Request) {
 
     // Sort matches by match_score descending
     matches.sort((a, b) => b.match_score - a.match_score);
+
+    if (isPreview) {
+      return NextResponse.json({
+        success: true,
+        matchScore: matches.length > 0 ? matches[0].match_score : 0,
+        matches: matches.slice(0, 8)
+      });
+    }
 
     // 5. Duplicate Protection Check (30-day window)
     const thirtyDaysAgo = new Date();
@@ -445,7 +468,11 @@ I’d like a consultation.`;
       leadScore,
       priority,
       matches: matches.slice(0, 8), // return top 8 matching universities to client
-      whatsappRedirectUrl
+      whatsappRedirectUrl,
+      counselor: assignedCounselorId ? {
+        name: assignedCounselorName || "Annex Counselor",
+        phone: assignedCounselorPhone || "+977 1 4545450"
+      } : null
     });
   } catch (err: any) {
     console.error("API POST Eligibility Check Error:", err);

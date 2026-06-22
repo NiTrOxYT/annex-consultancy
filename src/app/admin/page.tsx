@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { 
-  Sparkle, ShieldCheck, SignOut, Trash, Plus, FileText, 
-  Calendar, Users, Eye, CheckCircle, XCircle, ChartBar, 
-  Download, MagnifyingGlass, Funnel, ArrowSquareOut, Globe, 
+import {
+  Sparkle, ShieldCheck, SignOut, Trash, Plus, FileText,
+  Calendar, Users, Eye, CheckCircle, XCircle, ChartBar,
+  Download, MagnifyingGlass, Funnel, ArrowSquareOut, Globe,
   Warning, WarningCircle, Check, X, SpinnerGap, GraduationCap, Star, Copy,
   User, Paperclip, PaperPlaneRight, Gear, UploadSimple, Lock, Key, Clock, Checks,
   ChatCircleDots, Briefcase, Bell, ShareNetwork, Gift
@@ -124,6 +124,10 @@ interface LeadDetailsPanelProps {
   onClose: () => void;
   onUpdateField: (leadId: string, fieldName: string, fieldValue: any) => void;
   onCompleteReminder: (reminderId: string, title: string, note: string) => void;
+  onGeneratePdf?: (requestId: string, leadId: string) => void;
+  onMarkDelivered?: (requestId: string, leadId: string) => void;
+  generatingPdf?: boolean;
+  markingDelivered?: boolean;
 }
 
 function LeadDetailsPanel({
@@ -160,9 +164,8 @@ function LeadDetailsPanel({
           <button
             key={t}
             onClick={() => setDetailsTab(t)}
-            className={`flex-1 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-colors cursor-pointer ${
-              detailsTab === t ? "bg-white text-primary shadow-[0_1px_2px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-primary"
-            }`}
+            className={`flex-1 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-colors cursor-pointer ${detailsTab === t ? "bg-white text-primary shadow-[0_1px_2px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-primary"
+              }`}
           >
             {t}
           </button>
@@ -237,13 +240,12 @@ function LeadDetailsPanel({
                           {m.university_name_snapshot}
                         </span>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold font-mono-data ${
-                            m.admission_chance === "Safe" 
-                              ? "bg-emerald-50 text-emerald-600" 
+                          <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold font-mono-data ${m.admission_chance === "Safe"
+                              ? "bg-emerald-50 text-emerald-600"
                               : m.admission_chance === "Target"
-                              ? "bg-amber-50 text-amber-600"
-                              : "bg-orange-50 text-orange-600"
-                          }`}>
+                                ? "bg-amber-50 text-amber-600"
+                                : "bg-orange-50 text-orange-600"
+                            }`}>
                             {m.admission_chance}
                           </span>
                           <span className="text-[10px] font-bold text-slate-500 font-mono-data">{m.match_score}%</span>
@@ -303,11 +305,10 @@ function LeadDetailsPanel({
                 <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Outreach Checklists</h4>
                 <div className="space-y-3">
                   {details?.reminders?.map((rem: any) => (
-                    <div 
-                      key={rem.id} 
-                      className={`p-3 border rounded-2xl flex flex-col justify-between gap-2 shadow-sm ${
-                        rem.completed ? "bg-slate-50/50 border-slate-100 opacity-60" : "bg-white border-slate-200"
-                      }`}
+                    <div
+                      key={rem.id}
+                      className={`p-3 border rounded-2xl flex flex-col justify-between gap-2 shadow-sm ${rem.completed ? "bg-slate-50/50 border-slate-100 opacity-60" : "bg-white border-slate-200"
+                        }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-2">
@@ -412,7 +413,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const [password, setPassword] = React.useState("");
   const [authError, setAuthError] = React.useState("");
   const [checkingAuth, setCheckingAuth] = React.useState(true);
-  
+
   // Dashboard Tabs
   const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat" | "counselors" | "settings" | "training" | "experts" | "notifications" | "roles" | "referrals" | "eligibility">((initialTab as any) || "bookings");
 
@@ -442,7 +443,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const [loadingReferrals, setLoadingReferrals] = React.useState(false);
   const [referralSearch, setReferralSearch] = React.useState("");
   const [referralStatusFilter, setReferralStatusFilter] = React.useState("All");
-  
+
   const [isRewardModalOpen, setIsRewardModalOpen] = React.useState(false);
   const [rewardAmount, setRewardAmount] = React.useState("10000");
   const [selectedReferral, setSelectedReferral] = React.useState<any | null>(null);
@@ -475,14 +476,20 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const [selectedLeadDetails, setSelectedLeadDetails] = React.useState<any | null>(null);
   const [loadingLeadDetails, setLoadingLeadDetails] = React.useState(false);
   const [bulkSelectedLeadIds, setBulkSelectedLeadIds] = React.useState<string[]>([]);
-  
+
   const [leadNoteText, setLeadNoteText] = React.useState("");
   const [addingLeadNote, setAddingLeadNote] = React.useState(false);
-  
+
   const [analyticsData, setAnalyticsData] = React.useState<any | null>(null);
   const [loadingAnalytics, setLoadingAnalytics] = React.useState(false);
 
-  const [eligibilityTabMode, setEligibilityTabMode] = React.useState<"all" | "queue" | "analytics">("all");
+  const [eligibilityTabMode, setEligibilityTabMode] = React.useState<"all" | "queue" | "analytics" | "shortlists">("all");
+  const [shortlistRequests, setShortlistRequests] = React.useState<any[]>([]);
+  const [loadingShortlists, setLoadingShortlists] = React.useState(false);
+  const [shortlistStatusFilter, setShortlistStatusFilter] = React.useState("All");
+  const [selectedRequest, setSelectedRequest] = React.useState<any | null>(null);
+  const [generatingShortlistPdf, setGeneratingShortlistPdf] = React.useState(false);
+  const [markingDelivered, setMarkingDelivered] = React.useState(false);
   const [followupQueue, setFollowupQueue] = React.useState<{ overdue: any[]; dueToday: any[]; dueTomorrow: any[] } | null>(null);
   const [loadingQueue, setLoadingQueue] = React.useState(false);
 
@@ -493,9 +500,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const [emailLogs, setEmailLogs] = React.useState<any[]>([]);
   const [testEmailAddress, setTestEmailAddress] = React.useState("");
   const [sendingTestEmail, setSendingTestEmail] = React.useState(false);
-  const [testEmailResult, setTestEmailResult] = React.useState<{ 
-    success: boolean; 
-    message?: string; 
+  const [testEmailResult, setTestEmailResult] = React.useState<{
+    success: boolean;
+    message?: string;
     responseBody?: string;
   } | null>(null);
   const [emailConfig, setEmailConfig] = React.useState<{
@@ -600,7 +607,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const [bookings, setBookings] = React.useState<Booking[]>([]);
   const [selectedBooking, setSelectedBooking] = React.useState<Booking | null>(null);
   const [isNotesModalOpen, setIsNotesModalOpen] = React.useState(false);
-  
+
   // Search & Filter states for Bookings
   const [searchQuery, setSearchQuery] = React.useState("");
   const [destinationFilter, setDestinationFilter] = React.useState("All");
@@ -615,7 +622,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const [trainingTasks, setTrainingTasks] = React.useState<any[]>([]);
   const [trainingMeetings, setTrainingMeetings] = React.useState<any[]>([]);
   const [activeTrainingTab, setActiveTrainingTab] = React.useState<"services" | "students" | "tasks" | "meetings" | "analytics">("services");
-  
+
   // Service CRUD form
   const [serviceForm, setServiceForm] = React.useState({
     id: "",
@@ -690,9 +697,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   // RBAC Permission States
   const [roles, setRoles] = React.useState<any[]>([]);
   const [selectedCounselorRole, setSelectedCounselorRole] = React.useState<string>("");
-  const [counselorPermOverrides, setCounselorPermOverrides] = React.useState<{[key: string]: boolean | null}>({});
+  const [counselorPermOverrides, setCounselorPermOverrides] = React.useState<{ [key: string]: boolean | null }>({});
   const [loadingPerms, setLoadingPerms] = React.useState(false);
-  
+
   // Provision login modal state
   const [provisionModalOpen, setProvisionModalOpen] = React.useState(false);
   const [provisionCounselor, setProvisionCounselor] = React.useState<any | null>(null);
@@ -1153,7 +1160,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       if (studErr) throw studErr;
 
       const studentMap = new Map(studs?.map(s => [s.id, s]) || []);
-      
+
       const mergedConvs = (convs || []).map(c => {
         studentMap.delete(c.student_id);
         return {
@@ -1234,7 +1241,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   // Fetch Database tables
   const fetchAllData = React.useCallback(async () => {
     setLoading(true);
-    
+
     // 1. Fetch Bookings
     try {
       const { data, error } = await supabase
@@ -1326,7 +1333,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     } catch (err: any) {
       console.error("Error loading students/counts:", err.message);
     }
-    
+
     // 6. Fetch Chat Conversations
     try {
       await fetchConversations();
@@ -1467,7 +1474,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     } catch (err: any) {
       console.error("Error loading career experts:", err.message);
     }
-    
+
     // 12. Fetch Referrals & Analytics (Admin)
     try {
       const token = getAdminCredentials();
@@ -1486,7 +1493,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     } catch (err: any) {
       console.error("Error loading referrals in fetchAllData:", err.message);
     }
-    
+
     setLoading(false);
   }, [fetchConversations]);
 
@@ -1505,7 +1512,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     console.log(`[Diagnostic] Initializing admin health check channel`);
     const healthChannel = supabase
       .channel("admin_health_check")
-      .on("system" as any, { event: "presence" }, () => {})
+      .on("system" as any, { event: "presence" }, () => { })
       .subscribe((status, err) => {
         console.log(`[Diagnostic] Realtime health check channel connection status change: ${status}`);
         if (status === "SUBSCRIBED") {
@@ -1653,6 +1660,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     }
   }, [activeTab, activeChatStudentId, markAdminMessagesAsRead]);
 
+
+
   // Retrieve admin token from sessionStorage or cookie
   const getAdminCredentials = () => {
     if (typeof window === "undefined") return "";
@@ -1734,6 +1743,84 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       setLoadingAnalytics(false);
     }
   }, []);
+
+  const fetchShortlistRequests = React.useCallback(async () => {
+    setLoadingShortlists(true);
+    try {
+      const token = getAdminCredentials();
+      const statusParam = shortlistStatusFilter !== "All" ? `&status=${shortlistStatusFilter}` : "";
+      const res = await fetch(`/api/admin/shortlist-requests?counselorId=All${statusParam}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to fetch shortlist requests");
+      const data = await res.json();
+      if (data.success) {
+        setShortlistRequests(data.requests || []);
+      }
+    } catch (err: any) {
+      console.error("Error loading shortlist requests:", err.message);
+    } finally {
+      setLoadingShortlists(false);
+    }
+  }, [shortlistStatusFilter]);
+
+  const handleGenerateShortlistPdf = async (requestId: string, leadId: string) => {
+    setGeneratingShortlistPdf(true);
+    try {
+      const token = getAdminCredentials();
+      const res = await fetch("/api/admin/shortlist-requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ requestId, leadId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate PDF");
+      showToast("Personalized Shortlist PDF generated successfully!");
+      fetchShortlistRequests();
+      if (selectedLead && selectedLead.id === leadId) {
+        fetchLeadDetails(leadId);
+      }
+    } catch (err: any) {
+      showToast(`Error: ${err.message}`);
+    } finally {
+      setGeneratingShortlistPdf(false);
+    }
+  };
+
+  const handleMarkDelivered = async (requestId: string, leadId: string) => {
+    setMarkingDelivered(true);
+    try {
+      const token = getAdminCredentials();
+      const res = await fetch("/api/admin/shortlist-requests", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ requestId, status: "Delivered" })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to mark delivered");
+      showToast("Shortlist request marked as Delivered!");
+      fetchShortlistRequests();
+      if (selectedLead && selectedLead.id === leadId) {
+        fetchLeadDetails(leadId);
+      }
+    } catch (err: any) {
+      showToast(`Error: ${err.message}`);
+    } finally {
+      setMarkingDelivered(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (activeTab === "eligibility" && eligibilityTabMode === "shortlists" && isAuthenticated) {
+      fetchShortlistRequests();
+    }
+  }, [activeTab, eligibilityTabMode, shortlistStatusFilter, isAuthenticated, fetchShortlistRequests]);
 
   const fetchLeadDetails = async (leadId: string) => {
     setLoadingLeadDetails(true);
@@ -1914,7 +2001,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   };
 
   const handleExportCSV = () => {
-    const leadsToExport = eligibilityLeads.filter(l => 
+    const leadsToExport = eligibilityLeads.filter(l =>
       bulkSelectedLeadIds.length === 0 || bulkSelectedLeadIds.includes(l.id)
     );
 
@@ -1944,9 +2031,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       new Date(l.created_at).toLocaleDateString()
     ]);
 
-    const csvContent = "data:text/csv;charset=utf-8," 
+    const csvContent = "data:text/csv;charset=utf-8,"
       + [headers.join(","), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","))].join("\n");
-    
+
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -2006,10 +2093,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update referral status");
-      
+
       setToastMessage("Referral status updated successfully!");
       setTimeout(() => setToastMessage(null), 3000);
-      
+
       fetchReferralsData();
     } catch (err: any) {
       alert("Error: " + err.message);
@@ -2021,7 +2108,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const handleIssueReferralReward = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedReferral) return;
-    
+
     setIssuingReward(true);
     try {
       const token = getAdminCredentials();
@@ -2041,13 +2128,13 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to issue reward");
-      
+
       setToastMessage("Reward issued successfully!");
       setTimeout(() => setToastMessage(null), 3000);
-      
+
       setIsRewardModalOpen(false);
       setSelectedReferral(null);
-      
+
       fetchReferralsData();
     } catch (err: any) {
       alert("Error: " + err.message);
@@ -2133,14 +2220,14 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
           .from("universities")
           .update(payload)
           .eq("id", editingUni.id);
-        
+
         if (error) throw error;
         showToast("University updated successfully");
       } else {
         const { error } = await supabase
           .from("universities")
           .insert([payload]);
-        
+
         if (error) throw error;
         showToast("University added successfully");
       }
@@ -2184,7 +2271,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     try {
       const duplicatedName = `${uni.name} - Copy`;
       const duplicatedSlug = `${uni.slug}-copy-${Math.floor(Math.random() * 1000)}`;
-      
+
       const payload = {
         name: duplicatedName,
         slug: duplicatedSlug,
@@ -2209,7 +2296,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       const { error } = await supabase
         .from("universities")
         .insert([payload]);
-      
+
       if (error) throw error;
       showToast(`Duplicated "${uni.name}" as draft`);
       fetchAllData();
@@ -2254,7 +2341,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
             published_date: publishedDate
           })
           .eq("id", editingPost.id);
-        
+
         if (error) throw error;
         showToast("Article updated successfully");
       } else {
@@ -2272,7 +2359,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
             published: postForm.published,
             published_date: publishedDate
           }]);
-        
+
         if (error) throw error;
         showToast("Article created successfully");
       }
@@ -2332,7 +2419,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
             published: storyForm.published
           })
           .eq("id", editingStory.id);
-        
+
         if (error) throw error;
         showToast("Success story updated successfully");
       } else {
@@ -2349,7 +2436,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
             success_metrics: storyForm.success_metrics,
             published: storyForm.published
           }]);
-        
+
         if (error) throw error;
         showToast("Success story created successfully");
       }
@@ -2391,7 +2478,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       });
 
       const result = await response.json();
-      
+
       let prettyResponse = "";
       if (result.responseBody) {
         try {
@@ -2522,11 +2609,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       });
 
       if (authError) {
-        if (authError.message.toLowerCase().includes("already registered") || 
-            authError.message.toLowerCase().includes("already exists") || 
-            authError.code === "user_already_exists") {
+        if (authError.message.toLowerCase().includes("already registered") ||
+          authError.message.toLowerCase().includes("already exists") ||
+          authError.code === "user_already_exists") {
           console.log("[Diagnostic] User exists in Auth. Attempting to sign in using default/restored session.");
-          
+
           const { data: signInData, error: signInError } = await sessionlessClient.auth.signInWithPassword({
             email: student.student_email,
             password: tempPassword
@@ -2595,7 +2682,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       if (error) throw error;
       setToastMessage("Advisor assigned successfully.");
       await fetchAllData();
-      
+
       // Update selected student state if open
       if (selectedTrainingStudent && selectedTrainingStudent.id === studentId) {
         const refreshedStudent = trainingStudents.find(s => s.id === studentId);
@@ -2931,9 +3018,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
             last_activity: new Date().toISOString()
           })
           .eq("id", editingStudent.id);
-        
+
         if (error) throw error;
-        
+
         // Log admin action
         await supabase.from("student_activity_logs").insert({
           student_id: editingStudent.id,
@@ -2975,12 +3062,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
         if (authError) {
           console.warn("[Diagnostic] Auth signUp failed. Error code:", authError.code, "Message:", authError.message);
-          
-          if (authError.message.toLowerCase().includes("already registered") || 
-              authError.message.toLowerCase().includes("already exists") || 
-              authError.code === "user_already_exists") {
+
+          if (authError.message.toLowerCase().includes("already registered") ||
+            authError.message.toLowerCase().includes("already exists") ||
+            authError.code === "user_already_exists") {
             console.log("[Diagnostic] User exists in Auth but not in students table. Attempting self-healing by signing in to retrieve User ID.");
-            
+
             // Sign in to retrieve user id using provided password
             const { data: signInData, error: signInError } = await sessionlessClient.auth.signInWithPassword({
               email: studentForm.email,
@@ -3079,7 +3166,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
         .update({ status: newStatus })
         .eq("id", student.id);
       if (error) throw error;
-      
+
       await supabase.from("student_activity_logs").insert({
         student_id: student.id,
         action: newStatus === "Disabled" ? "Account Disabled" : "Account Enabled",
@@ -3137,7 +3224,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     setSelectedCounselorRole(c.role_id || "");
     setCounselorPermOverrides({});
     setIsCounselorModalOpen(true);
-    
+
     // Load overrides from server side
     setLoadingPerms(true);
     try {
@@ -3626,7 +3713,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
       setAdminChatText("");
       setAdminChatFile(null);
-      
+
       // Update optimistic message with actual message returned from database
       setChatCenterMessages(prev => prev.map(m => m.id === tempId ? { ...newMsg, message_attachments: [] } : m));
       await fetchConversations();
@@ -3644,17 +3731,17 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
           messageId: newMsg.id
         })
       })
-      .then(async (res) => {
-        const result = await res.json();
-        if (!res.ok || !result.success) {
-          const errorMsg = result.error || "Email delivery failed";
-          showToast(`⚠️ Reply sent, but email notification to student failed: ${errorMsg}`);
-        }
-      })
-      .catch(err => {
-        console.error("Email notification error:", err);
-        showToast(`⚠️ Reply sent, but email notification to student failed: ${err.message}`);
-      });
+        .then(async (res) => {
+          const result = await res.json();
+          if (!res.ok || !result.success) {
+            const errorMsg = result.error || "Email delivery failed";
+            showToast(`⚠️ Reply sent, but email notification to student failed: ${errorMsg}`);
+          }
+        })
+        .catch(err => {
+          console.error("Email notification error:", err);
+          showToast(`⚠️ Reply sent, but email notification to student failed: ${err.message}`);
+        });
 
     } catch (err: any) {
       console.error(`[Diagnostic] Supabase database admin insert failed:`, err);
@@ -3745,11 +3832,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
           description: newTaskDesc
         }]);
       if (error) throw error;
-      
+
       setNewTaskTitle("");
       setNewTaskDesc("");
       showToast("Task assigned successfully");
-      
+
       await supabase.from("student_notifications").insert([{
         student_id: selectedStudent.id,
         title: "New Task Assigned",
@@ -3895,7 +3982,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
           .insert([{ student_id: selectedStudent.id, status: adminVisaStatus, details: adminVisaDetails }]);
         error = res.error;
       }
-      
+
       if (error) throw error;
 
       // Update general stage as well
@@ -4045,7 +4132,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
       const res = await fetch("/api/send-student-notification", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${getAdminCredentials()}`
         },
@@ -4152,17 +4239,17 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
           messageId: newMsg.id
         })
       })
-      .then(async (res) => {
-        const result = await res.json();
-        if (!res.ok || !result.success) {
-          const errorMsg = result.error || "Email delivery failed";
-          showToast(`⚠️ Reply sent, but email notification to student failed: ${errorMsg}`);
-        }
-      })
-      .catch(err => {
-        console.error("Email notification error:", err);
-        showToast(`⚠️ Reply sent, but email notification to student failed: ${err.message}`);
-      });
+        .then(async (res) => {
+          const result = await res.json();
+          if (!res.ok || !result.success) {
+            const errorMsg = result.error || "Email delivery failed";
+            showToast(`⚠️ Reply sent, but email notification to student failed: ${errorMsg}`);
+          }
+        })
+        .catch(err => {
+          console.error("Email notification error:", err);
+          showToast(`⚠️ Reply sent, but email notification to student failed: ${err.message}`);
+        });
 
     } catch (err: any) {
       console.error(`[Diagnostic] Supabase database admin audit insert failed:`, err);
@@ -4183,8 +4270,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     if (!b.created_at) return false;
     const bDate = new Date(b.created_at);
     return bDate.getDate() === today.getDate() &&
-           bDate.getMonth() === today.getMonth() &&
-           bDate.getFullYear() === today.getFullYear();
+      bDate.getMonth() === today.getMonth() &&
+      bDate.getFullYear() === today.getFullYear();
   }).length;
 
   const publishedPostsCount = posts.filter(p => p.published).length;
@@ -4214,14 +4301,14 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   // ----------------------------------------------------
   // Bookings filter
   const filteredBookings = bookings.filter(b => {
-    const matchesSearch = 
+    const matchesSearch =
       b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       b.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       b.phone.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     const matchesDestination = destinationFilter === "All" || b.destination === destinationFilter;
     const matchesStatus = statusFilter === "All" || b.status === statusFilter;
-    
+
     return matchesSearch && matchesDestination && matchesStatus;
   });
 
@@ -4229,31 +4316,31 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const filteredUnis = React.useMemo(() => {
     return universities
       .filter(u => {
-        const matchesSearch = 
+        const matchesSearch =
           u.name.toLowerCase().includes(uniSearch.toLowerCase()) ||
           u.city.toLowerCase().includes(uniSearch.toLowerCase()) ||
           u.country.toLowerCase().includes(uniSearch.toLowerCase());
-        
+
         const matchesCountry = uniCountryFilter === "All" || u.country === uniCountryFilter;
         const matchesCategory = uniCategoryFilter === "All" || u.category === uniCategoryFilter;
-        
-        const matchesPublished = 
-          uniPublishedFilter === "All" 
-            ? true 
-            : uniPublishedFilter === "Published" 
-            ? u.published === true 
-            : u.published === false;
-            
+
+        const matchesPublished =
+          uniPublishedFilter === "All"
+            ? true
+            : uniPublishedFilter === "Published"
+              ? u.published === true
+              : u.published === false;
+
         return matchesSearch && matchesCountry && matchesCategory && matchesPublished;
       })
       .sort((a, b) => {
         if (uniSortBy === "newest") {
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         }
-        
+
         const rankA = a.ranking === null || a.ranking === undefined ? Infinity : a.ranking;
         const rankB = b.ranking === null || b.ranking === undefined ? Infinity : b.ranking;
-        
+
         if (uniSortBy === "ranking_asc") {
           return rankA - rankB;
         } else {
@@ -4263,7 +4350,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
         }
       });
   }, [universities, uniSearch, uniCountryFilter, uniCategoryFilter, uniPublishedFilter, uniSortBy]);
-  
+
   React.useEffect(() => {
     setUniPage(1);
   }, [uniSearch, uniCountryFilter, uniCategoryFilter, uniPublishedFilter, uniSortBy]);
@@ -4275,7 +4362,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
   // Blog posts filter
   const filteredPosts = posts.filter(p => {
-    const matchesSearch = 
+    const matchesSearch =
       p.title.toLowerCase().includes(blogSearch.toLowerCase()) ||
       p.excerpt.toLowerCase().includes(blogSearch.toLowerCase()) ||
       p.tags.toLowerCase().includes(blogSearch.toLowerCase());
@@ -4288,7 +4375,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
   // Success Stories filter
   const filteredStories = stories.filter(s => {
-    const matchesSearch = 
+    const matchesSearch =
       s.name.toLowerCase().includes(storySearch.toLowerCase()) ||
       s.university.toLowerCase().includes(storySearch.toLowerCase()) ||
       s.course.toLowerCase().includes(storySearch.toLowerCase());
@@ -4347,7 +4434,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       b.status,
       b.created_at
     ]);
-    
+
     const csvString = [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
     const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -4388,18 +4475,16 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
             <button
               type="button"
               onClick={() => { setLoginMethod("counselor"); setAuthError(""); }}
-              className={`flex-1 py-2 text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer ${
-                loginMethod === "counselor" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}
+              className={`flex-1 py-2 text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer ${loginMethod === "counselor" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
             >
               Counselor Login
             </button>
             <button
               type="button"
               onClick={() => { setLoginMethod("access-key"); setAuthError(""); setEmail(""); }}
-              className={`flex-1 py-2 text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer ${
-                loginMethod === "access-key" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}
+              className={`flex-1 py-2 text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer ${loginMethod === "access-key" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
             >
               Access Key
             </button>
@@ -4411,7 +4496,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 {authError}
               </div>
             )}
-            
+
             {loginMethod === "counselor" ? (
               <>
                 <div className="flex flex-col gap-1.5 text-left">
@@ -4474,15 +4559,15 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     const studentName = log.students?.name || log.training_students?.student_name || "";
     const studentEmail = log.students?.email || log.training_students?.student_email || "";
     const subject = log.subject || "";
-    
-    const matchesSearch = 
+
+    const matchesSearch =
       studentName.toLowerCase().includes(notifHistorySearch.toLowerCase()) ||
       studentEmail.toLowerCase().includes(notifHistorySearch.toLowerCase()) ||
       subject.toLowerCase().includes(notifHistorySearch.toLowerCase());
-      
+
     const matchesType = notifHistoryTypeFilter === "All" || log.notification_type === notifHistoryTypeFilter;
     const matchesStatus = notifHistoryStatusFilter === "All" || log.status === notifHistoryStatusFilter;
-    
+
     return matchesSearch && matchesType && matchesStatus;
   });
 
@@ -4508,11 +4593,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
             <AnnexLogo size={32} showText={true} />
             <span className="font-display font-bold text-lg text-slate-400 tracking-tight">ADMIN</span>
           </div>
-          
+
           <nav className="flex flex-wrap gap-1 sm:gap-2">
             {visibleTabs.map(tab => {
               const isActive = activeTab === tab.id;
-              const unreadCount = tab.id === "chat" 
+              const unreadCount = tab.id === "chat"
                 ? conversations.reduce((sum, c) => sum + (c.unread_count_admin || 0), 0)
                 : 0;
 
@@ -4520,9 +4605,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <button
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
-                  className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
-                    isActive ? "bg-primary text-white" : "text-slate-500 hover:text-primary hover:bg-slate-50"
-                  }`}
+                  className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${isActive ? "bg-primary text-white" : "text-slate-500 hover:text-primary hover:bg-slate-50"
+                    }`}
                 >
                   <span>{tab.label}</span>
                   {tab.id === "chat" && unreadCount > 0 && (
@@ -4598,25 +4682,25 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
             {/* Sub-panels (Quick Actions / Analytics Insights) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              
+
               {/* Quick Actions Column */}
               <div className="lg:col-span-5 flex flex-col gap-4">
                 <Card>
                   <CardTitle className="text-sm uppercase tracking-wider text-slate-400 mb-4">Quick Access Links</CardTitle>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <a 
-                      href="https://analytics.google.com/" 
-                      target="_blank" 
+                    <a
+                      href="https://analytics.google.com/"
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="flex flex-col items-center justify-center p-4 border border-hairline hover:border-primary rounded-xl bg-slate-50 hover:bg-slate-100/30 transition-all text-center gap-2 group"
                     >
                       <ChartBar size={20} className="text-primary group-hover:scale-105 transition-transform" />
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Google Analytics</span>
                     </a>
-                    
-                    <a 
-                      href="https://clarity.microsoft.com/" 
-                      target="_blank" 
+
+                    <a
+                      href="https://clarity.microsoft.com/"
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="flex flex-col items-center justify-center p-4 border border-hairline hover:border-primary rounded-xl bg-slate-50 hover:bg-slate-100/30 transition-all text-center gap-2 group"
                     >
@@ -4624,9 +4708,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Microsoft Clarity</span>
                     </a>
 
-                    <a 
-                      href="https://supabase.com/dashboard" 
-                      target="_blank" 
+                    <a
+                      href="https://supabase.com/dashboard"
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="flex flex-col items-center justify-center p-4 border border-hairline hover:border-primary rounded-xl bg-slate-50 hover:bg-slate-100/30 transition-all text-center gap-2 group"
                     >
@@ -4639,17 +4723,17 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <Card>
                   <div className="flex items-center justify-between mb-4">
                     <CardTitle className="text-sm uppercase tracking-wider text-slate-400 m-0">System Health Diagnostics</CardTitle>
-                    <Button 
-                      variant="secondary" 
-                      size="sm" 
-                      onClick={checkSystemHealth} 
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={checkSystemHealth}
                       className="h-7 px-2.5 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shrink-0"
                     >
                       <SpinnerGap className={healthStatus.supabase === "checking" ? "animate-spin" : ""} size={12} />
                       Re-Check
                     </Button>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-3">
                     {/* Supabase connection indicator */}
                     <div className="p-3 border border-hairline/80 rounded-xl bg-slate-50 flex items-center justify-between gap-2.5 hover:shadow-sm transition-all">
@@ -4658,13 +4742,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                         <span className="text-[9px] text-slate-400 truncate">Database API Connection</span>
                       </div>
                       <div className="shrink-0 flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full ${
-                          healthStatus.supabase === "connected" ? "bg-emerald-500 animate-pulse" : 
-                          healthStatus.supabase === "failed" ? "bg-red-500 animate-pulse" : "bg-yellow-500 animate-bounce"
-                        }`} />
+                        <span className={`w-2 h-2 rounded-full ${healthStatus.supabase === "connected" ? "bg-emerald-500 animate-pulse" :
+                            healthStatus.supabase === "failed" ? "bg-red-500 animate-pulse" : "bg-yellow-500 animate-bounce"
+                          }`} />
                         <span className="text-[10px] font-semibold text-slate-600">
-                          {healthStatus.supabase === "connected" ? "OK" : 
-                           healthStatus.supabase === "failed" ? "Failed" : "Checking"}
+                          {healthStatus.supabase === "connected" ? "OK" :
+                            healthStatus.supabase === "failed" ? "Failed" : "Checking"}
                         </span>
                       </div>
                     </div>
@@ -4676,13 +4759,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                         <span className="text-[9px] text-slate-400 truncate">Websocket Channels</span>
                       </div>
                       <div className="shrink-0 flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full ${
-                          healthStatus.realtime === "connected" ? "bg-emerald-500 animate-pulse" : 
-                          healthStatus.realtime === "failed" ? "bg-red-500 animate-pulse" : "bg-yellow-500 animate-bounce"
-                        }`} />
+                        <span className={`w-2 h-2 rounded-full ${healthStatus.realtime === "connected" ? "bg-emerald-500 animate-pulse" :
+                            healthStatus.realtime === "failed" ? "bg-red-500 animate-pulse" : "bg-yellow-500 animate-bounce"
+                          }`} />
                         <span className="text-[10px] font-semibold text-slate-600">
-                          {healthStatus.realtime === "connected" ? "OK" : 
-                           healthStatus.realtime === "failed" ? "Failed" : "Checking"}
+                          {healthStatus.realtime === "connected" ? "OK" :
+                            healthStatus.realtime === "failed" ? "Failed" : "Checking"}
                         </span>
                       </div>
                     </div>
@@ -4696,13 +4778,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                         </span>
                       </div>
                       <div className="shrink-0 flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full ${
-                          healthStatus.email === "connected" ? "bg-emerald-500 animate-pulse" : 
-                          healthStatus.email === "failed" ? "bg-red-500 animate-pulse" : "bg-yellow-500 animate-bounce"
-                        }`} />
+                        <span className={`w-2 h-2 rounded-full ${healthStatus.email === "connected" ? "bg-emerald-500 animate-pulse" :
+                            healthStatus.email === "failed" ? "bg-red-500 animate-pulse" : "bg-yellow-500 animate-bounce"
+                          }`} />
                         <span className="text-[10px] font-semibold text-slate-600">
-                          {healthStatus.email === "connected" ? "Active" : 
-                           healthStatus.email === "failed" ? "Failed" : "Checking"}
+                          {healthStatus.email === "connected" ? "Active" :
+                            healthStatus.email === "failed" ? "Failed" : "Checking"}
                         </span>
                       </div>
                     </div>
@@ -4714,13 +4795,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                         <span className="text-[9px] text-slate-400 truncate">student-files bucket list</span>
                       </div>
                       <div className="shrink-0 flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full ${
-                          healthStatus.storage === "connected" ? "bg-emerald-500 animate-pulse" : 
-                          healthStatus.storage === "failed" ? "bg-red-500 animate-pulse" : "bg-yellow-500 animate-bounce"
-                        }`} />
+                        <span className={`w-2 h-2 rounded-full ${healthStatus.storage === "connected" ? "bg-emerald-500 animate-pulse" :
+                            healthStatus.storage === "failed" ? "bg-red-500 animate-pulse" : "bg-yellow-500 animate-bounce"
+                          }`} />
                         <span className="text-[10px] font-semibold text-slate-600">
-                          {healthStatus.storage === "connected" ? "OK" : 
-                           healthStatus.storage === "failed" ? "Failed" : "Checking"}
+                          {healthStatus.storage === "connected" ? "OK" :
+                            healthStatus.storage === "failed" ? "Failed" : "Checking"}
                         </span>
                       </div>
                     </div>
@@ -4749,15 +4829,15 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
             {/* Main Area: Bookings list & timeline Activity feed */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              
+
               {/* Consultation Requests list */}
               <div className="lg:col-span-8 flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-slate-50 border border-hairline p-4 rounded-2xl">
                   <div className="flex flex-grow max-w-md items-center gap-2.5 px-3 py-2 border border-hairline rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20">
                     <MagnifyingGlass size={16} className="text-slate-400" />
-                    <input 
-                      type="text" 
-                      placeholder="Search bookings..." 
+                    <input
+                      type="text"
+                      placeholder="Search bookings..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="text-xs w-full focus:outline-none text-slate-800 bg-transparent"
@@ -4768,10 +4848,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       </button>
                     )}
                   </div>
-                  
+
                   <div className="flex flex-wrap items-center gap-2">
-                    <select 
-                      value={destinationFilter} 
+                    <select
+                      value={destinationFilter}
                       onChange={(e) => setDestinationFilter(e.target.value)}
                       className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
                     >
@@ -4784,8 +4864,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       <option value="India">India</option>
                     </select>
 
-                    <select 
-                      value={statusFilter} 
+                    <select
+                      value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
                       className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
                     >
@@ -4833,13 +4913,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                               {booking.preferred_date} @ {booking.preferred_time}
                             </td>
                             <td className="p-4">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                booking.status === "Confirmed"
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${booking.status === "Confirmed"
                                   ? "bg-green-50 text-green-600 border border-green-100"
                                   : booking.status === "Cancelled"
-                                  ? "bg-red-50 text-red-600 border border-red-100"
-                                  : "bg-yellow-50 text-yellow-600 border border-yellow-100"
-                              }`}>
+                                    ? "bg-red-50 text-red-600 border border-red-100"
+                                    : "bg-yellow-50 text-yellow-600 border border-yellow-100"
+                                }`}>
                                 {booking.status}
                               </span>
                             </td>
@@ -4893,18 +4972,16 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   <div className="flex flex-col gap-4">
                     {combinedActivity.map((act) => (
                       <div key={act.id} className="flex gap-3 items-start border-b border-hairline/60 pb-3 last:border-0 last:pb-0">
-                        <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
-                          act.type === "Booking" ? "bg-primary" : act.type === "Blog" ? "bg-blue-500" : "bg-purple-500"
-                        }`} />
+                        <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${act.type === "Booking" ? "bg-primary" : act.type === "Blog" ? "bg-blue-500" : "bg-purple-500"
+                          }`} />
                         <div className="flex-grow min-w-0">
                           <p className="text-xs font-semibold text-primary truncate" title={act.title}>{act.title}</p>
                           <p className="text-[10px] text-slate-400">
                             {act.meta} &bull; {new Date(act.date).toLocaleDateString()}
                           </p>
                         </div>
-                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider uppercase shrink-0 ${
-                          act.type === "Booking" ? "bg-slate-100 text-slate-600" : act.type === "Blog" ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"
-                        }`}>
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider uppercase shrink-0 ${act.type === "Booking" ? "bg-slate-100 text-slate-600" : act.type === "Blog" ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"
+                          }`}>
                           {act.type}
                         </span>
                       </div>
@@ -4928,7 +5005,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <p className="text-xs text-slate-400 mt-1">Coordinate placement details and country tags.</p>
               </div>
               {uniTableExists && (
-                <Button 
+                <Button
                   onClick={() => {
                     setEditingUni(null);
                     setUniForm({
@@ -4959,9 +5036,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       scholarship_available: false
                     });
                     setIsUniModalOpen(true);
-                  }} 
-                  variant="primary" 
-                  size="sm" 
+                  }}
+                  variant="primary"
+                  size="sm"
                   className="flex items-center gap-1"
                 >
                   <Plus size={14} /> Add University
@@ -5005,18 +5082,18 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <div className="flex flex-col xl:flex-row gap-4 justify-between items-stretch xl:items-center bg-slate-50 border border-hairline p-4 rounded-2xl">
                   <div className="flex flex-grow max-w-md items-center gap-2.5 px-3 py-2 border border-hairline rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20">
                     <MagnifyingGlass size={16} className="text-slate-400" />
-                    <input 
-                      type="text" 
-                      placeholder="Search universities..." 
+                    <input
+                      type="text"
+                      placeholder="Search universities..."
                       value={uniSearch}
                       onChange={(e) => setUniSearch(e.target.value)}
                       className="text-xs w-full focus:outline-none text-slate-800 bg-transparent"
                     />
                   </div>
-                  
+
                   <div className="flex flex-wrap items-center gap-2">
-                    <select 
-                      value={uniCountryFilter} 
+                    <select
+                      value={uniCountryFilter}
                       onChange={(e) => setUniCountryFilter(e.target.value)}
                       className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
                     >
@@ -5026,8 +5103,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       ))}
                     </select>
 
-                    <select 
-                      value={uniCategoryFilter} 
+                    <select
+                      value={uniCategoryFilter}
                       onChange={(e) => setUniCategoryFilter(e.target.value)}
                       className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
                     >
@@ -5037,8 +5114,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       ))}
                     </select>
 
-                    <select 
-                      value={uniPublishedFilter} 
+                    <select
+                      value={uniPublishedFilter}
                       onChange={(e) => setUniPublishedFilter(e.target.value)}
                       className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
                     >
@@ -5047,8 +5124,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       <option value="Draft">Draft</option>
                     </select>
 
-                    <select 
-                      value={uniSortBy} 
+                    <select
+                      value={uniSortBy}
                       onChange={(e) => setUniSortBy(e.target.value as any)}
                       className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
                     >
@@ -5106,7 +5183,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                               </td>
                               <td className="p-4">
                                 {uni.ranking ? (
-                                  <span className="font-semibold font-mono-data text-primary">#{uni.ranking}<br/>
+                                  <span className="font-semibold font-mono-data text-primary">#{uni.ranking}<br />
                                     <span className="text-[9px] font-normal text-slate-400 font-sans">{uni.ranking_source || "Ranked"}</span>
                                   </span>
                                 ) : (
@@ -5120,9 +5197,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                               <td className="p-4">
                                 <button
                                   onClick={() => togglePublishedUni(uni.id, uni.published)}
-                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
-                                    uni.published ? "bg-green-50 text-green-600 border-green-100 hover:bg-green-100/30" : "bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200/30"
-                                  }`}
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${uni.published ? "bg-green-50 text-green-600 border-green-100 hover:bg-green-100/30" : "bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200/30"
+                                    }`}
                                 >
                                   {uni.published ? "Published" : "Draft"}
                                 </button>
@@ -5172,8 +5248,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                 >
                                   <Copy size={16} />
                                 </button>
-                                <button 
-                                  onClick={() => handleDeleteUni(uni.id)} 
+                                <button
+                                  onClick={() => handleDeleteUni(uni.id)}
                                   className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
                                   title="Delete"
                                 >
@@ -5191,7 +5267,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                         <span className="text-xs text-slate-500">
                           Showing Page <strong className="font-mono-data">{uniPage}</strong> of <strong className="font-mono-data">{totalUniPages}</strong> ({filteredUnis.length} universities)
                         </span>
-                        
+
                         <div className="flex gap-2">
                           <Button disabled={uniPage === 1} onClick={() => setUniPage(p => Math.max(1, p - 1))} variant="secondary" size="sm">Previous</Button>
                           <Button disabled={uniPage === totalUniPages} onClick={() => setUniPage(p => Math.min(totalUniPages, p + 1))} variant="secondary" size="sm">Next</Button>
@@ -5208,9 +5284,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       <Eye size={16} /> Most Viewed Universities
                     </CardTitle>
                     <div className="flex flex-col gap-3">
-                      {([...universities].sort((a,b) => b.views_count - a.views_count).slice(0, 5)).map((u, i) => (
+                      {([...universities].sort((a, b) => b.views_count - a.views_count).slice(0, 5)).map((u, i) => (
                         <div key={u.id} className="flex justify-between items-center text-xs border-b border-hairline/60 pb-2 last:border-0 last:pb-0">
-                          <span className="font-semibold text-primary">{i+1}. {u.name}</span>
+                          <span className="font-semibold text-primary">{i + 1}. {u.name}</span>
                           <span className="font-mono-data text-slate-500 font-bold">{u.views_count} views</span>
                         </div>
                       ))}
@@ -5223,9 +5299,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       <Sparkle size={16} /> Most Clicked Apply Buttons
                     </CardTitle>
                     <div className="flex flex-col gap-3">
-                      {([...universities].sort((a,b) => b.clicks_count - a.clicks_count).slice(0, 5)).map((u, i) => (
+                      {([...universities].sort((a, b) => b.clicks_count - a.clicks_count).slice(0, 5)).map((u, i) => (
                         <div key={u.id} className="flex justify-between items-center text-xs border-b border-hairline/60 pb-2 last:border-0 last:pb-0">
-                          <span className="font-semibold text-primary">{i+1}. {u.name}</span>
+                          <span className="font-semibold text-primary">{i + 1}. {u.name}</span>
                           <span className="font-mono-data text-slate-500 font-bold">{u.clicks_count} clicks</span>
                         </div>
                       ))}
@@ -5290,7 +5366,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <p className="text-xs text-slate-400 mt-1">Manage public articles and insights.</p>
               </div>
               {postsTableExists && (
-                <Button 
+                <Button
                   onClick={() => {
                     setEditingPost(null);
                     setPostForm({
@@ -5307,8 +5383,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     setPostModalTab("edit");
                     setIsPostModalOpen(true);
                   }}
-                  variant="primary" 
-                  size="sm" 
+                  variant="primary"
+                  size="sm"
                   className="flex items-center gap-1"
                 >
                   <Plus size={14} /> New Article
@@ -5333,17 +5409,17 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-slate-50 border border-hairline p-4 rounded-2xl">
                   <div className="flex flex-grow max-w-md items-center gap-2.5 px-3 py-2 border border-hairline rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20">
                     <MagnifyingGlass size={16} className="text-slate-400" />
-                    <input 
-                      type="text" 
-                      placeholder="Search articles..." 
+                    <input
+                      type="text"
+                      placeholder="Search articles..."
                       value={blogSearch}
                       onChange={(e) => setBlogSearch(e.target.value)}
                       className="text-xs w-full focus:outline-none text-slate-800 bg-transparent"
                     />
                   </div>
-                  
-                  <select 
-                    value={blogCategoryFilter} 
+
+                  <select
+                    value={blogCategoryFilter}
                     onChange={(e) => setBlogCategoryFilter(e.target.value)}
                     className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
                   >
@@ -5402,9 +5478,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                             <td className="p-4">
                               <button
                                 onClick={() => togglePublishPost(post.id, post.published)}
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
-                                  post.published ? "bg-green-50 text-green-600 border-green-100 hover:bg-green-100/30" : "bg-yellow-50 text-yellow-600 border-yellow-100 hover:bg-yellow-100/30"
-                                }`}
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${post.published ? "bg-green-50 text-green-600 border-green-100 hover:bg-green-100/30" : "bg-yellow-50 text-yellow-600 border-yellow-100 hover:bg-yellow-100/30"
+                                  }`}
                                 title={post.published ? "Mark Draft" : "Publish"}
                               >
                                 {post.published ? "Published" : "Draft"}
@@ -5455,7 +5530,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <p className="text-xs text-slate-400 mt-1">Manage public placements and test prep testimonials.</p>
               </div>
               {storiesTableExists && (
-                <Button 
+                <Button
                   onClick={() => {
                     setEditingStory(null);
                     setStoryForm({
@@ -5471,8 +5546,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     });
                     setIsStoryModalOpen(true);
                   }}
-                  variant="primary" 
-                  size="sm" 
+                  variant="primary"
+                  size="sm"
                   className="flex items-center gap-1"
                 >
                   <Plus size={14} /> New Story
@@ -5497,17 +5572,17 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center bg-slate-50 border border-hairline p-4 rounded-2xl">
                   <div className="flex flex-grow max-w-md items-center gap-2.5 px-3 py-2 border border-hairline rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20">
                     <MagnifyingGlass size={16} className="text-slate-400" />
-                    <input 
-                      type="text" 
-                      placeholder="Search success stories..." 
+                    <input
+                      type="text"
+                      placeholder="Search success stories..."
                       value={storySearch}
                       onChange={(e) => setStorySearch(e.target.value)}
                       className="text-xs w-full focus:outline-none text-slate-800 bg-transparent"
                     />
                   </div>
-                  
-                  <select 
-                    value={storyCountryFilter} 
+
+                  <select
+                    value={storyCountryFilter}
                     onChange={(e) => setStoryCountryFilter(e.target.value)}
                     className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
                   >
@@ -5556,9 +5631,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                             <td className="p-4">
                               <button
                                 onClick={() => togglePublishStory(story.id, story.published)}
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
-                                  story.published ? "bg-green-50 text-green-600 border-green-100 hover:bg-green-100/30" : "bg-yellow-50 text-yellow-600 border-yellow-100 hover:bg-yellow-100/30"
-                                }`}
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${story.published ? "bg-green-50 text-green-600 border-green-100 hover:bg-green-100/30" : "bg-yellow-50 text-yellow-600 border-yellow-100 hover:bg-yellow-100/30"
+                                  }`}
                                 title={story.published ? "Mark Draft" : "Publish"}
                               >
                                 {story.published ? "Published" : "Draft"}
@@ -5607,7 +5681,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <h2 className="font-display font-bold text-2xl text-primary">Student Management</h2>
                 <p className="text-xs text-slate-400 mt-1">Generate login credentials, manage profiles, track visa lodgements, and review uploaded documents.</p>
               </div>
-              <Button 
+              <Button
                 onClick={() => {
                   setEditingStudent(null);
                   setStudentForm({
@@ -5627,9 +5701,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     current_stage: "Consultation"
                   });
                   setIsStudentModalOpen(true);
-                }} 
-                variant="primary" 
-                size="sm" 
+                }}
+                variant="primary"
+                size="sm"
                 className="flex items-center gap-1"
               >
                 <Plus size={14} /> Add Student
@@ -5660,9 +5734,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
             <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center bg-slate-50 border border-hairline p-4 rounded-2xl">
               <div className="flex flex-grow max-w-md items-center gap-2.5 px-3 py-2 border border-hairline rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20">
                 <MagnifyingGlass size={16} className="text-slate-400" />
-                <input 
-                  type="text" 
-                  placeholder="Search by student name, email, phone..." 
+                <input
+                  type="text"
+                  placeholder="Search by student name, email, phone..."
                   value={studentSearch}
                   onChange={(e) => setStudentSearch(e.target.value)}
                   className="text-xs w-full focus:outline-none text-slate-800 bg-transparent"
@@ -5670,7 +5744,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <select 
+                <select
                   value={studentDestFilter}
                   onChange={(e) => setStudentDestFilter(e.target.value)}
                   className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
@@ -5684,7 +5758,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   <option value="India">India</option>
                 </select>
 
-                <select 
+                <select
                   value={studentStatusFilter}
                   onChange={(e) => setStudentStatusFilter(e.target.value)}
                   className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-600 font-semibold focus:outline-none cursor-pointer"
@@ -5721,11 +5795,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   <tbody className="divide-y divide-hairline">
                     {students
                       .filter(s => {
-                        const matchesSearch = 
+                        const matchesSearch =
                           s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
                           s.email.toLowerCase().includes(studentSearch.toLowerCase()) ||
                           (s.phone && s.phone.includes(studentSearch));
-                        
+
                         const matchesDest = studentDestFilter === "All" || s.destination === studentDestFilter;
                         const matchesStatus = studentStatusFilter === "All" || s.status === studentStatusFilter;
 
@@ -5747,11 +5821,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                             {student.intake || "N/A"}
                           </td>
                           <td className="p-4">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                              student.status === "Active"
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${student.status === "Active"
                                 ? "bg-emerald-50 text-emerald-600 border-emerald-100"
                                 : "bg-red-50 text-red-600 border-red-100"
-                            }`}>
+                              }`}>
                               {student.status}
                             </span>
                           </td>
@@ -5811,9 +5884,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                             </button>
                             <button
                               onClick={() => toggleStudentStatus(student)}
-                              className={`p-1.5 rounded transition-colors cursor-pointer ${
-                                student.status === "Active" ? "text-red-500 hover:bg-red-50" : "text-emerald-500 hover:bg-emerald-50"
-                              }`}
+                              className={`p-1.5 rounded transition-colors cursor-pointer ${student.status === "Active" ? "text-red-500 hover:bg-red-50" : "text-emerald-500 hover:bg-emerald-50"
+                                }`}
                               title={student.status === "Active" ? "Disable Account" : "Activate Account"}
                             >
                               {student.status === "Active" ? <XCircle size={16} /> : <CheckCircle size={16} />}
@@ -5838,7 +5910,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
             <div className="mt-8">
               <h3 className="font-display font-bold text-lg text-primary mb-4">Student Analytics Insights</h3>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
+
                 {/* Stage wise Funnel Breakdown */}
                 <Card className="lg:col-span-2">
                   <CardTitle className="text-xs uppercase tracking-wider text-slate-400 mb-4">Milestone Conversion Funnel</CardTitle>
@@ -5865,7 +5937,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                 {/* Country breakdown & visa rates */}
                 <div className="space-y-6">
-                  
+
                   {/* Country breakdown */}
                   <Card>
                     <CardTitle className="text-xs uppercase tracking-wider text-slate-400 mb-4">Destination Countries</CardTitle>
@@ -5876,7 +5948,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           return acc;
                         }, {} as Record<string, number>)
                       ) as [string, number][])
-                        .sort((a,b) => b[1] - a[1])
+                        .sort((a, b) => b[1] - a[1])
                         .map(([dest, count]) => (
                           <div key={dest} className="flex justify-between items-center text-xs border-b border-hairline/60 pb-2 last:border-0 last:pb-0">
                             <span className="font-semibold text-primary">{dest}</span>
@@ -5925,7 +5997,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <h2 className="font-display font-bold text-2xl text-primary">Counselor Directory</h2>
                 <p className="text-xs text-slate-400 mt-1">Manage admissions counselors, view workload distributions, and update staff active status.</p>
               </div>
-              <Button 
+              <Button
                 onClick={() => {
                   setEditingCounselor(null);
                   setCounselorForm({
@@ -5937,9 +6009,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     is_active: true
                   });
                   setIsCounselorModalOpen(true);
-                }} 
-                variant="primary" 
-                size="sm" 
+                }}
+                variant="primary"
+                size="sm"
                 className="flex items-center gap-1"
               >
                 <Plus size={14} /> Add Counselor
@@ -5989,7 +6061,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   <tbody className="divide-y divide-hairline">
                     {counselors.map(c => {
                       const studentCount = students.filter(s => s.counselor_id === c.id).length;
-                      
+
                       // Calculate computed Last Activity
                       // Find student IDs assigned to this counselor
                       const assignedStudentIds = students.filter(s => s.counselor_id === c.id).map(s => s.id);
@@ -5999,9 +6071,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       const activities = counselorConversations
                         .map(conv => conv.last_activity_at ? new Date(conv.last_activity_at).getTime() : 0)
                         .filter(time => time > 0);
-                      
+
                       const maxActivityTime = activities.length > 0 ? Math.max(...activities) : 0;
-                      const lastActivityFormatted = maxActivityTime > 0 
+                      const lastActivityFormatted = maxActivityTime > 0
                         ? new Date(maxActivityTime).toLocaleDateString()
                         : "No recent activity";
 
@@ -6010,9 +6082,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           <td className="p-4 font-semibold text-primary">
                             <div className="flex items-center gap-3">
                               {c.avatar_url ? (
-                                <img 
-                                  src={c.avatar_url} 
-                                  alt={c.full_name} 
+                                <img
+                                  src={c.avatar_url}
+                                  alt={c.full_name}
                                   className="w-8 h-8 rounded-full object-cover border border-hairline shadow-sm"
                                 />
                               ) : (
@@ -6035,11 +6107,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           <td className="p-4 font-mono-data text-slate-500">{c.phone || "N/A"}</td>
                           <td className="p-4 font-bold text-primary">{studentCount} students</td>
                           <td className="p-4">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                              c.is_active
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${c.is_active
                                 ? "bg-emerald-50 text-emerald-600 border-emerald-100"
                                 : "bg-red-50 text-red-600 border-red-100"
-                            }`}>
+                              }`}>
                               {c.is_active ? "Active" : "Inactive"}
                             </span>
                           </td>
@@ -6071,9 +6142,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                             )}
                             <button
                               onClick={() => toggleCounselorStatus(c)}
-                              className={`p-1.5 rounded transition-colors cursor-pointer ${
-                                c.is_active ? "text-red-500 hover:bg-red-50" : "text-emerald-500 hover:bg-emerald-50"
-                              }`}
+                              className={`p-1.5 rounded transition-colors cursor-pointer ${c.is_active ? "text-red-500 hover:bg-red-50" : "text-emerald-500 hover:bg-emerald-50"
+                                }`}
                             >
                               {c.is_active ? (
                                 <span title="Disable counselor">
@@ -6116,9 +6186,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <div className="p-4 border-b border-hairline bg-slate-50/50 flex flex-col gap-2">
                   <div className="flex items-center gap-2.5 px-3 py-2 border border-hairline rounded-xl bg-white focus-within:ring-2 focus-within:ring-primary/20">
                     <MagnifyingGlass size={16} className="text-slate-400" />
-                    <input 
-                      type="text" 
-                      placeholder="Search students or messages..." 
+                    <input
+                      type="text"
+                      placeholder="Search students or messages..."
                       value={chatCenterSearch}
                       onChange={(e) => setChatCenterSearch(e.target.value)}
                       className="text-xs w-full focus:outline-none text-slate-800 bg-transparent"
@@ -6129,7 +6199,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       </button>
                     )}
                   </div>
-                  
+
                   {/* Counselor & Active Filters */}
                   <div className="flex gap-2">
                     <select
@@ -6147,11 +6217,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     <button
                       type="button"
                       onClick={() => setChatActiveOnlyFilter(!chatActiveOnlyFilter)}
-                      className={`px-3 py-1.5 border rounded-xl text-[10px] font-bold transition-all cursor-pointer whitespace-nowrap ${
-                        chatActiveOnlyFilter 
-                          ? "bg-primary border-primary text-white" 
+                      className={`px-3 py-1.5 border rounded-xl text-[10px] font-bold transition-all cursor-pointer whitespace-nowrap ${chatActiveOnlyFilter
+                          ? "bg-primary border-primary text-white"
                           : "bg-white border-hairline text-slate-500 hover:text-primary hover:bg-slate-50"
-                      }`}
+                        }`}
                     >
                       Active Only
                     </button>
@@ -6162,7 +6231,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   {conversations
                     .filter(c => {
                       if (!c.student) return false;
-                      
+
                       // 1. Search query filter
                       const searchLower = chatCenterSearch.toLowerCase();
                       const nameMatch = c.student.name.toLowerCase().includes(searchLower);
@@ -6191,18 +6260,17 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       const relativeTime = c.last_activity_at && c.last_activity_at !== new Date(0).toISOString()
                         ? new Date(c.last_activity_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                         : "";
-                      
+
                       const assignedCounselorName = c.student.counselors?.full_name || c.student.counselor || "Unassigned";
 
                       return (
-                        <button 
+                        <button
                           key={c.student_id}
                           onClick={() => {
                             setActiveChatStudentId(c.student_id);
                           }}
-                          className={`w-full text-left p-4 flex items-start gap-3 transition-colors cursor-pointer ${
-                            isSelected ? "bg-primary/5 text-primary" : "hover:bg-slate-50/60"
-                          }`}
+                          className={`w-full text-left p-4 flex items-start gap-3 transition-colors cursor-pointer ${isSelected ? "bg-primary/5 text-primary" : "hover:bg-slate-50/60"
+                            }`}
                         >
                           <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs uppercase shrink-0">
                             {c.student.name.charAt(0)}
@@ -6213,12 +6281,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                               <span className="text-[9px] text-slate-400 font-mono-data">{relativeTime}</span>
                             </div>
                             <p className="text-[10px] text-slate-400 truncate mb-0.5">{c.student.email}</p>
-                            
+
                             {/* Assigned Counselor display */}
                             <p className="text-[9px] text-primary/70 font-semibold mb-1 truncate">
                               Counselor: {assignedCounselorName}
                             </p>
-                            
+
                             <p className="text-[11px] text-slate-500 truncate leading-tight">{c.last_message}</p>
                           </div>
                           {c.unread_count_admin > 0 && (
@@ -6232,7 +6300,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                   {conversations.filter(c => {
                     if (!c.student) return false;
-                    
+
                     const searchLower = chatCenterSearch.toLowerCase();
                     const nameMatch = c.student.name.toLowerCase().includes(searchLower);
                     const emailMatch = c.student.email.toLowerCase().includes(searchLower);
@@ -6253,8 +6321,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                     return true;
                   }).length === 0 && (
-                    <div className="p-8 text-center text-slate-400 text-xs font-medium">No matching conversations.</div>
-                  )}
+                      <div className="p-8 text-center text-slate-400 text-xs font-medium">No matching conversations.</div>
+                    )}
                 </div>
               </div>
 
@@ -6272,7 +6340,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   (() => {
                     const activeConv = conversations.find(c => c.student_id === activeChatStudentId);
                     const activeStudent = activeConv?.student;
-                    
+
                     return (
                       <>
                         {/* Thread Header */}
@@ -6301,8 +6369,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                         {/* Messages Area */}
                         <div className="flex-grow p-6 overflow-y-auto space-y-4 flex flex-col">
                           {chatCenterHasMore && (
-                            <button 
-                              type="button" 
+                            <button
+                              type="button"
                               onClick={() => loadAdminChatMessages(activeChatStudentId, chatCenterMessages.length)}
                               className="mx-auto block text-xs font-semibold text-primary/80 hover:text-primary bg-primary/5 hover:bg-primary/10 px-3.5 py-1.5 rounded-full transition-all border border-primary/10 cursor-pointer mb-2"
                             >
@@ -6322,18 +6390,16 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                             chatCenterMessages.map((msg, index) => {
                               const isCounselor = msg.sender_type === "counselor" || msg.sender_type === "admin";
                               return (
-                                <div 
+                                <div
                                   key={msg.id || index}
-                                  className={`flex flex-col max-w-[75%] ${
-                                    isCounselor ? "self-end items-end" : "self-start items-start"
-                                  }`}
+                                  className={`flex flex-col max-w-[75%] ${isCounselor ? "self-end items-end" : "self-start items-start"
+                                    }`}
                                 >
-                                  <div className={`p-4 rounded-3xl text-sm leading-relaxed ${
-                                    isCounselor 
-                                      ? "bg-primary text-white rounded-br-none" 
+                                  <div className={`p-4 rounded-3xl text-sm leading-relaxed ${isCounselor
+                                      ? "bg-primary text-white rounded-br-none"
                                       : "bg-white border border-hairline/60 text-slate-800 rounded-bl-none shadow-sm"
-                                  }`}>
-                                    
+                                    }`}>
+
                                     {/* Text Message */}
                                     <p className="whitespace-pre-wrap">{msg.message}</p>
 
@@ -6342,9 +6408,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                       <div className="mt-2.5">
                                         {/\.(jpeg|jpg|gif|png|webp)$/i.test(msg.attachment_name || "") ? (
                                           <div className="relative rounded-lg overflow-hidden border border-hairline max-w-[240px] bg-slate-100/10">
-                                            <img 
-                                              src={msg.attachment_url} 
-                                              alt={msg.attachment_name} 
+                                            <img
+                                              src={msg.attachment_url}
+                                              alt={msg.attachment_name}
                                               className="w-full h-auto object-cover max-h-[180px] hover:scale-102 transition-all cursor-pointer"
                                               onClick={() => window.open(msg.attachment_url, "_blank")}
                                             />
@@ -6356,15 +6422,14 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                             </div>
                                           </div>
                                         ) : (
-                                          <a 
+                                          <a
                                             href={msg.attachment_url}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className={`p-3 rounded-xl flex items-center gap-2.5 text-xs border ${
-                                              isCounselor 
-                                                ? "bg-white/10 border-white/20 text-white hover:bg-white/20" 
+                                            className={`p-3 rounded-xl flex items-center gap-2.5 text-xs border ${isCounselor
+                                                ? "bg-white/10 border-white/20 text-white hover:bg-white/20"
                                                 : "bg-slate-50 border-hairline text-slate-600 hover:bg-slate-100"
-                                            } transition-colors`}
+                                              } transition-colors`}
                                           >
                                             <FileText size={16} />
                                             <div className="text-left overflow-hidden">
@@ -6406,23 +6471,22 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                         {/* Message Input form */}
                         <form onSubmit={handleSendAdminChatReply} className="p-4 border-t border-hairline bg-white flex items-end gap-3.5 shrink-0">
-                          
+
                           {/* File Attachment input */}
                           <div className="relative shrink-0">
-                            <label className={`w-11 h-11 rounded-full border border-hairline flex items-center justify-center cursor-pointer transition-colors ${
-                              adminChatFile ? "bg-primary/10 border-primary/20 text-primary" : "text-slate-400 hover:text-primary hover:bg-slate-50"
-                            }`} title="Add Attachment">
+                            <label className={`w-11 h-11 rounded-full border border-hairline flex items-center justify-center cursor-pointer transition-colors ${adminChatFile ? "bg-primary/10 border-primary/20 text-primary" : "text-slate-400 hover:text-primary hover:bg-slate-50"
+                              }`} title="Add Attachment">
                               <Paperclip size={18} />
-                              <input 
-                                type="file" 
-                                className="hidden" 
+                              <input
+                                type="file"
+                                className="hidden"
                                 onChange={(e) => e.target.files && setAdminChatFile(e.target.files[0])}
                                 disabled={sendingAdminChat}
                               />
                             </label>
                             {adminChatFile && (
-                              <button 
-                                type="button" 
+                              <button
+                                type="button"
                                 onClick={() => setAdminChatFile(null)}
                                 className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors"
                               >
@@ -6443,9 +6507,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                               value={adminChatText}
                               onChange={(e) => setAdminChatText(e.target.value)}
                               placeholder="Type your reply to student..."
-                              className={`w-full border border-hairline px-4.5 py-3 outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-sm transition-all resize-none bg-white ${
-                                adminChatFile ? "rounded-b-2xl border-t-0" : "rounded-2xl"
-                              }`}
+                              className={`w-full border border-hairline px-4.5 py-3 outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-sm transition-all resize-none bg-white ${adminChatFile ? "rounded-b-2xl border-t-0" : "rounded-2xl"
+                                }`}
                               disabled={sendingAdminChat}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter" && !e.shiftKey) {
@@ -6456,9 +6519,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                             />
                           </div>
 
-                          <Button 
-                            type="submit" 
-                            disabled={sendingAdminChat} 
+                          <Button
+                            type="submit"
+                            disabled={sendingAdminChat}
                             className="rounded-full w-11 h-11 p-0 flex items-center justify-center shrink-0"
                           >
                             {sendingAdminChat ? (
@@ -6491,10 +6554,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              
+
               {/* Left Column: Diagnostics & Config Status / Send Test Email */}
               <div className="lg:col-span-1 space-y-6">
-                
+
                 {/* Configuration Card */}
                 <Card>
                   <CardHeader>
@@ -6508,18 +6571,17 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     <div className="flex justify-between items-center py-2 border-b border-hairline">
                       <span className="font-semibold text-slate-500">Active Provider</span>
                       {emailConfig ? (
-                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase border ${
-                          emailConfig.activeProvider === "brevo-smtp"
+                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase border ${emailConfig.activeProvider === "brevo-smtp"
                             ? "bg-blue-50 text-blue-700 border-blue-200"
                             : "bg-amber-50 text-amber-700 border-amber-200"
-                        }`}>
+                          }`}>
                           {emailConfig.activeProvider === "brevo-smtp" ? "Brevo SMTP" : "Mock Mode"}
                         </span>
                       ) : (
                         <span className="text-slate-400 font-medium">Checking...</span>
                       )}
                     </div>
-                    
+
                     <div className="flex justify-between items-center py-2 border-b border-hairline">
                       <span className="font-semibold text-slate-500">Sender Email</span>
                       <span className="font-mono-data text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-hairline/50">
@@ -6585,11 +6647,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                             <span className="font-mono-data text-slate-700 break-all pr-2 max-w-[150px] overflow-hidden text-ellipsis whitespace-nowrap">
                               {emailLogs[0].recipient_email}
                             </span>
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
-                              emailLogs[0].status === "sent" || emailLogs[0].status === "delivered"
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${emailLogs[0].status === "sent" || emailLogs[0].status === "delivered"
                                 ? "bg-emerald-50 text-emerald-700"
                                 : "bg-red-50 text-red-700"
-                            }`}>
+                              }`}>
                               {emailLogs[0].status}
                             </span>
                           </div>
@@ -6644,7 +6705,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           className="w-full border border-hairline px-3.5 py-2.5 rounded-xl text-xs outline-none focus:border-primary bg-white text-slate-800"
                         />
                       </div>
-                      
+
                       <Button
                         type="submit"
                         disabled={sendingTestEmail}
@@ -6659,13 +6720,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           </>
                         )}
                       </Button>
-                      
+
                       {testEmailResult && (
-                        <div className={`p-4 rounded-xl border text-xs leading-relaxed ${
-                          testEmailResult.success 
-                            ? "bg-emerald-50 text-emerald-800 border-emerald-200" 
+                        <div className={`p-4 rounded-xl border text-xs leading-relaxed ${testEmailResult.success
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
                             : "bg-red-50 text-red-800 border-red-200"
-                        }`}>
+                          }`}>
                           <p className="font-bold mb-1">{testEmailResult.success ? "Success" : "Error Details"}</p>
                           <p className="break-words whitespace-pre-wrap font-mono-data text-[10px] bg-white/50 p-2 rounded border border-hairline/25">{testEmailResult.message}</p>
                           {testEmailResult.responseBody && (
@@ -6686,7 +6746,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
               {/* Right Column: Notification Logs attempts */}
               <div className="lg:col-span-2 space-y-6">
-                
+
                 <Card className="h-full flex flex-col">
                   <CardHeader>
                     <CardTitle className="text-sm font-bold flex items-center gap-2">
@@ -6739,13 +6799,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                             {emailLogs.map((log) => (
                               <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
                                 <td className="px-4 py-3">
-                                  <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                                    log.status === "delivered" 
-                                      ? "bg-emerald-50 text-emerald-600 border-emerald-200" 
+                                  <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${log.status === "delivered"
+                                      ? "bg-emerald-50 text-emerald-600 border-emerald-200"
                                       : log.status === "sent"
-                                      ? "bg-blue-50 text-blue-600 border-blue-200"
-                                      : "bg-red-50 text-red-600 border-red-200"
-                                  }`}>
+                                        ? "bg-blue-50 text-blue-600 border-blue-200"
+                                        : "bg-red-50 text-red-600 border-red-200"
+                                    }`}>
                                     {log.status}
                                   </span>
                                 </td>
@@ -6793,35 +6852,35 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
             {/* Notification Statistics */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
               {[
-                { 
-                  label: "Total Reminders", 
-                  value: notificationHistory.length, 
-                  icon: <Bell size={18} className="text-primary" weight="bold" />, 
-                  bg: "bg-slate-50 border-slate-100" 
+                {
+                  label: "Total Reminders",
+                  value: notificationHistory.length,
+                  icon: <Bell size={18} className="text-primary" weight="bold" />,
+                  bg: "bg-slate-50 border-slate-100"
                 },
-                { 
-                  label: "Documents Alerted", 
-                  value: notificationHistory.filter(n => n.notification_type === "missing_documents").length, 
-                  icon: <FileText size={18} className="text-yellow-600" weight="bold" />, 
-                  bg: "bg-yellow-50/20 border-yellow-100/60" 
+                {
+                  label: "Documents Alerted",
+                  value: notificationHistory.filter(n => n.notification_type === "missing_documents").length,
+                  icon: <FileText size={18} className="text-yellow-600" weight="bold" />,
+                  bg: "bg-yellow-50/20 border-yellow-100/60"
                 },
-                { 
-                  label: "Meetings Alerted", 
-                  value: notificationHistory.filter(n => n.notification_type === "consultation").length, 
-                  icon: <Calendar size={18} className="text-blue-600" weight="bold" />, 
-                  bg: "bg-blue-50/20 border-blue-100/60" 
+                {
+                  label: "Meetings Alerted",
+                  value: notificationHistory.filter(n => n.notification_type === "consultation").length,
+                  icon: <Calendar size={18} className="text-blue-600" weight="bold" />,
+                  bg: "bg-blue-50/20 border-blue-100/60"
                 },
-                { 
-                  label: "Visa Updates Sent", 
-                  value: notificationHistory.filter(n => n.notification_type === "visa_update").length, 
-                  icon: <Globe size={18} className="text-purple-600" weight="bold" />, 
-                  bg: "bg-purple-50/20 border-purple-100/60" 
+                {
+                  label: "Visa Updates Sent",
+                  value: notificationHistory.filter(n => n.notification_type === "visa_update").length,
+                  icon: <Globe size={18} className="text-purple-600" weight="bold" />,
+                  bg: "bg-purple-50/20 border-purple-100/60"
                 },
-                { 
-                  label: "Delivery Failures", 
-                  value: notificationHistory.filter(n => n.status === "failed").length, 
-                  icon: <WarningCircle size={18} className="text-red-600" weight="bold" />, 
-                  bg: "bg-red-50/20 border-red-100/60" 
+                {
+                  label: "Delivery Failures",
+                  value: notificationHistory.filter(n => n.status === "failed").length,
+                  icon: <WarningCircle size={18} className="text-red-600" weight="bold" />,
+                  bg: "bg-red-50/20 border-red-100/60"
                 }
               ].map((stat, idx) => (
                 <div key={idx} className={`border rounded-2xl p-4 flex flex-col justify-between min-h-[90px] ${stat.bg}`}>
@@ -6851,34 +6910,31 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                         <span className="font-semibold text-xs text-slate-700 block">Automated Dispatcher</span>
                         <span className="text-[10px] text-slate-400 block font-medium">Temporarily silence or resume all crons</span>
                       </div>
-                      
+
                       {systemSettingsTableExists === false ? (
                         <span className="text-[10px] font-bold text-red-500 uppercase bg-red-50 border border-red-200 px-2.5 py-1 rounded-full">Missing Table</span>
                       ) : (
                         <button
                           type="button"
                           onClick={() => handleToggleGlobalNotifications(!notificationsEnabled)}
-                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                            notificationsEnabled ? "bg-primary" : "bg-slate-200"
-                          }`}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${notificationsEnabled ? "bg-primary" : "bg-slate-200"
+                            }`}
                         >
                           <span
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              notificationsEnabled ? "translate-x-5" : "translate-x-0"
-                            }`}
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${notificationsEnabled ? "translate-x-5" : "translate-x-0"
+                              }`}
                           />
                         </button>
                       )}
                     </div>
 
-                    <div className={`p-4 rounded-xl border text-xs leading-relaxed ${
-                      notificationsEnabled 
-                        ? "bg-emerald-50 text-emerald-800 border-emerald-100" 
+                    <div className={`p-4 rounded-xl border text-xs leading-relaxed ${notificationsEnabled
+                        ? "bg-emerald-50 text-emerald-800 border-emerald-100"
                         : "bg-amber-50 text-amber-800 border-amber-100"
-                    }`}>
+                      }`}>
                       <p className="font-bold mb-1">Status: {notificationsEnabled ? "Active & Listening" : "Paused / Disabled"}</p>
                       <p className="text-[10px] opacity-80 leading-normal">
-                        {notificationsEnabled 
+                        {notificationsEnabled
                           ? "Vercel Cron triggers will evaluate and dispatch student emails automatically under standard 24-hour limits."
                           : "All cron execution checks will immediately terminate upon starting. No emails will be sent automatically. Manual resends will still function."}
                       </p>
@@ -6898,7 +6954,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     <CardDescription className="text-[11px]">Real-time history logs of reminders sent to university placement and career candidate portals.</CardDescription>
                   </CardHeader>
                   <CardContent className="flex-grow p-0 flex flex-col">
-                    
+
                     {/* Search & Filter Bar */}
                     <div className="p-4 border-b border-hairline bg-slate-50/50 flex flex-col md:flex-row gap-3">
                       <div className="relative flex-grow">
@@ -6911,7 +6967,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           className="w-full pl-9 pr-4 py-2 border border-hairline rounded-xl text-xs bg-white text-slate-800 focus:outline-none focus:border-primary"
                         />
                       </div>
-                      
+
                       <div className="flex gap-2">
                         <select
                           value={notifHistoryTypeFilter}
@@ -6972,11 +7028,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                               return (
                                 <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
                                   <td className="px-4 py-3">
-                                    <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                                      log.status === "sent" 
-                                        ? "bg-emerald-50 text-emerald-600 border-emerald-200" 
+                                    <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${log.status === "sent"
+                                        ? "bg-emerald-50 text-emerald-600 border-emerald-200"
                                         : "bg-red-50 text-red-600 border-red-200"
-                                    }`}>
+                                      }`}>
                                       {log.status}
                                     </span>
                                   </td>
@@ -7032,7 +7087,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <h2 className="font-display font-bold text-2xl text-primary">Career Experts Directory</h2>
                 <p className="text-xs text-slate-400 mt-1">Manage career consultants, experts, and display orders shown on the Training & Placement page.</p>
               </div>
-              <Button 
+              <Button
                 onClick={() => {
                   setEditingExpert(null);
                   setExpertForm({
@@ -7045,9 +7100,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     is_active: true
                   });
                   setIsExpertModalOpen(true);
-                }} 
-                variant="primary" 
-                size="sm" 
+                }}
+                variant="primary"
+                size="sm"
                 className="flex items-center gap-1"
               >
                 <Plus size={14} /> Add Expert
@@ -7094,8 +7149,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     {experts.map(e => (
                       <tr key={e.id} className="hover:bg-subtle-gray/30">
                         <td className="p-4">
-                          <input 
-                            type="number" 
+                          <input
+                            type="number"
                             defaultValue={e.display_order}
                             onBlur={(event) => handleUpdateExpertOrder(e.id, parseInt(event.target.value) || 0)}
                             onKeyDown={(event) => {
@@ -7109,9 +7164,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                         <td className="p-4 font-semibold text-primary">
                           <div className="flex items-center gap-3">
                             {e.photo_url ? (
-                              <img 
-                                src={e.photo_url} 
-                                alt={e.name} 
+                              <img
+                                src={e.photo_url}
+                                alt={e.name}
                                 className="w-8 h-8 rounded-full object-cover border border-hairline shadow-sm"
                               />
                             ) : (
@@ -7128,10 +7183,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                         <td className="p-4 text-slate-500">{e.expertise}</td>
                         <td className="p-4">
                           {e.linkedin_url ? (
-                            <a 
-                              href={e.linkedin_url} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
+                            <a
+                              href={e.linkedin_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="text-primary hover:underline font-medium"
                             >
                               View Profile &rarr;
@@ -7143,18 +7198,17 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                         <td className="p-4">
                           <button
                             onClick={() => handleToggleExpertActive(e)}
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
-                              e.is_active
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${e.is_active
                                 ? "bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100"
                                 : "bg-red-50 text-red-600 border-red-100 hover:bg-red-100"
-                            }`}
+                              }`}
                           >
                             {e.is_active ? "Active" : "Inactive"}
                           </button>
                         </td>
                         <td className="p-4 text-right flex justify-end gap-1.5 items-center">
-                          <Button 
-                            variant="secondary" 
+                          <Button
+                            variant="secondary"
                             size="sm"
                             onClick={() => {
                               setEditingExpert(e);
@@ -7172,8 +7226,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           >
                             Edit
                           </Button>
-                          <Button 
-                            variant="secondary" 
+                          <Button
+                            variant="secondary"
                             size="sm"
                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
                             onClick={() => handleDeleteExpert(e.id)}
@@ -7211,12 +7265,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 { id: "meetings", label: "Meetings Scheduler" },
                 { id: "analytics", label: "Analytics" }
               ].map(subTab => (
-                <button 
+                <button
                   key={subTab.id}
                   onClick={() => setActiveTrainingTab(subTab.id as any)}
-                  className={`pb-1.5 cursor-pointer transition-all ${
-                    activeTrainingTab === subTab.id ? "text-primary border-b-2 border-primary font-black" : "hover:text-primary"
-                  }`}
+                  className={`pb-1.5 cursor-pointer transition-all ${activeTrainingTab === subTab.id ? "text-primary border-b-2 border-primary font-black" : "hover:text-primary"
+                    }`}
                 >
                   {subTab.label}
                 </button>
@@ -7225,14 +7278,14 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
             {/* Sub Tab Content View */}
             <div className="mt-4">
-              
+
               {/* SUB TAB: SERVICES */}
               {activeTrainingTab === "services" && (
                 <div className="space-y-6">
                   <div className="flex justify-end">
-                    <Button 
-                      variant="primary" 
-                      size="sm" 
+                    <Button
+                      variant="primary"
+                      size="sm"
                       onClick={() => {
                         setServiceForm({
                           id: "",
@@ -7278,9 +7331,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                             </div>
                           </div>
                           <div className="border-t border-hairline pt-4 mt-6 flex justify-between items-center gap-3">
-                            <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${
-                              service.status === "Active" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-slate-50 text-slate-400 border-slate-100"
-                            }`}>
+                            <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${service.status === "Active" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-slate-50 text-slate-400 border-slate-100"
+                              }`}>
                               {service.status}
                             </span>
                             <div className="flex gap-2">
@@ -7360,15 +7412,14 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                 </select>
                               </td>
                               <td className="px-6 py-4">
-                                <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-                                  student.status === "Active"
+                                <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${student.status === "Active"
                                     ? "bg-emerald-50 text-emerald-600 border-emerald-100"
                                     : student.status === "Completed"
-                                    ? "bg-blue-50 text-blue-600 border-blue-100"
-                                    : student.status === "Pending"
-                                    ? "bg-amber-50 text-amber-600 border-amber-100"
-                                    : "bg-slate-100 text-slate-500 border-slate-200"
-                                }`}>
+                                      ? "bg-blue-50 text-blue-600 border-blue-100"
+                                      : student.status === "Pending"
+                                        ? "bg-amber-50 text-amber-600 border-amber-100"
+                                        : "bg-slate-100 text-slate-500 border-slate-200"
+                                  }`}>
                                   {student.status}
                                 </span>
                               </td>
@@ -7666,8 +7717,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           <span className="text-primary">{stage.count} ({stage.percentage}%)</span>
                         </div>
                         <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-                          <div 
-                            className="bg-primary h-full rounded-full transition-all" 
+                          <div
+                            className="bg-primary h-full rounded-full transition-all"
                             style={{ width: `${stage.percentage}%` }}
                           />
                         </div>
@@ -7686,10 +7737,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           <span className="text-slate-500 font-semibold">{trend.month}</span>
                           <div className="flex-grow mx-4">
                             <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                              <div 
-                                className="bg-gold h-full rounded-full" 
-                                style={{ 
-                                  width: `${referralAnalytics.totalReferrals > 0 ? (trend.count / referralAnalytics.totalReferrals) * 100 : 0}%` 
+                              <div
+                                className="bg-gold h-full rounded-full"
+                                style={{
+                                  width: `${referralAnalytics.totalReferrals > 0 ? (trend.count / referralAnalytics.totalReferrals) * 100 : 0}%`
                                 }}
                               />
                             </div>
@@ -7739,8 +7790,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   {/* Search input */}
                   <div className="relative w-full sm:w-60">
                     <MagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       placeholder="Search referrer or lead name..."
                       value={referralSearch}
                       onChange={(e) => setReferralSearch(e.target.value)}
@@ -7836,9 +7887,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                 {reward ? (
                                   <div className="flex flex-col">
                                     <span className="font-bold text-slate-700">Rs. {reward.reward_amount.toLocaleString()}</span>
-                                    <span className={`text-[8px] font-extrabold uppercase tracking-wider mt-0.5 ${
-                                      reward.status === "paid" ? "text-emerald-500" : reward.status === "approved" ? "text-blue-500" : "text-amber-500"
-                                    }`}>
+                                    <span className={`text-[8px] font-extrabold uppercase tracking-wider mt-0.5 ${reward.status === "paid" ? "text-emerald-500" : reward.status === "approved" ? "text-blue-500" : "text-amber-500"
+                                      }`}>
                                       {reward.status}
                                     </span>
                                   </div>
@@ -7886,43 +7936,48 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <nav className="flex bg-slate-100 p-1 rounded-xl">
-                  <button 
+                  <button
                     onClick={() => setEligibilityTabMode("all")}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
-                      eligibilityTabMode === "all" ? "bg-white text-primary shadow-[0_1px_3px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-primary"
-                    }`}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${eligibilityTabMode === "all" ? "bg-white text-primary shadow-[0_1px_3px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-primary"
+                      }`}
                   >
                     All Leads
                   </button>
-                  <button 
+                  <button
                     onClick={() => setEligibilityTabMode("queue")}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
-                      eligibilityTabMode === "queue" ? "bg-white text-primary shadow-[0_1px_3px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-primary"
-                    }`}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${eligibilityTabMode === "queue" ? "bg-white text-primary shadow-[0_1px_3px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-primary"
+                      }`}
                   >
                     Follow-up Queue
                   </button>
-                  <button 
+                  <button
+                    onClick={() => setEligibilityTabMode("shortlists")}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${eligibilityTabMode === "shortlists" ? "bg-white text-primary shadow-[0_1px_3px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-primary"
+                      }`}
+                  >
+                    Shortlist Requests
+                  </button>
+                  <button
                     onClick={() => setEligibilityTabMode("analytics")}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
-                      eligibilityTabMode === "analytics" ? "bg-white text-primary shadow-[0_1px_3px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-primary"
-                    }`}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${eligibilityTabMode === "analytics" ? "bg-white text-primary shadow-[0_1px_3px_rgba(0,0,0,0.05)]" : "text-slate-500 hover:text-primary"
+                      }`}
                   >
                     Attribution & Workloads
                   </button>
                 </nav>
-                <Button 
-                  variant="secondary" 
-                  size="sm" 
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => {
                     fetchEligibilityData();
                     fetchEligibilityAnalytics();
                     if (eligibilityTabMode === "queue") fetchFollowupQueue();
+                    if (eligibilityTabMode === "shortlists") fetchShortlistRequests();
                     if (selectedLead) fetchLeadDetails(selectedLead.id);
                   }}
                   className="flex items-center gap-1.5"
                 >
-                  <SpinnerGap className={eligibilityLoading || loadingAnalytics || loadingQueue ? "animate-spin" : ""} size={14} /> 
+                  <SpinnerGap className={eligibilityLoading || loadingAnalytics || loadingQueue || loadingShortlists ? "animate-spin" : ""} size={14} />
                   Refresh
                 </Button>
               </div>
@@ -8036,6 +8091,18 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                         <span>Converted Students</span>
                         <span className="font-mono-data">{analyticsData?.funnel?.converted || 0}</span>
                       </div>
+                      <div className="flex justify-between text-xs border-b border-hairline pb-2 mt-2">
+                        <span className="text-slate-500">Previews Viewed</span>
+                        <span className="font-bold text-primary font-mono-data">{analyticsData?.funnel?.previewViewedCount || 0}</span>
+                      </div>
+                      <div className="flex justify-between text-xs border-b border-hairline pb-2">
+                        <span className="text-slate-500">Results Unlocked</span>
+                        <span className="font-bold text-primary font-mono-data">{analyticsData?.funnel?.resultsUnlockedCount || 0}</span>
+                      </div>
+                      <div className="flex justify-between text-xs font-bold text-teal-600 border-b border-hairline pb-2">
+                        <span>Preview Conversion Rate</span>
+                        <span className="font-mono-data">{analyticsData?.funnel?.previewConversionRate || 0}%</span>
+                      </div>
                       <div className="pt-2 flex justify-between text-sm font-bold text-gold">
                         <span>Lead Conversion Rate</span>
                         <span className="font-mono-data">{analyticsData?.funnel?.conversionRate || 0}%</span>
@@ -8067,6 +8134,89 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Shortlist System Performance Section */}
+                <div className="border-t border-hairline pt-6">
+                  <h3 className="text-sm font-bold text-primary uppercase tracking-wider mb-4 font-display">Shortlist System Performance</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                    <div className="p-4 bg-slate-50 border border-hairline rounded-2xl text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Requested</span>
+                      <div className="text-2xl font-extrabold text-primary font-mono-data">
+                        {analyticsData?.shortlistAnalytics?.totalRequests || 0}
+                      </div>
+                    </div>
+                    <div className="p-4 bg-slate-50 border border-hairline rounded-2xl text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Generated</span>
+                      <div className="text-2xl font-extrabold text-primary font-mono-data">
+                        {analyticsData?.shortlistAnalytics?.generatedRequests || 0}
+                      </div>
+                    </div>
+                    <div className="p-4 bg-slate-50 border border-hairline rounded-2xl text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Delivered</span>
+                      <div className="text-2xl font-extrabold text-primary font-mono-data">
+                        {analyticsData?.shortlistAnalytics?.deliveredRequests || 0}
+                      </div>
+                    </div>
+                    <div className="p-4 bg-slate-50 border border-hairline rounded-2xl text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Delivery Rate</span>
+                      <div className="text-2xl font-extrabold text-indigo-600 font-mono-data">
+                        {analyticsData?.shortlistAnalytics?.deliveryRate || 0}%
+                      </div>
+                    </div>
+                    <div className="p-4 bg-slate-50 border border-hairline rounded-2xl text-center col-span-2 md:col-span-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Consultation Conversion</span>
+                      <div className="text-2xl font-extrabold text-teal-600 font-mono-data">
+                        {analyticsData?.shortlistAnalytics?.consultationConversionRate || 0}%
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Top Destination Countries */}
+                    <div className="p-4 bg-slate-50 border border-hairline rounded-2xl">
+                      <h4 className="text-xs font-bold text-primary uppercase tracking-wider mb-3">Top Requested Countries</h4>
+                      {analyticsData?.shortlistAnalytics?.topCountries?.length > 0 ? (
+                        <div className="space-y-2">
+                          {analyticsData.shortlistAnalytics.topCountries.map((c: any, index: number) => (
+                            <div key={c.country} className="flex justify-between items-center text-xs border-b border-slate-100 pb-1.5 last:border-0 last:pb-0">
+                              <span className="text-slate-600 font-medium">
+                                <span className="text-[10px] text-slate-400 font-mono-data mr-2">#{index + 1}</span>
+                                {c.country}
+                              </span>
+                              <span className="font-bold text-primary font-mono-data bg-white px-2 py-0.5 rounded border border-hairline">
+                                {c.count} reqs
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400 text-center py-4">No country data available</p>
+                      )}
+                    </div>
+
+                    {/* Top Requested Courses */}
+                    <div className="p-4 bg-slate-50 border border-hairline rounded-2xl">
+                      <h4 className="text-xs font-bold text-primary uppercase tracking-wider mb-3">Top Requested Courses</h4>
+                      {analyticsData?.shortlistAnalytics?.topCourses?.length > 0 ? (
+                        <div className="space-y-2">
+                          {analyticsData.shortlistAnalytics.topCourses.map((c: any, index: number) => (
+                            <div key={c.course} className="flex justify-between items-center text-xs border-b border-slate-100 pb-1.5 last:border-0 last:pb-0">
+                              <span className="text-slate-600 font-medium truncate max-w-[70%]">
+                                <span className="text-[10px] text-slate-400 font-mono-data mr-2">#{index + 1}</span>
+                                {c.course}
+                              </span>
+                              <span className="font-bold text-primary font-mono-data bg-white px-2 py-0.5 rounded border border-hairline">
+                                {c.count} reqs
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400 text-center py-4">No course data available</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -8209,7 +8359,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 {/* Lead Detail sidebar block */}
                 <div className="lg:col-span-4">
                   {selectedLead ? (
-                    <LeadDetailsPanel 
+                    <LeadDetailsPanel
                       lead={selectedLead}
                       details={selectedLeadDetails}
                       loading={loadingLeadDetails}
@@ -8221,6 +8371,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       onClose={() => setSelectedLead(null)}
                       onUpdateField={handleUpdateLeadField}
                       onCompleteReminder={handleCompleteReminder}
+                      onGeneratePdf={handleGenerateShortlistPdf}
+                      onMarkDelivered={handleMarkDelivered}
+                      generatingPdf={generatingShortlistPdf}
+                      markingDelivered={markingDelivered}
                     />
                   ) : (
                     <div className="border border-dashed border-slate-200 rounded-3xl p-8 text-center text-slate-400 text-xs">
@@ -8395,7 +8549,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           ))}
                         </select>
 
-                        <button 
+                        <button
                           onClick={() => setBulkSelectedLeadIds([])}
                           className="text-white/60 hover:text-white text-xs font-semibold cursor-pointer"
                         >
@@ -8447,11 +8601,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                 const isChecked = bulkSelectedLeadIds.includes(lead.id);
 
                                 return (
-                                  <tr 
+                                  <tr
                                     key={lead.id}
-                                    className={`hover:bg-slate-50/80 transition-colors ${
-                                      isSelected ? "bg-slate-50" : ""
-                                    }`}
+                                    className={`hover:bg-slate-50/80 transition-colors ${isSelected ? "bg-slate-50" : ""
+                                      }`}
                                   >
                                     <td className="p-4">
                                       <input
@@ -8467,7 +8620,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                         className="rounded border-slate-300 focus:ring-gold"
                                       />
                                     </td>
-                                    <td 
+                                    <td
                                       className="p-4 cursor-pointer"
                                       onClick={() => setSelectedLead(lead)}
                                     >
@@ -8475,7 +8628,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                       <div className="text-[10px] text-slate-400 mt-0.5">{lead.email}</div>
                                       <div className="text-[10px] text-slate-400 font-mono-data">{lead.phone}</div>
                                     </td>
-                                    <td 
+                                    <td
                                       className="p-4 cursor-pointer"
                                       onClick={() => setSelectedLead(lead)}
                                     >
@@ -8485,7 +8638,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                         <div className="text-[10px] text-slate-400 font-mono-data">{lead.test_type}: {lead.test_score}</div>
                                       )}
                                     </td>
-                                    <td 
+                                    <td
                                       className="p-4 cursor-pointer"
                                       onClick={() => setSelectedLead(lead)}
                                     >
@@ -8494,22 +8647,20 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                       <div className="text-[10px] text-slate-400 font-mono-data">Intake: {lead.intake}</div>
                                     </td>
                                     <td className="p-4 text-center">
-                                      <span className={`inline-block px-2 py-0.5 rounded font-bold text-[9px] font-mono-data mr-1 ${
-                                        lead.lead_score === "Hot" 
-                                          ? "bg-red-50 text-red-600 border border-red-100" 
-                                          : lead.lead_score === "Warm" 
-                                          ? "bg-amber-50 text-amber-600 border border-amber-100" 
-                                          : "bg-blue-50 text-blue-600 border border-blue-100"
-                                      }`}>
+                                      <span className={`inline-block px-2 py-0.5 rounded font-bold text-[9px] font-mono-data mr-1 ${lead.lead_score === "Hot"
+                                          ? "bg-red-50 text-red-600 border border-red-100"
+                                          : lead.lead_score === "Warm"
+                                            ? "bg-amber-50 text-amber-600 border border-amber-100"
+                                            : "bg-blue-50 text-blue-600 border border-blue-100"
+                                        }`}>
                                         {lead.lead_score} ({lead.lead_score_value}%)
                                       </span>
-                                      <span className={`inline-block px-2 py-0.5 rounded font-bold text-[9px] uppercase tracking-wider ${
-                                        lead.priority === "High"
+                                      <span className={`inline-block px-2 py-0.5 rounded font-bold text-[9px] uppercase tracking-wider ${lead.priority === "High"
                                           ? "bg-red-500 text-white"
                                           : lead.priority === "Medium"
-                                          ? "bg-amber-500 text-white"
-                                          : "bg-slate-200 text-slate-600"
-                                      }`}>
+                                            ? "bg-amber-500 text-white"
+                                            : "bg-slate-200 text-slate-600"
+                                        }`}>
                                         {lead.priority}
                                       </span>
                                     </td>
@@ -8517,17 +8668,16 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                       <select
                                         value={lead.lead_status}
                                         onChange={(e) => handleUpdateLeadField(lead.id, "lead_status", e.target.value)}
-                                        className={`px-2.5 py-1 rounded text-[10px] font-bold focus:outline-none cursor-pointer border ${
-                                          lead.lead_status === "New" 
+                                        className={`px-2.5 py-1 rounded text-[10px] font-bold focus:outline-none cursor-pointer border ${lead.lead_status === "New"
                                             ? "bg-blue-50 text-blue-600 border-blue-100"
                                             : lead.lead_status === "Contacted"
-                                            ? "bg-amber-50 text-amber-600 border-amber-100"
-                                            : lead.lead_status === "Qualified"
-                                            ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                                            : lead.lead_status === "Unqualified"
-                                            ? "bg-slate-100 text-slate-500 border-slate-200"
-                                            : "bg-indigo-50 text-indigo-600 border-indigo-100"
-                                        }`}
+                                              ? "bg-amber-50 text-amber-600 border-amber-100"
+                                              : lead.lead_status === "Qualified"
+                                                ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                                : lead.lead_status === "Unqualified"
+                                                  ? "bg-slate-100 text-slate-500 border-slate-200"
+                                                  : "bg-indigo-50 text-indigo-600 border-indigo-100"
+                                          }`}
                                       >
                                         <option value="New">New</option>
                                         <option value="Contacted">Contacted</option>
@@ -8585,6 +8735,196 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 {/* Lead Detail sidebar block */}
                 <div className="lg:col-span-4">
                   {selectedLead ? (
+                    <LeadDetailsPanel
+                      lead={selectedLead}
+                      details={selectedLeadDetails}
+                      loading={loadingLeadDetails}
+                      counselors={counselors}
+                      noteText={leadNoteText}
+                      setNoteText={setLeadNoteText}
+                      addingNote={addingLeadNote}
+                      onAddNote={handleAddNoteLead}
+                      onClose={() => setSelectedLead(null)}
+                      onUpdateField={handleUpdateLeadField}
+                      onCompleteReminder={handleCompleteReminder}
+                      onGeneratePdf={handleGenerateShortlistPdf}
+                      onMarkDelivered={handleMarkDelivered}
+                      generatingPdf={generatingShortlistPdf}
+                      markingDelivered={markingDelivered}
+                    />
+                  ) : (
+                    <div className="border border-dashed border-slate-200 rounded-3xl p-8 text-center text-slate-400 text-xs">
+                      Select a lead row from the table list to show detailed academic profile, notes, and activity timeline.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {eligibilityTabMode === "shortlists" && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                <div className="lg:col-span-8 space-y-6">
+                  {/* Filters block */}
+                  <div className="bg-slate-50 border border-hairline rounded-3xl p-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
+                    <div className="text-sm font-bold text-primary">
+                      Shortlist Requests Registry
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {/* Status Filter */}
+                      <div className="flex items-center gap-1.5 border border-hairline bg-slate-50 rounded-full px-3 py-1.5 text-xs text-slate-500">
+                        <Funnel size={14} className="text-slate-400" />
+                        <select
+                          value={shortlistStatusFilter}
+                          onChange={(e) => {
+                            setShortlistStatusFilter(e.target.value);
+                          }}
+                          className="bg-transparent outline-none text-xs font-semibold cursor-pointer text-slate-600"
+                        >
+                          <option value="All">All Statuses</option>
+                          <option value="Requested">Requested</option>
+                          <option value="In Review">In Review</option>
+                          <option value="Generated">Generated</option>
+                          <option value="Delivered">Delivered</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Requests Data Table */}
+                  <Card>
+                    <CardContent className="p-0">
+                      {loadingShortlists ? (
+                        <div className="p-12 text-center text-slate-400">Loading shortlist requests...</div>
+                      ) : shortlistRequests.length === 0 ? (
+                        <div className="p-12 text-center text-slate-400 text-sm">
+                          No shortlist requests found.
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full text-left text-xs text-slate-600 bg-white">
+                            <thead>
+                              <tr className="border-b border-hairline bg-slate-50/50 text-slate-400 font-bold uppercase tracking-wider">
+                                <th className="p-4">Student</th>
+                                <th className="p-4">Country</th>
+                                <th className="p-4">Course</th>
+                                <th className="p-4 text-center">Match Score</th>
+                                <th className="p-4">Requested</th>
+                                <th className="p-4">Counselor</th>
+                                <th className="p-4">Status</th>
+                                <th className="p-4 text-right">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {shortlistRequests.map(req => {
+                                const isSelected = selectedLead?.id === req.lead?.id;
+                                return (
+                                  <tr 
+                                    key={req.id}
+                                    className={`hover:bg-slate-50/80 transition-colors ${
+                                      isSelected ? "bg-slate-50" : ""
+                                    }`}
+                                  >
+                                    <td 
+                                      className="p-4 cursor-pointer font-bold text-primary"
+                                      onClick={() => {
+                                        setSelectedLead(req.lead);
+                                        fetchLeadDetails(req.lead?.id);
+                                      }}
+                                    >
+                                      <div>{req.lead?.name || "N/A"}</div>
+                                      <div className="text-[10px] text-slate-400 font-normal mt-0.5">{req.lead?.email}</div>
+                                      <div className="text-[10px] text-slate-400 font-mono-data font-normal">{req.lead?.phone}</div>
+                                    </td>
+                                    <td 
+                                      className="p-4 cursor-pointer font-semibold text-slate-700"
+                                      onClick={() => {
+                                        setSelectedLead(req.lead);
+                                        fetchLeadDetails(req.lead?.id);
+                                      }}
+                                    >
+                                      {req.lead?.preferred_country || "N/A"}
+                                    </td>
+                                    <td 
+                                      className="p-4 cursor-pointer font-medium text-slate-600"
+                                      onClick={() => {
+                                        setSelectedLead(req.lead);
+                                        fetchLeadDetails(req.lead?.id);
+                                      }}
+                                    >
+                                      {req.lead?.preferred_course || "N/A"}
+                                    </td>
+                                    <td 
+                                      className="p-4 cursor-pointer text-center font-mono-data font-bold text-slate-700"
+                                      onClick={() => {
+                                        setSelectedLead(req.lead);
+                                        fetchLeadDetails(req.lead?.id);
+                                      }}
+                                    >
+                                      {req.lead?.lead_score_value ? `${req.lead.lead_score_value}%` : "N/A"}
+                                    </td>
+                                    <td 
+                                      className="p-4 cursor-pointer text-slate-400"
+                                      onClick={() => {
+                                        setSelectedLead(req.lead);
+                                        fetchLeadDetails(req.lead?.id);
+                                      }}
+                                    >
+                                      {new Date(req.requested_at).toLocaleDateString()}
+                                    </td>
+                                    <td 
+                                      className="p-4 cursor-pointer text-slate-600 font-semibold"
+                                      onClick={() => {
+                                        setSelectedLead(req.lead);
+                                        fetchLeadDetails(req.lead?.id);
+                                      }}
+                                    >
+                                      {req.counselor?.full_name || "Unassigned"}
+                                    </td>
+                                    <td 
+                                      className="p-4 cursor-pointer"
+                                      onClick={() => {
+                                        setSelectedLead(req.lead);
+                                        fetchLeadDetails(req.lead?.id);
+                                      }}
+                                    >
+                                      <span className={`inline-block px-2 py-0.5 rounded font-bold text-[9px] uppercase tracking-wider ${
+                                        req.status === "Requested"
+                                          ? "bg-blue-50 text-blue-600 border border-blue-100"
+                                          : req.status === "In Review"
+                                          ? "bg-amber-50 text-amber-600 border border-amber-100"
+                                          : req.status === "Generated"
+                                          ? "bg-indigo-50 text-indigo-600 border border-indigo-100"
+                                          : "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                                      }`}>
+                                        {req.status}
+                                      </span>
+                                    </td>
+                                    <td className="p-4 text-right space-x-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedLead(req.lead);
+                                          fetchLeadDetails(req.lead?.id);
+                                        }}
+                                        className="px-2.5 py-1 text-[10px] font-bold uppercase bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer font-semibold"
+                                      >
+                                        Open Request
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Sidebar details panel */}
+                <div className="lg:col-span-4">
+                  {selectedLead ? (
                     <LeadDetailsPanel 
                       lead={selectedLead}
                       details={selectedLeadDetails}
@@ -8597,10 +8937,14 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       onClose={() => setSelectedLead(null)}
                       onUpdateField={handleUpdateLeadField}
                       onCompleteReminder={handleCompleteReminder}
+                      onGeneratePdf={handleGenerateShortlistPdf}
+                      onMarkDelivered={handleMarkDelivered}
+                      generatingPdf={generatingShortlistPdf}
+                      markingDelivered={markingDelivered}
                     />
                   ) : (
                     <div className="border border-dashed border-slate-200 rounded-3xl p-8 text-center text-slate-400 text-xs">
-                      Select a lead row from the table list to show detailed academic profile, notes, and activity timeline.
+                      Select a shortlist request from the table list to show detailed academic profile, university matches, and action buttons.
                     </div>
                   )}
                 </div>
@@ -8622,10 +8966,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <Button variant="secondary" size="sm" onClick={fetchAllData} className="flex items-center gap-1.5">
                   <SpinnerGap className={loading ? "animate-spin" : ""} size={14} /> Refresh
                 </Button>
-                <Button 
-                  onClick={openNewRoleModal} 
-                  variant="primary" 
-                  size="sm" 
+                <Button
+                  onClick={openNewRoleModal}
+                  variant="primary"
+                  size="sm"
                   className="flex items-center gap-1"
                 >
                   <Plus size={14} /> Create Role
@@ -8667,7 +9011,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   return (
                     <div key={role.id} className="border border-hairline rounded-2xl bg-white overflow-hidden transition-all">
                       {/* Role Header */}
-                      <div 
+                      <div
                         className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50/50 transition-colors"
                         onClick={() => setExpandedRoleId(isExpanded ? null : role.id)}
                       >
@@ -8683,11 +9027,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                            (role.userCount || 0) > 0
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${(role.userCount || 0) > 0
                               ? "bg-emerald-50 text-emerald-600 border-emerald-100"
                               : "bg-slate-50 text-slate-400 border-slate-100"
-                          }`}>
+                            }`}>
                             {role.userCount || 0} assigned
                           </span>
                           <span className={`transition-transform ${isExpanded ? "rotate-180" : ""}`}>
@@ -8706,13 +9049,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                               {ALL_PERMISSIONS.map(perm => {
                                 const hasIt = role.permissions?.includes(perm);
                                 return (
-                                  <div key={perm} className={`flex items-center gap-2 p-2 rounded-xl border text-[10px] ${
-                                    hasIt
+                                  <div key={perm} className={`flex items-center gap-2 p-2 rounded-xl border text-[10px] ${hasIt
                                       ? "bg-emerald-50/40 border-emerald-200/50 text-emerald-700"
                                       : "bg-slate-50/50 border-slate-100 text-slate-400"
-                                  }`}>
-                                    {hasIt 
-                                      ? <CheckCircle size={12} weight="fill" className="text-emerald-500 shrink-0" /> 
+                                    }`}>
+                                    {hasIt
+                                      ? <CheckCircle size={12} weight="fill" className="text-emerald-500 shrink-0" />
                                       : <XCircle size={12} weight="fill" className="text-slate-300 shrink-0" />
                                     }
                                     <span className="font-bold truncate">{perm}</span>
@@ -8744,25 +9086,25 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                           {/* Actions */}
                           <div className="flex items-center gap-2 px-4 py-3 bg-slate-50/80 border-t border-hairline">
-                            <Button 
-                              onClick={(e: React.MouseEvent) => { e.stopPropagation(); openEditRoleModal(role); }} 
-                              variant="secondary" 
-                              size="sm" 
+                            <Button
+                              onClick={(e: React.MouseEvent) => { e.stopPropagation(); openEditRoleModal(role); }}
+                              variant="secondary"
+                              size="sm"
                               className="text-xs flex items-center gap-1"
                             >
                               <Gear size={12} /> Edit Role
                             </Button>
-                            <Button 
-                              onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleCloneRole(role); }} 
-                              variant="secondary" 
+                            <Button
+                              onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleCloneRole(role); }}
+                              variant="secondary"
                               size="sm"
                               className="text-xs flex items-center gap-1"
                             >
                               <Copy size={12} /> Clone
                             </Button>
-                            <Button 
-                              onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleDeleteRole(role); }} 
-                              variant="ghost" 
+                            <Button
+                              onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleDeleteRole(role); }}
+                              variant="ghost"
                               size="sm"
                               className="text-xs flex items-center gap-1 text-red-500 hover:text-red-600"
                             >
@@ -8891,7 +9233,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       {isTrainingDetailOpen && selectedTrainingStudent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in text-slate-700">
           <Card className="max-w-5xl w-full h-[85vh] p-0 relative bg-white shadow-2xl flex flex-col justify-between overflow-hidden">
-            
+
             {/* Header */}
             <div className="p-5 border-b border-hairline bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex items-center gap-3">
@@ -8905,12 +9247,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <span className="text-[10px] font-bold uppercase bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full">
                   {selectedTrainingStudent.status}
                 </span>
-                <button 
+                <button
                   onClick={() => setIsTrainingDetailOpen(false)}
                   className="p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer"
                 >
@@ -8930,12 +9272,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 { id: "chat", label: "Advisor Chat" },
                 { id: "notifications", label: "Notifications" }
               ].map(subTab => (
-                <button 
+                <button
                   key={subTab.id}
                   onClick={() => setTrainingDetailTab(subTab.id as any)}
-                  className={`pb-1 cursor-pointer transition-all ${
-                    trainingDetailTab === subTab.id ? "text-primary border-b-2 border-primary" : "hover:text-primary"
-                  }`}
+                  className={`pb-1 cursor-pointer transition-all ${trainingDetailTab === subTab.id ? "text-primary border-b-2 border-primary" : "hover:text-primary"
+                    }`}
                 >
                   {subTab.label}
                 </button>
@@ -8944,7 +9285,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
             {/* Scrollable Workspace Content */}
             <div className="flex-grow p-6 overflow-y-auto bg-slate-50/50 text-xs">
-              
+
               {/* TAB VIEW: OVERVIEW */}
               {trainingDetailTab === "overview" && (
                 <div className="space-y-6 text-left">
@@ -8983,7 +9324,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               {trainingDetailTab === "tasks" && (
                 <div className="space-y-6 text-left">
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    
+
                     {/* Assign Task form */}
                     <div className="lg:col-span-1">
                       <Card className="p-5">
@@ -8991,11 +9332,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                         <form onSubmit={handleCreateCareerTask} className="space-y-3">
                           <div className="flex flex-col gap-1">
                             <label className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Task Title *</label>
-                            <input 
-                              type="text" 
-                              required 
-                              value={careerTaskForm.title} 
-                              onChange={(e) => setCareerTaskForm({ ...careerTaskForm, title: e.target.value })} 
+                            <input
+                              type="text"
+                              required
+                              value={careerTaskForm.title}
+                              onChange={(e) => setCareerTaskForm({ ...careerTaskForm, title: e.target.value })}
                               placeholder="e.g. Submit ATS Resume Draft"
                               className="px-3.5 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-white"
                             />
@@ -9003,9 +9344,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                           <div className="flex flex-col gap-1">
                             <label className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Description</label>
-                            <textarea 
-                              value={careerTaskForm.description} 
-                              onChange={(e) => setCareerTaskForm({ ...careerTaskForm, description: e.target.value })} 
+                            <textarea
+                              value={careerTaskForm.description}
+                              onChange={(e) => setCareerTaskForm({ ...careerTaskForm, description: e.target.value })}
                               placeholder="Task instructions..."
                               rows={3}
                               className="px-3.5 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-white resize-none"
@@ -9014,10 +9355,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                           <div className="flex flex-col gap-1">
                             <label className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Due Date</label>
-                            <input 
-                              type="date" 
-                              value={careerTaskForm.due_date} 
-                              onChange={(e) => setCareerTaskForm({ ...careerTaskForm, due_date: e.target.value })} 
+                            <input
+                              type="date"
+                              value={careerTaskForm.due_date}
+                              onChange={(e) => setCareerTaskForm({ ...careerTaskForm, due_date: e.target.value })}
                               className="px-3.5 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-white"
                             />
                           </div>
@@ -9160,7 +9501,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               {trainingDetailTab === "meetings" && (
                 <div className="space-y-6 text-left">
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    
+
                     {/* Schedule Meeting form */}
                     <div className="lg:col-span-1">
                       <Card className="p-5">
@@ -9168,11 +9509,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                         <form onSubmit={handleScheduleCareerMeeting} className="space-y-3">
                           <div className="flex flex-col gap-1">
                             <label className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Session Title *</label>
-                            <input 
-                              type="text" 
-                              required 
-                              value={careerMeetingForm.title} 
-                              onChange={(e) => setCareerMeetingForm({ ...careerMeetingForm, title: e.target.value })} 
+                            <input
+                              type="text"
+                              required
+                              value={careerMeetingForm.title}
+                              onChange={(e) => setCareerMeetingForm({ ...careerMeetingForm, title: e.target.value })}
                               placeholder="e.g. Mock Interview Round 1"
                               className="px-3.5 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-white"
                             />
@@ -9180,9 +9521,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                           <div className="flex flex-col gap-1">
                             <label className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Description</label>
-                            <textarea 
-                              value={careerMeetingForm.description} 
-                              onChange={(e) => setCareerMeetingForm({ ...careerMeetingForm, description: e.target.value })} 
+                            <textarea
+                              value={careerMeetingForm.description}
+                              onChange={(e) => setCareerMeetingForm({ ...careerMeetingForm, description: e.target.value })}
                               placeholder="Agenda details..."
                               rows={2}
                               className="px-3.5 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-white resize-none"
@@ -9192,21 +9533,21 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           <div className="grid grid-cols-2 gap-2">
                             <div className="flex flex-col gap-1">
                               <label className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Date *</label>
-                              <input 
-                                type="date" 
-                                required 
-                                value={careerMeetingForm.date} 
-                                onChange={(e) => setCareerMeetingForm({ ...careerMeetingForm, date: e.target.value })} 
+                              <input
+                                type="date"
+                                required
+                                value={careerMeetingForm.date}
+                                onChange={(e) => setCareerMeetingForm({ ...careerMeetingForm, date: e.target.value })}
                                 className="px-3.5 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-white"
                               />
                             </div>
                             <div className="flex flex-col gap-1">
                               <label className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Time *</label>
-                              <input 
-                                type="time" 
-                                required 
-                                value={careerMeetingForm.time} 
-                                onChange={(e) => setCareerMeetingForm({ ...careerMeetingForm, time: e.target.value })} 
+                              <input
+                                type="time"
+                                required
+                                value={careerMeetingForm.time}
+                                onChange={(e) => setCareerMeetingForm({ ...careerMeetingForm, time: e.target.value })}
                                 className="px-3.5 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-white"
                               />
                             </div>
@@ -9215,20 +9556,20 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           <div className="grid grid-cols-2 gap-2">
                             <div className="flex flex-col gap-1">
                               <label className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Duration (Min) *</label>
-                              <input 
-                                type="number" 
-                                required 
-                                value={careerMeetingForm.duration_minutes} 
-                                onChange={(e) => setCareerMeetingForm({ ...careerMeetingForm, duration_minutes: e.target.value })} 
+                              <input
+                                type="number"
+                                required
+                                value={careerMeetingForm.duration_minutes}
+                                onChange={(e) => setCareerMeetingForm({ ...careerMeetingForm, duration_minutes: e.target.value })}
                                 placeholder="30"
                                 className="px-3.5 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-white font-mono-data"
                               />
                             </div>
                             <div className="flex flex-col gap-1">
                               <label className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Meeting Type *</label>
-                              <select 
-                                value={careerMeetingForm.meeting_type} 
-                                onChange={(e) => setCareerMeetingForm({ ...careerMeetingForm, meeting_type: e.target.value })} 
+                              <select
+                                value={careerMeetingForm.meeting_type}
+                                onChange={(e) => setCareerMeetingForm({ ...careerMeetingForm, meeting_type: e.target.value })}
                                 className="px-3.5 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-800 focus:outline-none cursor-pointer"
                               >
                                 <option value="Google Meet">Google Meet</option>
@@ -9240,10 +9581,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                           <div className="flex flex-col gap-1">
                             <label className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Meeting Link</label>
-                            <input 
-                              type="text" 
-                              value={careerMeetingForm.meeting_link} 
-                              onChange={(e) => setCareerMeetingForm({ ...careerMeetingForm, meeting_link: e.target.value })} 
+                            <input
+                              type="text"
+                              value={careerMeetingForm.meeting_link}
+                              onChange={(e) => setCareerMeetingForm({ ...careerMeetingForm, meeting_link: e.target.value })}
                               placeholder="https://"
                               className="px-3.5 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none text-slate-800 bg-white"
                             />
@@ -9283,9 +9624,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                             </div>
 
                             <div className="flex flex-col gap-2 shrink-0 items-end">
-                              <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${
-                                meet.status === "Rescheduled" ? "bg-blue-50 text-blue-600 border-blue-100" : meet.status === "Cancelled" ? "bg-red-50 text-red-600 border-red-100" : "bg-slate-100 text-slate-600 border-slate-200"
-                              }`}>
+                              <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${meet.status === "Rescheduled" ? "bg-blue-50 text-blue-600 border-blue-100" : meet.status === "Cancelled" ? "bg-red-50 text-red-600 border-red-100" : "bg-slate-100 text-slate-600 border-slate-200"
+                                }`}>
                                 {meet.status}
                               </span>
                               <button
@@ -9308,7 +9648,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               {trainingDetailTab === "chat" && (
                 <div className="space-y-4 text-left">
                   <h4 className="font-bold text-xs text-primary uppercase tracking-wider mb-2">Live Candidate Communication</h4>
-                  
+
                   <div className="bg-white border border-hairline rounded-2xl h-[400px] flex flex-col overflow-hidden shadow-sm">
                     {/* Message Logs */}
                     <div className="flex-grow p-4 overflow-y-auto space-y-3 bg-slate-50/40 text-[11px] leading-relaxed flex flex-col">
@@ -9323,11 +9663,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           return (
                             <div
                               key={msg.id}
-                              className={`max-w-[75%] rounded-xl p-3 ${
-                                isCounselor
+                              className={`max-w-[75%] rounded-xl p-3 ${isCounselor
                                   ? "bg-primary text-white self-end rounded-tr-none"
                                   : "bg-white border border-hairline text-slate-800 self-start rounded-tl-none shadow-sm"
-                              }`}
+                                }`}
                             >
                               <p className="whitespace-pre-wrap">{msg.message}</p>
                               {msg.attachment_url && (
@@ -9370,12 +9709,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               {trainingDetailTab === "notifications" && (
                 <div className="space-y-6 text-left">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    
+
                     {/* Left: Preferences Card */}
                     <div className="md:col-span-1 space-y-4">
                       <Card className="p-5">
                         <h4 className="font-bold text-sm text-primary mb-4 border-b border-hairline pb-2">Student Preferences</h4>
-                        
+
                         {selectedStudentPrefs ? (
                           <div className="space-y-4">
                             <div className="flex items-center justify-between">
@@ -9430,7 +9769,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       {/* Manual Dispatch Center */}
                       <Card className="p-5 space-y-4">
                         <h4 className="font-bold text-sm text-primary border-b border-hairline pb-2">Manual Dispatch Triggers</h4>
-                        
+
                         <div className="space-y-3">
                           <div>
                             <p className="text-[10px] text-slate-400 font-medium mb-1.5 uppercase tracking-wider">Document Checklist Alert</p>
@@ -9440,7 +9779,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                 try {
                                   const res = await fetch("/api/send-student-notification", {
                                     method: "POST",
-                                    headers: { 
+                                    headers: {
                                       "Content-Type": "application/json",
                                       "Authorization": `Bearer ${getAdminCredentials()}`
                                     },
@@ -9482,7 +9821,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                       try {
                                         const res = await fetch("/api/send-student-notification", {
                                           method: "POST",
-                                          headers: { 
+                                          headers: {
                                             "Content-Type": "application/json",
                                             "Authorization": `Bearer ${getAdminCredentials()}`
                                           },
@@ -9521,7 +9860,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     <div className="md:col-span-2 space-y-4">
                       <Card className="p-5">
                         <h4 className="font-bold text-sm text-primary mb-4 border-b border-hairline pb-2">Student Notification Logs</h4>
-                        
+
                         {selectedStudentHistory.length === 0 ? (
                           <p className="text-slate-400 py-12 text-center border border-dashed border-hairline bg-slate-50/50 rounded-2xl">
                             No notifications dispatched to this student profile yet.
@@ -9541,9 +9880,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                 {selectedStudentHistory.map((h) => (
                                   <tr key={h.id} className="hover:bg-slate-50/50 transition-colors">
                                     <td className="px-3.5 py-2.5">
-                                      <span className={`inline-block text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full border ${
-                                        h.status === "sent" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-red-50 text-red-600 border-red-100"
-                                      }`}>
+                                      <span className={`inline-block text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full border ${h.status === "sent" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-red-50 text-red-600 border-red-100"
+                                        }`}>
                                         {h.status}
                                       </span>
                                     </td>
@@ -9605,9 +9943,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               </div>
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Status</label>
-                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                  selectedBooking.status === "Confirmed" ? "bg-green-50 text-green-600 border border-green-100" : selectedBooking.status === "Cancelled" ? "bg-red-50 text-red-600 border border-red-100" : "bg-yellow-50 text-yellow-600 border border-yellow-100"
-                }`}>{selectedBooking.status}</span>
+                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${selectedBooking.status === "Confirmed" ? "bg-green-50 text-green-600 border border-green-100" : selectedBooking.status === "Cancelled" ? "bg-red-50 text-red-600 border border-red-100" : "bg-yellow-50 text-yellow-600 border border-yellow-100"
+                  }`}>{selectedBooking.status}</span>
               </div>
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Email</label>
@@ -9659,26 +9996,26 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">University Name *</label>
-                  <input 
-                    type="text" 
-                    value={uniForm.name} 
+                  <input
+                    type="text"
+                    value={uniForm.name}
                     onChange={(e) => {
                       const nameVal = e.target.value;
                       const slugVal = nameVal.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
                       setUniForm({ ...uniForm, name: nameVal, slug: slugVal });
-                    }} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
-                    required 
+                    }}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
+                    required
                   />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">URL Slug (Auto)</label>
-                  <input 
-                    type="text" 
-                    value={uniForm.slug} 
-                    onChange={(e) => setUniForm({ ...uniForm, slug: e.target.value })} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-slate-50 font-mono-data" 
-                    required 
+                  <input
+                    type="text"
+                    value={uniForm.slug}
+                    onChange={(e) => setUniForm({ ...uniForm, slug: e.target.value })}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-slate-50 font-mono-data"
+                    required
                   />
                 </div>
               </div>
@@ -9686,22 +10023,22 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Logo URL</label>
-                  <input 
-                    type="text" 
-                    value={uniForm.logo_url} 
-                    onChange={(e) => setUniForm({ ...uniForm, logo_url: e.target.value })} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
-                    placeholder="https://" 
+                  <input
+                    type="text"
+                    value={uniForm.logo_url}
+                    onChange={(e) => setUniForm({ ...uniForm, logo_url: e.target.value })}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
+                    placeholder="https://"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Website URL</label>
-                  <input 
-                    type="url" 
-                    value={uniForm.website_url} 
-                    onChange={(e) => setUniForm({ ...uniForm, website_url: e.target.value })} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
-                    placeholder="https://" 
+                  <input
+                    type="url"
+                    value={uniForm.website_url}
+                    onChange={(e) => setUniForm({ ...uniForm, website_url: e.target.value })}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
+                    placeholder="https://"
                   />
                 </div>
               </div>
@@ -9709,22 +10046,22 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Country *</label>
-                  <input 
-                    type="text" 
-                    value={uniForm.country} 
-                    onChange={(e) => setUniForm({ ...uniForm, country: e.target.value })} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
-                    required 
+                  <input
+                    type="text"
+                    value={uniForm.country}
+                    onChange={(e) => setUniForm({ ...uniForm, country: e.target.value })}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
+                    required
                   />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">City *</label>
-                  <input 
-                    type="text" 
-                    value={uniForm.city} 
-                    onChange={(e) => setUniForm({ ...uniForm, city: e.target.value })} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
-                    required 
+                  <input
+                    type="text"
+                    value={uniForm.city}
+                    onChange={(e) => setUniForm({ ...uniForm, city: e.target.value })}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
+                    required
                   />
                 </div>
               </div>
@@ -9732,9 +10069,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Category *</label>
-                  <select 
-                    value={uniForm.category} 
-                    onChange={(e) => setUniForm({ ...uniForm, category: e.target.value })} 
+                  <select
+                    value={uniForm.category}
+                    onChange={(e) => setUniForm({ ...uniForm, category: e.target.value })}
                     className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-800 focus:outline-none cursor-pointer"
                   >
                     <option value="Engineering">Engineering</option>
@@ -9747,9 +10084,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Course Level *</label>
-                  <select 
-                    value={uniForm.course_type} 
-                    onChange={(e) => setUniForm({ ...uniForm, course_type: e.target.value })} 
+                  <select
+                    value={uniForm.course_type}
+                    onChange={(e) => setUniForm({ ...uniForm, course_type: e.target.value })}
                     className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-800 focus:outline-none cursor-pointer"
                   >
                     <option value="Undergraduate">Undergraduate</option>
@@ -9761,34 +10098,34 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">World Ranking</label>
-                  <input 
-                    type="number" 
-                    value={uniForm.ranking} 
-                    onChange={(e) => setUniForm({ ...uniForm, ranking: e.target.value })} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
-                    placeholder="e.g. 154" 
+                  <input
+                    type="number"
+                    value={uniForm.ranking}
+                    onChange={(e) => setUniForm({ ...uniForm, ranking: e.target.value })}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
+                    placeholder="e.g. 154"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Ranking Source</label>
-                  <input 
-                    type="text" 
-                    value={uniForm.ranking_source} 
-                    onChange={(e) => setUniForm({ ...uniForm, ranking_source: e.target.value })} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
-                    placeholder="e.g. QS Rankings" 
+                  <input
+                    type="text"
+                    value={uniForm.ranking_source}
+                    onChange={(e) => setUniForm({ ...uniForm, ranking_source: e.target.value })}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
+                    placeholder="e.g. QS Rankings"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Rating (1-5)</label>
-                  <input 
-                    type="number" 
-                    step="0.1" 
-                    min="1" 
-                    max="5" 
-                    value={uniForm.rating} 
-                    onChange={(e) => setUniForm({ ...uniForm, rating: e.target.value })} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="1"
+                    max="5"
+                    value={uniForm.rating}
+                    onChange={(e) => setUniForm({ ...uniForm, rating: e.target.value })}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
                   />
                 </div>
               </div>
@@ -9796,31 +10133,31 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Min Percentage (%)</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     min="0"
                     max="100"
-                    value={uniForm.min_percentage} 
-                    onChange={(e) => setUniForm({ ...uniForm, min_percentage: e.target.value })} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    value={uniForm.min_percentage}
+                    onChange={(e) => setUniForm({ ...uniForm, min_percentage: e.target.value })}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
                     placeholder="e.g. 60"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Annual Fee (Numeric)</label>
-                  <input 
-                    type="number" 
-                    value={uniForm.annual_fees} 
-                    onChange={(e) => setUniForm({ ...uniForm, annual_fees: e.target.value })} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                  <input
+                    type="number"
+                    value={uniForm.annual_fees}
+                    onChange={(e) => setUniForm({ ...uniForm, annual_fees: e.target.value })}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
                     placeholder="e.g. 15000"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Degree Level *</label>
-                  <select 
-                    value={uniForm.degree_level} 
-                    onChange={(e) => setUniForm({ ...uniForm, degree_level: e.target.value })} 
+                  <select
+                    value={uniForm.degree_level}
+                    onChange={(e) => setUniForm({ ...uniForm, degree_level: e.target.value })}
                     className="px-3 py-1.5 border border-hairline bg-white rounded-xl text-xs text-slate-800 focus:outline-none cursor-pointer"
                   >
                     <option value="High School">High School</option>
@@ -9834,38 +10171,38 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Min IELTS Cutoff</label>
-                  <input 
-                    type="number" 
-                    step="0.1" 
+                  <input
+                    type="number"
+                    step="0.1"
                     min="0"
                     max="9"
-                    value={uniForm.min_ielts} 
-                    onChange={(e) => setUniForm({ ...uniForm, min_ielts: e.target.value })} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    value={uniForm.min_ielts}
+                    onChange={(e) => setUniForm({ ...uniForm, min_ielts: e.target.value })}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
                     placeholder="e.g. 6.5"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Min PTE Cutoff</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     min="0"
                     max="90"
-                    value={uniForm.min_pte} 
-                    onChange={(e) => setUniForm({ ...uniForm, min_pte: e.target.value })} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    value={uniForm.min_pte}
+                    onChange={(e) => setUniForm({ ...uniForm, min_pte: e.target.value })}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
                     placeholder="e.g. 58"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Min TOEFL Cutoff</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     min="0"
                     max="120"
-                    value={uniForm.min_toefl} 
-                    onChange={(e) => setUniForm({ ...uniForm, min_toefl: e.target.value })} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
+                    value={uniForm.min_toefl}
+                    onChange={(e) => setUniForm({ ...uniForm, min_toefl: e.target.value })}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
                     placeholder="e.g. 80"
                   />
                 </div>
@@ -9874,22 +10211,22 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Total Fees Range</label>
-                  <input 
-                    type="text" 
-                    value={uniForm.total_fees} 
-                    onChange={(e) => setUniForm({ ...uniForm, total_fees: e.target.value })} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
-                    placeholder="e.g. £15,000 - £22,000 per year" 
+                  <input
+                    type="text"
+                    value={uniForm.total_fees}
+                    onChange={(e) => setUniForm({ ...uniForm, total_fees: e.target.value })}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
+                    placeholder="e.g. £15,000 - £22,000 per year"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Application Deadline</label>
-                  <input 
-                    type="text" 
-                    value={uniForm.application_deadline} 
-                    onChange={(e) => setUniForm({ ...uniForm, application_deadline: e.target.value })} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
-                    placeholder="e.g. June 30" 
+                  <input
+                    type="text"
+                    value={uniForm.application_deadline}
+                    onChange={(e) => setUniForm({ ...uniForm, application_deadline: e.target.value })}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
+                    placeholder="e.g. June 30"
                   />
                 </div>
               </div>
@@ -9897,64 +10234,64 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Intake Cycles</label>
-                  <input 
-                    type="text" 
-                    value={uniForm.intake} 
-                    onChange={(e) => setUniForm({ ...uniForm, intake: e.target.value })} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
-                    placeholder="e.g. September / January" 
+                  <input
+                    type="text"
+                    value={uniForm.intake}
+                    onChange={(e) => setUniForm({ ...uniForm, intake: e.target.value })}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
+                    placeholder="e.g. September / January"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Entry Cutoff / Score</label>
-                  <input 
-                    type="text" 
-                    value={uniForm.cutoff} 
-                    onChange={(e) => setUniForm({ ...uniForm, cutoff: e.target.value })} 
-                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
-                    placeholder="e.g. IELTS 6.5 / 75% in 10+2" 
+                  <input
+                    type="text"
+                    value={uniForm.cutoff}
+                    onChange={(e) => setUniForm({ ...uniForm, cutoff: e.target.value })}
+                    className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
+                    placeholder="e.g. IELTS 6.5 / 75% in 10+2"
                   />
                 </div>
               </div>
 
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Description</label>
-                <textarea 
-                  value={uniForm.description} 
-                  onChange={(e) => setUniForm({ ...uniForm, description: e.target.value })} 
-                  className="px-3 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white min-h-[80px] resize-none" 
+                <textarea
+                  value={uniForm.description}
+                  onChange={(e) => setUniForm({ ...uniForm, description: e.target.value })}
+                  className="px-3 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white min-h-[80px] resize-none"
                   placeholder="Provide a detailed description of the campus, unique programs, and student facilities."
                 />
               </div>
 
               <div className="flex flex-wrap items-center gap-6 mt-2">
                 <div className="flex items-center gap-2">
-                  <input 
-                    type="checkbox" 
-                    id="featured" 
-                    checked={uniForm.featured} 
-                    onChange={(e) => setUniForm({ ...uniForm, featured: e.target.checked })} 
-                    className="w-4 h-4 text-primary cursor-pointer border-hairline rounded" 
+                  <input
+                    type="checkbox"
+                    id="featured"
+                    checked={uniForm.featured}
+                    onChange={(e) => setUniForm({ ...uniForm, featured: e.target.checked })}
+                    className="w-4 h-4 text-primary cursor-pointer border-hairline rounded"
                   />
                   <label htmlFor="featured" className="text-[10px] font-bold text-primary uppercase tracking-wider cursor-pointer">Featured Partner</label>
                 </div>
                 <div className="flex items-center gap-2">
-                  <input 
-                    type="checkbox" 
-                    id="scholarship_available" 
-                    checked={uniForm.scholarship_available} 
-                    onChange={(e) => setUniForm({ ...uniForm, scholarship_available: e.target.checked })} 
-                    className="w-4 h-4 text-primary cursor-pointer border-hairline rounded" 
+                  <input
+                    type="checkbox"
+                    id="scholarship_available"
+                    checked={uniForm.scholarship_available}
+                    onChange={(e) => setUniForm({ ...uniForm, scholarship_available: e.target.checked })}
+                    className="w-4 h-4 text-primary cursor-pointer border-hairline rounded"
                   />
                   <label htmlFor="scholarship_available" className="text-[10px] font-bold text-primary uppercase tracking-wider cursor-pointer">Scholarship Available</label>
                 </div>
                 <div className="flex items-center gap-2">
-                  <input 
-                    type="checkbox" 
-                    id="published" 
-                    checked={uniForm.published} 
-                    onChange={(e) => setUniForm({ ...uniForm, published: e.target.checked })} 
-                    className="w-4 h-4 text-primary cursor-pointer border-hairline rounded" 
+                  <input
+                    type="checkbox"
+                    id="published"
+                    checked={uniForm.published}
+                    onChange={(e) => setUniForm({ ...uniForm, published: e.target.checked })}
+                    className="w-4 h-4 text-primary cursor-pointer border-hairline rounded"
                   />
                   <label htmlFor="published" className="text-[10px] font-bold text-primary uppercase tracking-wider cursor-pointer">Published / Active</label>
                 </div>
@@ -9983,7 +10320,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <CardDescription className="text-xs">Publish articles directly onto the public Annex Journal page.</CardDescription>
               </div>
             </div>
-            
+
             {/* Inner modal tabs */}
             <div className="flex gap-4 text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 border-b border-hairline/40 pb-2">
               <button type="button" onClick={() => setPostModalTab("edit")} className={`pb-1 cursor-pointer transition-all ${postModalTab === "edit" ? "text-primary border-b-2 border-primary" : "hover:text-primary"}`}>Edit Content</button>
@@ -9995,16 +10332,16 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] font-bold text-primary uppercase tracking-wider">Title *</label>
-                    <input 
-                      type="text" 
-                      value={postForm.title} 
+                    <input
+                      type="text"
+                      value={postForm.title}
                       onChange={(e) => {
                         const newTitle = e.target.value;
                         const slugVal = newTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
                         setPostForm({ ...postForm, title: newTitle, slug: slugVal });
-                      }} 
-                      className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white" 
-                      required 
+                      }}
+                      className="px-3 py-1.5 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 bg-white"
+                      required
                     />
                   </div>
                   <div className="flex flex-col gap-1">
@@ -10152,26 +10489,26 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               </div>
             </div>
             <form onSubmit={handleSaveStudent} className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-1 text-xs">
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label className="font-bold text-primary uppercase tracking-wider">Full Name *</label>
-                  <input 
-                    type="text" 
-                    required 
-                    value={studentForm.name} 
-                    onChange={(e) => setStudentForm({ ...studentForm, name: e.target.value })} 
+                  <input
+                    type="text"
+                    required
+                    value={studentForm.name}
+                    onChange={(e) => setStudentForm({ ...studentForm, name: e.target.value })}
                     className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="font-bold text-primary uppercase tracking-wider">Email Address *</label>
-                  <input 
-                    type="email" 
-                    required 
+                  <input
+                    type="email"
+                    required
                     disabled={!!editingStudent}
-                    value={studentForm.email} 
-                    onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })} 
+                    value={studentForm.email}
+                    onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })}
                     className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white disabled:bg-slate-50 disabled:text-slate-400"
                   />
                 </div>
@@ -10180,12 +10517,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               {!editingStudent && (
                 <div className="flex flex-col gap-1.5">
                   <label className="font-bold text-primary uppercase tracking-wider">Temporary Password *</label>
-                  <input 
-                    type="text" 
-                    required 
+                  <input
+                    type="text"
+                    required
                     placeholder="Min 6 characters"
-                    value={studentForm.password} 
-                    onChange={(e) => setStudentForm({ ...studentForm, password: e.target.value })} 
+                    value={studentForm.password}
+                    onChange={(e) => setStudentForm({ ...studentForm, password: e.target.value })}
                     className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white font-mono-data"
                   />
                 </div>
@@ -10194,18 +10531,18 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label className="font-bold text-primary uppercase tracking-wider">Phone Number</label>
-                  <input 
-                    type="text" 
-                    value={studentForm.phone} 
-                    onChange={(e) => setStudentForm({ ...studentForm, phone: e.target.value })} 
+                  <input
+                    type="text"
+                    value={studentForm.phone}
+                    onChange={(e) => setStudentForm({ ...studentForm, phone: e.target.value })}
                     className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="font-bold text-primary uppercase tracking-wider">Destination Country *</label>
-                  <select 
-                    value={studentForm.destination} 
-                    onChange={(e) => setStudentForm({ ...studentForm, destination: e.target.value })} 
+                  <select
+                    value={studentForm.destination}
+                    onChange={(e) => setStudentForm({ ...studentForm, destination: e.target.value })}
                     className="px-3.5 py-2 border border-hairline bg-white rounded-xl text-xs text-slate-800 focus:outline-none cursor-pointer"
                   >
                     <option value="UK">UK</option>
@@ -10218,11 +10555,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="font-bold text-primary uppercase tracking-wider">Target Intake Cycle</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="e.g. Sept 2026"
-                    value={studentForm.intake} 
-                    onChange={(e) => setStudentForm({ ...studentForm, intake: e.target.value })} 
+                    value={studentForm.intake}
+                    onChange={(e) => setStudentForm({ ...studentForm, intake: e.target.value })}
                     className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
                   />
                 </div>
@@ -10231,17 +10568,17 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label className="font-bold text-primary uppercase tracking-wider">Assigned Counselor *</label>
-                  <select 
-                    value={studentForm.counselor_id || ""} 
+                  <select
+                    value={studentForm.counselor_id || ""}
                     onChange={(e) => {
                       const idVal = e.target.value;
                       const selected = counselors.find(c => c.id === idVal);
-                      setStudentForm({ 
-                        ...studentForm, 
+                      setStudentForm({
+                        ...studentForm,
                         counselor_id: idVal,
                         counselor: selected ? selected.full_name : "Annex Counselor"
                       });
-                    }} 
+                    }}
                     className="px-3.5 py-2 border border-hairline bg-white rounded-xl text-xs text-slate-800 focus:outline-none cursor-pointer"
                   >
                     <option value="">Select Counselor</option>
@@ -10252,9 +10589,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="font-bold text-primary uppercase tracking-wider">Journey Stage *</label>
-                  <select 
-                    value={studentForm.current_stage} 
-                    onChange={(e) => setStudentForm({ ...studentForm, current_stage: e.target.value })} 
+                  <select
+                    value={studentForm.current_stage}
+                    onChange={(e) => setStudentForm({ ...studentForm, current_stage: e.target.value })}
                     className="px-3.5 py-2 border border-hairline bg-white rounded-xl text-xs text-slate-800 focus:outline-none cursor-pointer"
                   >
                     {STAGES.map(stage => (
@@ -10264,9 +10601,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="font-bold text-primary uppercase tracking-wider">Account Status *</label>
-                  <select 
-                    value={studentForm.status} 
-                    onChange={(e) => setStudentForm({ ...studentForm, status: e.target.value })} 
+                  <select
+                    value={studentForm.status}
+                    onChange={(e) => setStudentForm({ ...studentForm, status: e.target.value })}
                     className="px-3.5 py-2 border border-hairline bg-white rounded-xl text-xs text-slate-800 focus:outline-none cursor-pointer"
                   >
                     <option value="Active">Active</option>
@@ -10277,10 +10614,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
               <div className="flex flex-col gap-1.5">
                 <label className="font-bold text-primary uppercase tracking-wider">Academic scores / details</label>
-                <textarea 
-                  rows={2} 
-                  value={studentForm.academic_details} 
-                  onChange={(e) => setStudentForm({ ...studentForm, academic_details: e.target.value })} 
+                <textarea
+                  rows={2}
+                  value={studentForm.academic_details}
+                  onChange={(e) => setStudentForm({ ...studentForm, academic_details: e.target.value })}
                   className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white resize-none"
                   placeholder="Qualifications, IELTS scores, GPA background"
                 />
@@ -10289,19 +10626,19 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex flex-col gap-1.5 md:col-span-2">
                   <label className="font-bold text-primary uppercase tracking-wider">Emergency Contact details</label>
-                  <input 
-                    type="text" 
-                    value={studentForm.emergency_contact} 
-                    onChange={(e) => setStudentForm({ ...studentForm, emergency_contact: e.target.value })} 
+                  <input
+                    type="text"
+                    value={studentForm.emergency_contact}
+                    onChange={(e) => setStudentForm({ ...studentForm, emergency_contact: e.target.value })}
                     className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="font-bold text-primary uppercase tracking-wider">Passport details</label>
-                  <input 
-                    type="text" 
-                    value={studentForm.passport_details} 
-                    onChange={(e) => setStudentForm({ ...studentForm, passport_details: e.target.value })} 
+                  <input
+                    type="text"
+                    value={studentForm.passport_details}
+                    onChange={(e) => setStudentForm({ ...studentForm, passport_details: e.target.value })}
                     className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
                   />
                 </div>
@@ -10333,15 +10670,15 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               </div>
             </div>
             <form onSubmit={handleSaveCounselor} className="flex flex-col gap-4 max-h-[75vh] overflow-y-auto pr-1 text-xs text-slate-700">
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-4">
                   <div className="flex flex-col gap-1.5">
                     <label className="font-bold text-primary uppercase tracking-wider">Full Name *</label>
-                    <input 
-                      type="text" 
-                      value={counselorForm.full_name} 
-                      onChange={(e) => setCounselorForm({ ...counselorForm, full_name: e.target.value })} 
+                    <input
+                      type="text"
+                      value={counselorForm.full_name}
+                      onChange={(e) => setCounselorForm({ ...counselorForm, full_name: e.target.value })}
                       className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
                       required
                     />
@@ -10349,10 +10686,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                   <div className="flex flex-col gap-1.5">
                     <label className="font-bold text-primary uppercase tracking-wider">Email Address *</label>
-                    <input 
-                      type="email" 
-                      value={counselorForm.email} 
-                      onChange={(e) => setCounselorForm({ ...counselorForm, email: e.target.value })} 
+                    <input
+                      type="email"
+                      value={counselorForm.email}
+                      onChange={(e) => setCounselorForm({ ...counselorForm, email: e.target.value })}
                       className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
                       required
                     />
@@ -10360,20 +10697,20 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                   <div className="flex flex-col gap-1.5">
                     <label className="font-bold text-primary uppercase tracking-wider">Phone Number</label>
-                    <input 
-                      type="text" 
-                      value={counselorForm.phone} 
-                      onChange={(e) => setCounselorForm({ ...counselorForm, phone: e.target.value })} 
+                    <input
+                      type="text"
+                      value={counselorForm.phone}
+                      onChange={(e) => setCounselorForm({ ...counselorForm, phone: e.target.value })}
                       className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
                     />
                   </div>
 
                   <div className="flex flex-col gap-1.5">
                     <label className="font-bold text-primary uppercase tracking-wider">Designation</label>
-                    <input 
-                      type="text" 
-                      value={counselorForm.designation} 
-                      onChange={(e) => setCounselorForm({ ...counselorForm, designation: e.target.value })} 
+                    <input
+                      type="text"
+                      value={counselorForm.designation}
+                      onChange={(e) => setCounselorForm({ ...counselorForm, designation: e.target.value })}
                       className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
                       placeholder="e.g. Senior Admission Counselor"
                     />
@@ -10403,9 +10740,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     <label className="font-bold text-primary uppercase tracking-wider">Profile Photo (Avatar)</label>
                     <div className="flex items-center gap-3">
                       {counselorForm.avatar_url ? (
-                        <img 
-                          src={counselorForm.avatar_url} 
-                          alt="Avatar Preview" 
+                        <img
+                          src={counselorForm.avatar_url}
+                          alt="Avatar Preview"
                           className="w-10 h-10 rounded-full object-cover border border-hairline"
                         />
                       ) : (
@@ -10414,15 +10751,15 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                         </div>
                       )}
                       <div className="flex-grow">
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          onChange={handleCounselorAvatarUpload} 
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleCounselorAvatarUpload}
                           disabled={uploadingCounselorAvatar}
-                          className="hidden" 
+                          className="hidden"
                           id="counselorAvatarFileInput"
                         />
-                        <label 
+                        <label
                           htmlFor="counselorAvatarFileInput"
                           className="px-3 py-2 border border-hairline rounded-xl hover:bg-slate-50 cursor-pointer flex items-center justify-center gap-1.5 font-bold uppercase tracking-wider text-[10px]"
                         >
@@ -10443,11 +10780,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   </div>
 
                   <div className="flex items-center gap-2 pt-2">
-                    <input 
-                      type="checkbox" 
-                      id="counselorActive" 
-                      checked={counselorForm.is_active} 
-                      onChange={(e) => setCounselorForm({ ...counselorForm, is_active: e.target.checked })} 
+                    <input
+                      type="checkbox"
+                      id="counselorActive"
+                      checked={counselorForm.is_active}
+                      onChange={(e) => setCounselorForm({ ...counselorForm, is_active: e.target.checked })}
                       className="w-4 h-4 text-primary cursor-pointer border-hairline rounded"
                     />
                     <label htmlFor="counselorActive" className="text-xs font-bold text-primary uppercase tracking-wider cursor-pointer">Active Counselor</label>
@@ -10469,18 +10806,17 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       const selectedRoleObj = roles.find(r => r.id === selectedCounselorRole);
                       const isInherited = selectedRoleObj?.permissions?.includes(permKey);
                       const overrideValue = counselorPermOverrides[permKey];
-                      const isChecked = overrideValue !== undefined && overrideValue !== null 
-                        ? overrideValue 
+                      const isChecked = overrideValue !== undefined && overrideValue !== null
+                        ? overrideValue
                         : !!isInherited;
 
                       return (
-                        <div 
-                          key={permKey} 
-                          className={`flex items-center justify-between p-2 rounded-xl border text-[10px] transition-colors ${
-                            overrideValue !== undefined && overrideValue !== null
+                        <div
+                          key={permKey}
+                          className={`flex items-center justify-between p-2 rounded-xl border text-[10px] transition-colors ${overrideValue !== undefined && overrideValue !== null
                               ? "bg-amber-50/60 border-amber-200/60 text-amber-900"
                               : "bg-white border-hairline"
-                          }`}
+                            }`}
                         >
                           <div className="flex flex-col text-left">
                             <span className="font-bold text-slate-700">{permKey}</span>
@@ -10543,13 +10879,13 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               </div>
             </div>
             <form onSubmit={handleSaveExpert} className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-1 text-xs text-slate-700">
-              
+
               <div className="flex flex-col gap-1.5">
                 <label className="font-bold text-primary uppercase tracking-wider">Expert Name *</label>
-                <input 
-                  type="text" 
-                  value={expertForm.name} 
-                  onChange={(e) => setExpertForm({ ...expertForm, name: e.target.value })} 
+                <input
+                  type="text"
+                  value={expertForm.name}
+                  onChange={(e) => setExpertForm({ ...expertForm, name: e.target.value })}
                   className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
                   required
                 />
@@ -10557,10 +10893,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
               <div className="flex flex-col gap-1.5">
                 <label className="font-bold text-primary uppercase tracking-wider">Designation *</label>
-                <input 
-                  type="text" 
-                  value={expertForm.designation} 
-                  onChange={(e) => setExpertForm({ ...expertForm, designation: e.target.value })} 
+                <input
+                  type="text"
+                  value={expertForm.designation}
+                  onChange={(e) => setExpertForm({ ...expertForm, designation: e.target.value })}
                   className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
                   placeholder="e.g. Senior Career Counselor"
                   required
@@ -10569,10 +10905,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
               <div className="flex flex-col gap-1.5">
                 <label className="font-bold text-primary uppercase tracking-wider">Area of Expertise</label>
-                <input 
-                  type="text" 
-                  value={expertForm.expertise} 
-                  onChange={(e) => setExpertForm({ ...expertForm, expertise: e.target.value })} 
+                <input
+                  type="text"
+                  value={expertForm.expertise}
+                  onChange={(e) => setExpertForm({ ...expertForm, expertise: e.target.value })}
                   className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
                   placeholder="e.g. Study Abroad & Placement Guidance"
                 />
@@ -10580,10 +10916,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
               <div className="flex flex-col gap-1.5">
                 <label className="font-bold text-primary uppercase tracking-wider">LinkedIn URL</label>
-                <input 
-                  type="url" 
-                  value={expertForm.linkedin_url} 
-                  onChange={(e) => setExpertForm({ ...expertForm, linkedin_url: e.target.value })} 
+                <input
+                  type="url"
+                  value={expertForm.linkedin_url}
+                  onChange={(e) => setExpertForm({ ...expertForm, linkedin_url: e.target.value })}
                   className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
                   placeholder="https://linkedin.com/in/username"
                 />
@@ -10591,10 +10927,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
               <div className="flex flex-col gap-1.5">
                 <label className="font-bold text-primary uppercase tracking-wider">Display Order</label>
-                <input 
-                  type="number" 
-                  value={expertForm.display_order} 
-                  onChange={(e) => setExpertForm({ ...expertForm, display_order: parseInt(e.target.value) || 0 })} 
+                <input
+                  type="number"
+                  value={expertForm.display_order}
+                  onChange={(e) => setExpertForm({ ...expertForm, display_order: parseInt(e.target.value) || 0 })}
                   className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
                 />
               </div>
@@ -10603,9 +10939,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <label className="font-bold text-primary uppercase tracking-wider">Profile Photo (Expert)</label>
                 <div className="flex items-center gap-3">
                   {expertForm.photo_url ? (
-                    <img 
-                      src={expertForm.photo_url} 
-                      alt="Expert Preview" 
+                    <img
+                      src={expertForm.photo_url}
+                      alt="Expert Preview"
                       className="w-10 h-10 rounded-full object-cover border border-hairline"
                     />
                   ) : (
@@ -10614,15 +10950,15 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     </div>
                   )}
                   <div className="flex-grow">
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={handleExpertPhotoUpload} 
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleExpertPhotoUpload}
                       disabled={uploadingExpertPhoto}
-                      className="hidden" 
+                      className="hidden"
                       id="expertPhotoFileInput"
                     />
-                    <label 
+                    <label
                       htmlFor="expertPhotoFileInput"
                       className="px-3 py-2 border border-hairline rounded-xl hover:bg-slate-50 cursor-pointer flex items-center justify-center gap-1.5 font-bold uppercase tracking-wider text-[10px]"
                     >
@@ -10643,11 +10979,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               </div>
 
               <div className="flex items-center gap-2 mt-2">
-                <input 
-                  type="checkbox" 
-                  id="expertActive" 
-                  checked={expertForm.is_active} 
-                  onChange={(e) => setExpertForm({ ...expertForm, is_active: e.target.checked })} 
+                <input
+                  type="checkbox"
+                  id="expertActive"
+                  checked={expertForm.is_active}
+                  onChange={(e) => setExpertForm({ ...expertForm, is_active: e.target.checked })}
                   className="w-4 h-4 text-primary cursor-pointer border-hairline rounded"
                 />
                 <label htmlFor="expertActive" className="text-xs font-bold text-primary uppercase tracking-wider cursor-pointer">Active Expert (Show on Page)</label>
@@ -10705,10 +11041,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     password: provisionPassword
                   })
                 });
-                
+
                 const result = await res.json();
                 if (!res.ok) throw new Error(result.error || "Provisioning failed");
-                
+
                 showToast(`Login credentials provisioned successfully for ${provisionCounselor.full_name}!`);
                 setProvisionModalOpen(false);
                 fetchAllData();
@@ -10728,10 +11064,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               </div>
               <div className="flex flex-col gap-1.5 text-left">
                 <label className="font-bold text-primary uppercase tracking-wider">Set Password *</label>
-                <input 
-                  type="password" 
-                  value={provisionPassword} 
-                  onChange={(e) => setProvisionPassword(e.target.value)} 
+                <input
+                  type="password"
+                  value={provisionPassword}
+                  onChange={(e) => setProvisionPassword(e.target.value)}
                   className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
                   placeholder="At least 6 characters"
                   required
@@ -10770,10 +11106,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
             <form onSubmit={handleSaveRole} className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-1 text-xs text-slate-700">
               <div className="flex flex-col gap-1.5">
                 <label className="font-bold text-primary uppercase tracking-wider">Role Name *</label>
-                <input 
-                  type="text" 
-                  value={roleForm.name} 
-                  onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })} 
+                <input
+                  type="text"
+                  value={roleForm.name}
+                  onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })}
                   className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
                   placeholder="e.g. Senior Counselor"
                   required
@@ -10782,10 +11118,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
               <div className="flex flex-col gap-1.5">
                 <label className="font-bold text-primary uppercase tracking-wider">Description</label>
-                <input 
-                  type="text" 
-                  value={roleForm.description} 
-                  onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })} 
+                <input
+                  type="text"
+                  value={roleForm.description}
+                  onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })}
                   className="px-3.5 py-2 border border-hairline rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary/20 text-slate-800 bg-white"
                   placeholder="Brief description of this role's responsibilities"
                 />
@@ -10796,7 +11132,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-primary uppercase tracking-wider">Default Permissions</span>
                   <div className="flex items-center gap-2">
-                    <button 
+                    <button
                       type="button"
                       onClick={() => setRoleForm({ ...roleForm, permissions: [...ALL_PERMISSIONS] })}
                       className="text-[9px] font-bold text-emerald-600 hover:underline cursor-pointer"
@@ -10804,7 +11140,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       Select All
                     </button>
                     <span className="text-slate-300">|</span>
-                    <button 
+                    <button
                       type="button"
                       onClick={() => setRoleForm({ ...roleForm, permissions: [] })}
                       className="text-[9px] font-bold text-red-500 hover:underline cursor-pointer"
@@ -10817,13 +11153,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   {ALL_PERMISSIONS.map(permKey => {
                     const isChecked = roleForm.permissions.includes(permKey);
                     return (
-                      <div 
-                        key={permKey} 
-                        className={`flex items-center justify-between p-2 rounded-xl border text-[10px] transition-colors cursor-pointer ${
-                          isChecked
+                      <div
+                        key={permKey}
+                        className={`flex items-center justify-between p-2 rounded-xl border text-[10px] transition-colors cursor-pointer ${isChecked
                             ? "bg-emerald-50/40 border-emerald-200/50 text-emerald-700"
                             : "bg-white border-hairline text-slate-500"
-                        }`}
+                          }`}
                         onClick={() => {
                           setRoleForm(prev => ({
                             ...prev,
@@ -10837,7 +11172,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                         <input
                           type="checkbox"
                           checked={isChecked}
-                          onChange={() => {}}
+                          onChange={() => { }}
                           className="w-3.5 h-3.5 text-primary border-hairline rounded cursor-pointer pointer-events-none"
                         />
                       </div>
@@ -10869,7 +11204,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       {isAuditModalOpen && selectedStudent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in text-slate-700">
           <Card className="max-w-5xl w-full h-[85vh] p-0 relative bg-white shadow-2xl flex flex-col justify-between overflow-hidden">
-            
+
             {/* Modal Header */}
             <div className="p-5 border-b border-hairline bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex items-center gap-3">
@@ -10881,12 +11216,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   <p className="text-xs text-slate-400 font-medium">{selectedStudent.email} &middot; counselor: {selectedStudent.counselor}</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <span className="text-[10px] font-bold uppercase bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full">
                   {selectedStudent.current_stage}
                 </span>
-                <button 
+                <button
                   onClick={() => setIsAuditModalOpen(false)}
                   className="p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer"
                 >
@@ -10907,12 +11242,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 { id: "meetings", label: "Schedule Meetings" },
                 { id: "notifications", label: "Notifications" }
               ].map(subTab => (
-                <button 
+                <button
                   key={subTab.id}
                   onClick={() => setAuditTab(subTab.id as any)}
-                  className={`pb-1 cursor-pointer transition-all ${
-                    auditTab === subTab.id ? "text-primary border-b-2 border-primary" : "hover:text-primary"
-                  }`}
+                  className={`pb-1 cursor-pointer transition-all ${auditTab === subTab.id ? "text-primary border-b-2 border-primary" : "hover:text-primary"
+                    }`}
                 >
                   {subTab.label}
                 </button>
@@ -10921,11 +11255,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
             {/* Modal Content Scroll viewport */}
             <div className="flex-grow p-6 overflow-y-auto bg-slate-50/50 text-xs">
-              
+
               {/* TAB A: TASKS & PROGRESS */}
               {auditTab === "progress" && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  
+
                   {/* Left: Task lists */}
                   <div className="md:col-span-2 space-y-4">
                     <h4 className="font-bold text-sm text-primary mb-2">Assigned Tasks checklist</h4>
@@ -10943,9 +11277,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                               {task.approved ? (
                                 <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">Approved</span>
                               ) : task.completed ? (
-                                <Button 
-                                  onClick={() => approveTask(task.id, task.title)} 
-                                  variant="primary" 
+                                <Button
+                                  onClick={() => approveTask(task.id, task.title)}
+                                  variant="primary"
                                   className="text-[10px] py-1 px-3"
                                 >
                                   Approve Completion
@@ -10966,22 +11300,22 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     <form onSubmit={handleAddTask} className="space-y-4">
                       <div className="flex flex-col gap-1">
                         <label className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Task Title *</label>
-                        <input 
-                          type="text" 
+                        <input
+                          type="text"
                           required
-                          value={newTaskTitle} 
+                          value={newTaskTitle}
                           onChange={(e) => setNewTaskTitle(e.target.value)}
-                          placeholder="e.g. Upload IELTS Certificate" 
+                          placeholder="e.g. Upload IELTS Certificate"
                           className="px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none focus:border-primary bg-white"
                         />
                       </div>
                       <div className="flex flex-col gap-1">
                         <label className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Description</label>
-                        <textarea 
-                          rows={3} 
+                        <textarea
+                          rows={3}
                           value={newTaskDesc}
                           onChange={(e) => setNewTaskDesc(e.target.value)}
-                          placeholder="Specify requirements, links, or templates." 
+                          placeholder="Specify requirements, links, or templates."
                           className="px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none focus:border-primary resize-none bg-white"
                         />
                       </div>
@@ -10998,7 +11332,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               {auditTab === "documents" && (
                 <div className="space-y-4">
                   <h4 className="font-bold text-sm text-primary">Verification Checklist</h4>
-                  
+
                   {auditDocs.length === 0 ? (
                     <div className="py-12 border border-dashed border-hairline rounded-2xl bg-white text-center text-slate-400">
                       <FileText size={32} className="mx-auto text-slate-300 mb-2" />
@@ -11008,7 +11342,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     <div className="grid grid-cols-1 gap-3">
                       {auditDocs.map(doc => (
                         <div key={doc.id} className="p-4 bg-white border border-hairline rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-sm transition-shadow">
-                          
+
                           <div className="flex items-start gap-3">
                             <div className="w-9 h-9 rounded-full bg-primary/5 text-primary flex items-center justify-center border border-primary/10 shrink-0">
                               <FileText size={18} weight="fill" />
@@ -11025,22 +11359,21 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           </div>
 
                           <div className="flex items-center gap-2.5 sm:self-center ml-12 sm:ml-0 shrink-0">
-                            <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-                              doc.status === "Approved" 
-                                ? "bg-emerald-50 text-emerald-600 border-emerald-200" 
+                            <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${doc.status === "Approved"
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-200"
                                 : doc.status === "Rejected"
-                                ? "bg-red-50 text-red-600 border-red-200"
-                                : doc.status === "Requires Correction"
-                                ? "bg-amber-50 text-amber-600 border-amber-200"
-                                : "bg-blue-50 text-blue-600 border-blue-200"
-                            }`}>
+                                  ? "bg-red-50 text-red-600 border-red-200"
+                                  : doc.status === "Requires Correction"
+                                    ? "bg-amber-50 text-amber-600 border-amber-200"
+                                    : "bg-blue-50 text-blue-600 border-blue-200"
+                              }`}>
                               {doc.status}
                             </span>
-                            
-                            <a 
-                              href={doc.file_url} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
+
+                            <a
+                              href={doc.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="px-3.5 py-1.5 border border-hairline hover:bg-slate-50 rounded-full text-xs font-bold text-slate-600 flex items-center gap-1 transition-colors"
                             >
                               View file <ArrowSquareOut size={12} />
@@ -11048,9 +11381,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                             {docFeedbackId === doc.id ? (
                               <div className="flex items-center gap-2">
-                                <input 
-                                  type="text" 
-                                  placeholder="Provide feedback..." 
+                                <input
+                                  type="text"
+                                  placeholder="Provide feedback..."
                                   value={docFeedbackText}
                                   onChange={(e) => setDocFeedbackText(e.target.value)}
                                   className="px-2 py-1.5 border border-hairline rounded-lg text-xs outline-none bg-white"
@@ -11060,14 +11393,14 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                               </div>
                             ) : (
                               <>
-                                <button 
+                                <button
                                   onClick={() => updateDocStatus(doc.id, "Approved")}
                                   className="px-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm shadow-emerald-600/10 cursor-pointer"
                                   disabled={doc.status === "Approved"}
                                 >
                                   Approve
                                 </button>
-                                <button 
+                                <button
                                   onClick={() => setDocFeedbackId(doc.id)}
                                   className="px-3.5 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-sm shadow-red-600/10 cursor-pointer"
                                   disabled={doc.status === "Rejected"}
@@ -11089,7 +11422,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               {/* TAB C: OFFER LETTERS */}
               {auditTab === "offers" && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  
+
                   {/* Left list of offer letters */}
                   <div className="md:col-span-2 space-y-4">
                     <h4 className="font-bold text-sm text-primary mb-2">Issued Offer Documents</h4>
@@ -11108,10 +11441,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                 <p className="text-[10px] text-slate-400 truncate mt-0.5">{letter.file_name}</p>
                               </div>
                             </div>
-                            <a 
-                              href={letter.file_url} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
+                            <a
+                              href={letter.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="text-slate-400 hover:text-primary shrink-0"
                             >
                               <ArrowSquareOut size={16} />
@@ -11126,10 +11459,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   <div className="bg-white border border-hairline rounded-2xl p-4.5 h-fit text-xs">
                     <h4 className="font-bold text-sm text-primary mb-4">Upload Offer / Receipt</h4>
                     <form onSubmit={handleUploadOfferLetter} className="space-y-4">
-                      
+
                       <div className="flex flex-col gap-1">
                         <label className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Document Type *</label>
-                        <select 
+                        <select
                           value={adminOfferType}
                           onChange={(e) => setAdminOfferType(e.target.value)}
                           className="px-3.5 py-2 border border-hairline rounded-xl bg-white text-xs text-slate-800 focus:outline-none cursor-pointer"
@@ -11144,7 +11477,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                       <div className="flex flex-col gap-1">
                         <label className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">File Attachment *</label>
-                        <input 
+                        <input
                           type="file"
                           required
                           onChange={(e) => e.target.files && setAdminOfferFile(e.target.files[0])}
@@ -11165,7 +11498,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               {/* TAB D: VISA STATUS */}
               {auditTab === "visa" && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  
+
                   {/* Left visa timeline visualization */}
                   <div className="md:col-span-2 space-y-4 bg-white border border-hairline p-5 rounded-2xl h-fit">
                     <h4 className="font-bold text-sm text-primary mb-4">Visa Progress Timeline</h4>
@@ -11193,13 +11526,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                         return (
                           <div key={step} className="relative z-10 flex items-start gap-3 text-left">
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                              isPassed 
-                                ? "bg-emerald-500 border-emerald-500 text-white" 
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${isPassed
+                                ? "bg-emerald-500 border-emerald-500 text-white"
                                 : isCurrent
-                                ? "bg-primary border-primary text-white scale-105"
-                                : "bg-white border-slate-200 text-slate-400"
-                            }`}>
+                                  ? "bg-primary border-primary text-white scale-105"
+                                  : "bg-white border-slate-200 text-slate-400"
+                              }`}>
                               {isPassed ? <Check size={10} weight="bold" /> : <span className="text-[9px] font-bold">{index + 1}</span>}
                             </div>
                             <div>
@@ -11216,10 +11548,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   <div className="bg-white border border-hairline rounded-2xl p-4.5 h-fit text-xs">
                     <h4 className="font-bold text-sm text-primary mb-4">Update Visa Milestone</h4>
                     <form onSubmit={handleUpdateVisaStatus} className="space-y-4">
-                      
+
                       <div className="flex flex-col gap-1">
                         <label className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Active Stage *</label>
-                        <select 
+                        <select
                           value={adminVisaStatus}
                           onChange={(e) => setAdminVisaStatus(e.target.value)}
                           className="px-3.5 py-2 border border-hairline rounded-xl bg-white text-xs text-slate-800 focus:outline-none cursor-pointer"
@@ -11235,11 +11567,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                       <div className="flex flex-col gap-1">
                         <label className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Milestone Notes</label>
-                        <textarea 
-                          rows={3} 
+                        <textarea
+                          rows={3}
                           value={adminVisaDetails}
                           onChange={(e) => setAdminVisaDetails(e.target.value)}
-                          placeholder="e.g. Scheduled for VFS Kathmandu at 10 AM." 
+                          placeholder="e.g. Scheduled for VFS Kathmandu at 10 AM."
                           className="px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none focus:border-primary resize-none bg-white"
                         />
                       </div>
@@ -11257,7 +11589,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               {/* TAB E: MESSAGING CHAT */}
               {auditTab === "chat" && (
                 <div className="bg-white border border-hairline rounded-2xl h-[450px] flex flex-col justify-between overflow-hidden">
-                  
+
                   {/* Messages container */}
                   <div className="flex-grow p-4 overflow-y-auto bg-slate-50/50 space-y-3 flex flex-col">
                     {auditMessages.length === 0 ? (
@@ -11266,28 +11598,25 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       auditMessages.map(msg => {
                         const isStudent = msg.sender_type === "student";
                         return (
-                          <div 
+                          <div
                             key={msg.id}
-                            className={`flex flex-col max-w-[75%] ${
-                              isStudent ? "self-start items-start" : "self-end items-end"
-                            }`}
+                            className={`flex flex-col max-w-[75%] ${isStudent ? "self-start items-start" : "self-end items-end"
+                              }`}
                           >
-                            <div className={`p-3 rounded-2xl text-[11px] leading-relaxed ${
-                              isStudent 
+                            <div className={`p-3 rounded-2xl text-[11px] leading-relaxed ${isStudent
                                 ? "bg-white border border-hairline/80 text-slate-800 rounded-bl-none shadow-sm"
                                 : "bg-primary text-white rounded-br-none"
-                            }`}>
+                              }`}>
                               <p className="whitespace-pre-wrap">{msg.message}</p>
                               {msg.attachment_url && (
-                                <a 
-                                  href={msg.attachment_url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer" 
-                                  className={`mt-2 p-1.5 rounded-lg flex items-center gap-1.5 text-[10px] border ${
-                                    isStudent 
+                                <a
+                                  href={msg.attachment_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`mt-2 p-1.5 rounded-lg flex items-center gap-1.5 text-[10px] border ${isStudent
                                       ? "bg-slate-50 border-hairline text-slate-600 hover:bg-slate-100"
                                       : "bg-white/10 border-white/20 text-white hover:bg-white/20"
-                                  }`}
+                                    }`}
                                 >
                                   <Paperclip size={12} />
                                   <span className="truncate max-w-[150px] font-bold">{msg.attachment_name}</span>
@@ -11322,23 +11651,22 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                   {/* Send Reply box */}
                   <form onSubmit={handleSendAdminReply} className="p-3.5 border-t border-hairline bg-white flex items-end gap-3.5">
-                    
+
                     {/* File Attachment selector */}
                     <div className="relative shrink-0">
-                      <label className={`w-9 h-9 rounded-full border border-hairline flex items-center justify-center cursor-pointer transition-colors ${
-                        adminReplyFile ? "bg-primary/10 border-primary/20 text-primary" : "text-slate-400 hover:text-primary hover:bg-slate-50"
-                      }`} title="Add Attachment">
+                      <label className={`w-9 h-9 rounded-full border border-hairline flex items-center justify-center cursor-pointer transition-colors ${adminReplyFile ? "bg-primary/10 border-primary/20 text-primary" : "text-slate-400 hover:text-primary hover:bg-slate-50"
+                        }`} title="Add Attachment">
                         <Paperclip size={16} />
-                        <input 
-                          type="file" 
-                          className="hidden" 
+                        <input
+                          type="file"
+                          className="hidden"
                           onChange={(e) => e.target.files && setAdminReplyFile(e.target.files[0])}
                           disabled={sendingReply}
                         />
                       </label>
                       {adminReplyFile && (
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           onClick={() => setAdminReplyFile(null)}
                           className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors"
                         >
@@ -11358,9 +11686,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                         value={adminReplyText}
                         onChange={(e) => setAdminReplyText(e.target.value)}
                         placeholder="Type counselor reply..."
-                        className={`w-full border border-hairline px-3.5 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs transition-all resize-none bg-white ${
-                          adminReplyFile ? "rounded-b-xl border-t-0" : "rounded-xl"
-                        }`}
+                        className={`w-full border border-hairline px-3.5 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-xs transition-all resize-none bg-white ${adminReplyFile ? "rounded-b-xl border-t-0" : "rounded-xl"
+                          }`}
                         disabled={sendingReply}
                       />
                     </div>
@@ -11406,7 +11733,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               {/* TAB G: SCHEDULE MEETINGS */}
               {auditTab === "meetings" && (
                 <div className="space-y-6">
-                  
+
                   {/* Meeting Counters */}
                   <div className="grid grid-cols-3 gap-4">
                     {[
@@ -11475,17 +11802,17 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                               meetingData: { title: meetingForm.title, scheduled_at: scheduledAt, meeting_link: meetingForm.meeting_link, meeting_type: meetingForm.meeting_type, duration_minutes: parseInt(meetingForm.duration_minutes) || 30 }
                             })
                           })
-                          .then(async (res) => {
-                            const result = await res.json();
-                            if (!res.ok || !result.success) {
-                              const errorMsg = result.error || "Email delivery failed";
-                              showToast(`⚠️ Meeting updated, but student email notification failed: ${errorMsg}`);
-                            }
-                          })
-                          .catch(err => {
-                            console.error("Meeting update email error:", err);
-                            showToast(`⚠️ Meeting updated, but student email notification failed: ${err.message}`);
-                          });
+                            .then(async (res) => {
+                              const result = await res.json();
+                              if (!res.ok || !result.success) {
+                                const errorMsg = result.error || "Email delivery failed";
+                                showToast(`⚠️ Meeting updated, but student email notification failed: ${errorMsg}`);
+                              }
+                            })
+                            .catch(err => {
+                              console.error("Meeting update email error:", err);
+                              showToast(`⚠️ Meeting updated, but student email notification failed: ${err.message}`);
+                            });
 
                           // Notification
                           await supabase.from("student_notifications").insert([{
@@ -11528,17 +11855,17 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                               meetingData: { title: meetingForm.title, scheduled_at: scheduledAt, meeting_link: meetingForm.meeting_link, meeting_type: meetingForm.meeting_type, duration_minutes: parseInt(meetingForm.duration_minutes) || 30 }
                             })
                           })
-                          .then(async (res) => {
-                            const result = await res.json();
-                            if (!res.ok || !result.success) {
-                              const errorMsg = result.error || "Email delivery failed";
-                              showToast(`⚠️ Meeting scheduled, but student email notification failed: ${errorMsg}`);
-                            }
-                          })
-                          .catch(err => {
-                            console.error("Meeting schedule email error:", err);
-                            showToast(`⚠️ Meeting scheduled, but student email notification failed: ${err.message}`);
-                          });
+                            .then(async (res) => {
+                              const result = await res.json();
+                              if (!res.ok || !result.success) {
+                                const errorMsg = result.error || "Email delivery failed";
+                                showToast(`⚠️ Meeting scheduled, but student email notification failed: ${errorMsg}`);
+                              }
+                            })
+                            .catch(err => {
+                              console.error("Meeting schedule email error:", err);
+                              showToast(`⚠️ Meeting scheduled, but student email notification failed: ${err.message}`);
+                            });
 
                           // Notification
                           await supabase.from("student_notifications").insert([{
@@ -11770,7 +12097,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                                       fetch("/api/send-meeting-notification", {
                                         method: "POST",
-                                        headers: { 
+                                        headers: {
                                           "Content-Type": "application/json",
                                           "Authorization": `Bearer ${getAdminCredentials()}`
                                         },
@@ -11780,17 +12107,17 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                           meetingData: { title: meeting.title, scheduled_at: meeting.scheduled_at }
                                         })
                                       })
-                                      .then(async (res) => {
-                                        const result = await res.json();
-                                        if (!res.ok || !result.success) {
-                                          const errorMsg = result.error || "Email delivery failed";
-                                          showToast(`⚠️ Meeting cancelled, but student email notification failed: ${errorMsg}`);
-                                        }
-                                      })
-                                      .catch(err => {
-                                        console.error("Meeting cancel email error:", err);
-                                        showToast(`⚠️ Meeting cancelled, but student email notification failed: ${err.message}`);
-                                      });
+                                        .then(async (res) => {
+                                          const result = await res.json();
+                                          if (!res.ok || !result.success) {
+                                            const errorMsg = result.error || "Email delivery failed";
+                                            showToast(`⚠️ Meeting cancelled, but student email notification failed: ${errorMsg}`);
+                                          }
+                                        })
+                                        .catch(err => {
+                                          console.error("Meeting cancel email error:", err);
+                                          showToast(`⚠️ Meeting cancelled, but student email notification failed: ${err.message}`);
+                                        });
 
                                       await supabase.from("student_notifications").insert([{
                                         student_id: selectedStudent.id,
@@ -11821,12 +12148,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               {auditTab === "notifications" && (
                 <div className="space-y-6 text-left">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    
+
                     {/* Left: Preferences Card */}
                     <div className="md:col-span-1 space-y-4">
                       <Card className="p-5">
                         <h4 className="font-bold text-sm text-primary mb-4 border-b border-hairline pb-2">Student Preferences</h4>
-                        
+
                         {selectedStudentPrefs ? (
                           <div className="space-y-4">
                             <div className="flex items-center justify-between">
@@ -11895,7 +12222,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       {/* Manual Dispatch Center */}
                       <Card className="p-5 space-y-4">
                         <h4 className="font-bold text-sm text-primary border-b border-hairline pb-2">Manual Dispatch Triggers</h4>
-                        
+
                         <div className="space-y-3">
                           <div>
                             <p className="text-[10px] text-slate-400 font-medium mb-1.5 uppercase tracking-wider">Document Checklist Alert</p>
@@ -11905,7 +12232,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                 try {
                                   const res = await fetch("/api/send-student-notification", {
                                     method: "POST",
-                                    headers: { 
+                                    headers: {
                                       "Content-Type": "application/json",
                                       "Authorization": `Bearer ${getAdminCredentials()}`
                                     },
@@ -11947,7 +12274,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                       try {
                                         const res = await fetch("/api/send-student-notification", {
                                           method: "POST",
-                                          headers: { 
+                                          headers: {
                                             "Content-Type": "application/json",
                                             "Authorization": `Bearer ${getAdminCredentials()}`
                                           },
@@ -11986,7 +12313,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     <div className="md:col-span-2 space-y-4">
                       <Card className="p-5">
                         <h4 className="font-bold text-sm text-primary mb-4 border-b border-hairline pb-2">Student Notification Logs</h4>
-                        
+
                         {selectedStudentHistory.length === 0 ? (
                           <p className="text-slate-400 py-12 text-center border border-dashed border-hairline bg-slate-50/50 rounded-2xl">
                             No notifications dispatched to this student profile yet.
@@ -12006,9 +12333,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                 {selectedStudentHistory.map((h) => (
                                   <tr key={h.id} className="hover:bg-slate-50/50 transition-colors">
                                     <td className="px-3.5 py-2.5">
-                                      <span className={`inline-block text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full border ${
-                                        h.status === "sent" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-red-50 text-red-600 border-red-100"
-                                      }`}>
+                                      <span className={`inline-block text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full border ${h.status === "sent" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-red-50 text-red-600 border-red-100"
+                                        }`}>
                                         {h.status}
                                       </span>
                                     </td>
@@ -12057,7 +12383,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <CardTitle>Issue Referral Reward</CardTitle>
                 <CardDescription>Approve a cashback/cash reward for the referrer</CardDescription>
               </div>
-              <button 
+              <button
                 onClick={() => { setIsRewardModalOpen(false); setSelectedReferral(null); }}
                 className="p-1 rounded-full hover:bg-slate-100 transition-colors text-slate-500 cursor-pointer"
               >
@@ -12079,8 +12405,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
                 <div className="space-y-1.5 text-slate-700">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Reward Amount (NPR)</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     required
                     min={1}
                     value={rewardAmount}
@@ -12090,15 +12416,15 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 </div>
 
                 <div className="flex gap-3 justify-end pt-2">
-                  <Button 
-                    type="button" 
+                  <Button
+                    type="button"
                     variant="secondary"
                     onClick={() => { setIsRewardModalOpen(false); setSelectedReferral(null); }}
                   >
                     Cancel
                   </Button>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={issuingReward}
                     className="flex items-center gap-1.5"
                   >

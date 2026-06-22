@@ -707,6 +707,95 @@ ALTER TABLE public.career_experts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow public select career_experts" ON public.career_experts FOR SELECT USING (true);
 CREATE POLICY "Allow public write career_experts" ON public.career_experts FOR ALL USING (true) WITH CHECK (true);
 
+----------------------------------------------------
+-- 10. Eligibility Calculator & Conversion Tracking
+----------------------------------------------------
+
+-- Eligibility Leads
+CREATE TABLE IF NOT EXISTS public.eligibility_leads (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    email TEXT NOT NULL,
+    qualification TEXT NOT NULL,
+    percentage NUMERIC NOT NULL,
+    budget NUMERIC NOT NULL,
+    currency TEXT NOT NULL,
+    preferred_country TEXT NOT NULL,
+    preferred_course TEXT NOT NULL,
+    test_type TEXT,
+    test_score NUMERIC,
+    intake TEXT NOT NULL,
+    lead_score TEXT CHECK (lead_score IN ('Hot', 'Warm', 'Cold')),
+    lead_score_value INTEGER NOT NULL,
+    priority TEXT CHECK (priority IN ('High', 'Medium', 'Low')),
+    utm_source TEXT,
+    utm_medium TEXT,
+    utm_campaign TEXT,
+    referrer TEXT,
+    referral_code TEXT REFERENCES public.students(referral_code) ON DELETE SET NULL,
+    assigned_counselor_id UUID REFERENCES public.counselors(id) ON DELETE SET NULL,
+    lead_status TEXT DEFAULT 'New' CHECK (lead_status IN ('New', 'Contacted', 'Qualified', 'Unqualified', 'Converted')),
+    first_contacted_at TIMESTAMP WITH TIME ZONE,
+    response_time_minutes INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.eligibility_leads ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public insert on eligibility_leads" ON public.eligibility_leads FOR INSERT WITH CHECK (true);
+CREATE POLICY "Counselors can view all eligibility_leads" ON public.eligibility_leads FOR SELECT USING (auth.uid() IN (SELECT auth_user_id FROM public.counselors WHERE is_active = true));
+CREATE POLICY "Counselors can manage all eligibility_leads" ON public.eligibility_leads FOR ALL USING (auth.uid() IN (SELECT auth_user_id FROM public.counselors WHERE is_active = true)) WITH CHECK (auth.uid() IN (SELECT auth_user_id FROM public.counselors WHERE is_active = true));
+
+-- Eligibility Matches
+CREATE TABLE IF NOT EXISTS public.eligibility_matches (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    lead_id UUID REFERENCES public.eligibility_leads(id) ON DELETE CASCADE NOT NULL,
+    university_id UUID REFERENCES public.universities(id) ON DELETE CASCADE NOT NULL,
+    university_name_snapshot TEXT NOT NULL,
+    match_score INTEGER NOT NULL,
+    admission_chance TEXT CHECK (admission_chance IN ('Safe', 'Target', 'Ambitious')) NOT NULL,
+    scholarship_estimate TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.eligibility_matches ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public insert on eligibility_matches" ON public.eligibility_matches FOR INSERT WITH CHECK (true);
+CREATE POLICY "Counselors can view eligibility_matches" ON public.eligibility_matches FOR SELECT USING (auth.uid() IN (SELECT auth_user_id FROM public.counselors WHERE is_active = true));
+CREATE POLICY "Counselors can manage eligibility_matches" ON public.eligibility_matches FOR ALL USING (auth.uid() IN (SELECT auth_user_id FROM public.counselors WHERE is_active = true)) WITH CHECK (auth.uid() IN (SELECT auth_user_id FROM public.counselors WHERE is_active = true));
+
+-- Eligibility Preview Logs
+CREATE TABLE IF NOT EXISTS public.eligibility_preview_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id TEXT NOT NULL,
+    event_type TEXT NOT NULL CHECK (event_type IN ('preview_viewed', 'results_unlocked')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.eligibility_preview_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public insert on eligibility_preview_logs" ON public.eligibility_preview_logs FOR INSERT WITH CHECK (true);
+CREATE POLICY "Counselors can view eligibility_preview_logs" ON public.eligibility_preview_logs FOR SELECT USING (auth.uid() IN (SELECT auth_user_id FROM public.counselors WHERE is_active = true));
+
+-- Shortlist Requests Table
+CREATE TABLE IF NOT EXISTS public.shortlist_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    lead_id UUID REFERENCES public.eligibility_leads(id) ON DELETE CASCADE NOT NULL,
+    counselor_id UUID REFERENCES public.counselors(id) ON DELETE SET NULL,
+    status TEXT NOT NULL CHECK (status IN ('Requested', 'In Review', 'Generated', 'Delivered')) DEFAULT 'Requested',
+    pdf_url TEXT,
+    requested_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    generated_at TIMESTAMP WITH TIME ZONE,
+    delivered_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.shortlist_requests ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public insert on shortlist_requests" ON public.shortlist_requests FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public select on shortlist_requests" ON public.shortlist_requests FOR SELECT USING (true);
+CREATE POLICY "Allow public update on shortlist_requests" ON public.shortlist_requests FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Counselors can manage shortlist_requests" ON public.shortlist_requests FOR ALL USING (auth.uid() IN (SELECT auth_user_id FROM public.counselors WHERE is_active = true)) WITH CHECK (auth.uid() IN (SELECT auth_user_id FROM public.counselors WHERE is_active = true));
+
+
 
 
 

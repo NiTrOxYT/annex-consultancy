@@ -76,6 +76,13 @@ export async function GET(request: Request) {
         .eq("lead_id", id)
         .order("created_at", { ascending: false });
 
+      const { data: shortlistRequest } = await db
+        .from("shortlist_requests")
+        .select("*")
+        .eq("lead_id", id)
+        .order("created_at", { ascending: false })
+        .maybeSingle();
+
       return NextResponse.json({
         success: true,
         lead,
@@ -83,7 +90,8 @@ export async function GET(request: Request) {
         reminders: reminders || [],
         assignments: assignments || [],
         activities: activities || [],
-        notes: notes || []
+        notes: notes || [],
+        shortlistRequest: shortlistRequest || null
       });
     }
 

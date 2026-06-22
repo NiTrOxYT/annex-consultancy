@@ -38,6 +38,7 @@ Supabase PostgreSQL database schemas:
 * `public.eligibility_activities` — Audit trail logs for lead actions.
 * `public.eligibility_notes` — Counselor timeline notes on leads.
 * `public.universities` — Main repository of institutions with matching criteria parameters (`min_percentage`, `min_ielts`, `min_pte`, `min_toefl`, `annual_fees`, `degree_level`, `scholarship_available`, `featured`, `published`).
+* `public.shortlist_requests` — Database ledger tracking premium counselor shortlist requests, matching leads with counselors across statuses (`Requested`, `In Review`, `Generated`, `Delivered`).
 
 
 ---
@@ -49,6 +50,8 @@ Supabase PostgreSQL database schemas:
 * `/api/admin/eligibility-analytics` (GET) — Funnel counts, average/fastest/slowest response times, counselor workloads, and lead source quality metrics.
 * `/api/admin/followups-today` (GET) — Returns due and overdue outreach tasks.
 * `/api/referrals` & `/api/admin/referrals` — Standard referral checks and payouts approvals.
+* `/api/eligibility/shortlist-request` (POST) — Submits student profile for shortlist review.
+* `/api/admin/shortlist-requests` (GET/POST/PATCH) — Loads student shortlist queue, handles PDF generation uploads to private storage bucket, and tracks delivery status updates.
 
 ---
 
@@ -61,7 +64,9 @@ The admin portal dashboard contains:
 * **Bulk Action Controls:** Dropdowns to bulk-assign counselors or bulk-edit status of selected leads.
 * **Export CSV Control:** Generates downloadable `Annex_Eligibility_Leads_YYYY-MM-DD.csv` for selected or filtered leads.
 * **Daily Follow-Up Queue:** Action lists showing overdue, today, and tomorrow follow-up checklists for the counselor.
-* **Expandable Lead Detail Card:** Integrates academic details, university matches, notes adding, checklist reminders toggling, assignment transfers, and activity timelines.
+* **Expandable Lead Detail Card:** Integrates academic details, university matches, notes adding, checklist reminders toggling, assignment transfers, activity timelines, and shortlist review controls.
+* **Shortlist Requests Tab:** Dedicated queue displaying student profile parameters, counselor allocations, requested date, and status tags, with responsive detail view drawer for custom counselor workflow operations.
+* **Shortlist Analytics Panel:** Renders total requested, total generated, total delivered, delivery rates, consultation conversion percentage, and top requested destinations/courses graphs.
 
 ---
 
@@ -69,11 +74,22 @@ The admin portal dashboard contains:
 The student portal dashboard contains:
 * **Calculator Wizard (`/study-abroad-eligibility`):** Step-by-step profile inputs (Destination -> Academics -> Budget -> Lead Capture -> Results) revealing matches only after lead capture.
 * **Matches Results Display:** Renders Top Match Score, Safe/Target/Ambitious chance badges, and direct messaging CTAs.
+* **Counselor Shortlist Request:** Integrates Step 5 "Request Counselor-Reviewed Shortlist" CTA card, rendering assigned counselor's contact information (Name, Phone, WhatsApp) and expected delivery window once submitted.
 * **Referrals Tab:** Controls for unique code/links copying, stats summary, and payout history.
 
 ---
 
-## 7. Features
+## 7. Results Preview & Conversion Optimization
+To increase lead conversion rates, the Study Abroad Eligibility Calculator uses a "value first" results preview strategy on Step 4 (Contact Capture Page):
+* **UX Flow & Curiosity Teaser:** After completing step 3, the matching engine runs in `previewOnly` mode, returning real matching university snapshots. In Step 4, users see a **✓ Profile Evaluated** badge revealing the count of matching universities.
+* **Teaser Card Treatment:** Matches are displayed in a blurred, non-interactive visual teaser (`blur-[1px] opacity-60`). University names are masked using a word-masking algorithm (e.g. `University of Milan` -> `U********* of M****`), and match scores, chances, and scholarships are replaced with lock symbols (`🔒 Hidden`).
+* **Premium Unlock Overlay:** A lock overlay outlines the premium features unlocked upon form submission.
+* **Mobile Responsiveness:** To maintain form visibility above the fold, mobile layouts collapse blurred teasers under an accordion panel.
+* **Conversion Analytics:** Firing unique session IDs tracks `preview_viewed` on Step 4 view and `results_unlocked` on submit, calculating the **Preview Conversion Rate** in the Admin Dashboard funnel block.
+
+---
+
+## 8. Features
 * **Duplicate Lead Protection:** Updates current lead profiles and assessments if submitted within a 30-day window instead of polluting CRM.
 * **Least-loaded Router:** Routes new leads to active counselors with the lowest active student count.
 * **Referrals Auto-Sync:** Automated trigger functions updating referral status as referred student progresses.
@@ -113,6 +129,8 @@ The student portal dashboard contains:
 * **2026-06-22T03:33:00+05:30:** Configured Open Graph, Twitter, Canonical, Robots, and metadataBase parameters in the root layout (`src/app/layout.tsx`). Aligned all favicon/icon paths under `public/` and `src/app/` to point to `public/branding/annex-logo.png`. Audited metadata and deleted conflicting `src/app/opengraph-image.png`. Verified compilation and production builds cleanly.
 * **2026-06-22T03:39:00+05:30:** Redesigned and rebuilt the navigation bar (`src/components/navigation.tsx`) based on business value page classification. Consolidated 11 top-level links/buttons into 4 clean dropdowns (mega menus for Destinations and Programs, standard dropdown for Resources, and unified Portals logins) with clear CTA conversion priorities: Primary Revenue (Book Consultation solid button) and Lead Generation (Check Eligibility outline gold button). Verified compilation and production builds cleanly.
 * **2026-06-22T16:04:00+05:30:** Rebuilt the university matching engine to make `public.universities` the single source of truth. Added migration `011_university_matching_criteria.sql` to introduce numeric criteria columns (`min_percentage`, `min_ielts`, `min_pte`, `min_toefl`, `annual_fees`, `degree_level`, `scholarship_available`) and corresponding indexes. Upgraded the backend eligibility checking API (`/api/eligibility/check`) to run dynamic matches using a 100-point weighted scoring engine with regex fallbacks. Rebuilt Admin CMS modal in `src/app/admin/page.tsx` with inputs for all new parameters. Refactored `<TopCollegesSection>` in `src/components/top-colleges.tsx` to remove fallback arrays and support `featuredOnly`, `limit`, and `showControls` properties, and integrated the featured colleges grid on the homepage. Verified compilation and production builds cleanly.
+* **2026-06-22T16:21:00+05:30:** Implemented Results Preview (Blurred Teaser) conversion optimization. Created SQL migration `012_eligibility_preview_analytics.sql` for `eligibility_preview_logs` table, updated `schema.sql`, added `/api/eligibility/track` tracking route, updated `/api/eligibility/check` route with `previewOnly` bypass mode, refactored `/api/admin/eligibility-analytics` to calculate Preview Viewed -> Submission conversion rates, updated calculator component `src/components/EligibilityCalculator.tsx` to render two-column desktop/accordion mobile previews, and updated admin dashboard funnel stats. Verified TypeScript compilation and production builds cleanly.
+* **2026-06-22T22:15:00+05:30:** Implemented Counselor-Reviewed Shortlist System. Replaced calculator Step 5 CTA with "Request Counselor-Reviewed Shortlist", and updated the Success UI to explicitly display Name, Phone, and WhatsApp fields of the assigned counselor. Built a dedicated "Shortlist Requests" sub-tab in the counselor dashboard supporting filters, row drawers, PDF generation actions (saved to storage bucket), and "Mark Delivered" status controls. Created a Shortlist Performance metrics analytics dashboard grid displaying total requests, generated count, delivered count, delivery rate, consultation conversion rate, and top requested country/course distribution tables. Verified that TypeScript compile and production builds run successfully.
 
 
 
