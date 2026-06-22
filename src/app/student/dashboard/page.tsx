@@ -2448,7 +2448,7 @@ export default function StudentDashboard() {
                 </div>
                 <div>
                   <span className="text-3xl font-extrabold font-display text-primary leading-none block">{referralStats.total}</span>
-                  <span className="text-[10px] text-slate-400 font-semibold block mt-1.5">Leads submitted</span>
+                  <span className="text-[10px] text-slate-400 font-semibold block mt-1.5">Referrals submitted</span>
                 </div>
               </Card>
 
@@ -2499,7 +2499,7 @@ export default function StudentDashboard() {
                 {/* Connecting Line */}
                 <div className="absolute top-5 left-[8%] right-[8%] h-0.5 bg-slate-100 z-0" />
                 {[
-                  { label: "Lead Submitted", desc: "Friend registers online via referral link" },
+                  { label: "Referral Registered", desc: "Friend registers online via referral link" },
                   { label: "Counseling", desc: "Annex counselor schedules admissions review" },
                   { label: "Application", desc: "Shortlisting and admissions files are submitted" },
                   { label: "Visa Processing", desc: "Visa application lodges and decisions complete" },
@@ -2519,7 +2519,7 @@ export default function StudentDashboard() {
               {/* Mobile Timeline */}
               <div className="md:hidden space-y-6 relative pl-6 border-l-2 border-slate-150 ml-4 py-2">
                 {[
-                  { label: "Lead Submitted", desc: "Friend registers online via referral link" },
+                  { label: "Referral Registered", desc: "Friend registers online via referral link" },
                   { label: "Counseling", desc: "Annex counselor schedules admissions review" },
                   { label: "Application", desc: "Shortlisting and admissions files are submitted" },
                   { label: "Visa Processing", desc: "Visa application lodges and decisions complete" },
@@ -2568,7 +2568,7 @@ export default function StudentDashboard() {
                       className="bg-transparent outline-none text-[10px] font-bold uppercase cursor-pointer text-slate-600 border-none p-0"
                     >
                       <option value="All">All Stages</option>
-                      <option value="lead">Lead</option>
+                      <option value="lead">Registered</option>
                       <option value="contacted">Counseling</option>
                       <option value="application_started">Application</option>
                       <option value="offer_received">Offer Received</option>
@@ -2607,7 +2607,7 @@ export default function StudentDashboard() {
                         {filteredReferrals.map((ref) => {
                           const getStageLabel = (status: string) => {
                             const mapping: { [key: string]: string } = {
-                              lead: "Lead Submitted",
+                              lead: "Referral Registered",
                               contacted: "Admissions Counseling",
                               application_started: "Application Started",
                               offer_received: "Offer Letter Received",

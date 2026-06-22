@@ -302,7 +302,7 @@ function CalculatorContent() {
       <div className="text-center mb-8">
         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-gold/10 text-gold mb-3">
           <Sparkle size={14} className="animate-pulse" />
-          Annex Consultancy Lead Engine
+          Annex Consultancy Matching Engine
         </span>
         <h1 className="text-3xl md:text-4xl font-bold text-primary tracking-tight font-display">
           Study Abroad Eligibility Calculator
@@ -622,7 +622,7 @@ function CalculatorContent() {
                     <CheckCircle size={20} className="text-emerald-500 shrink-0 mt-0.5" />
                     <div className="text-xs text-slate-600 leading-relaxed">
                       <span className="font-bold text-primary block mb-0.5">Profile Evaluation Computed!</span>
-                      We have mapped your inputs. Submit your contact details below to log your lead record and instantly reveal your customized university matching results dashboard.
+                      We have mapped your inputs. Submit your contact details below to save your profile and instantly reveal your customized university matching results dashboard.
                     </div>
                   </div>
 
@@ -888,7 +888,7 @@ function CalculatorContent() {
                       {results.matchScore}%
                     </div>
                     <span className="inline-block text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium font-mono-data">
-                      {results.leadScore} Lead Profile
+                      {results.leadScore} Profile
                     </span>
                   </div>
                 </div>

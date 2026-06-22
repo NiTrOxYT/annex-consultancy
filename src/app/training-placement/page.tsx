@@ -154,7 +154,7 @@ const testimonials = [
 const faqs = [
   {
     question: "How do I access the Career Portal?",
-    answer: "Once you enroll in any of our services and your payment or lead is approved by our administration, we will set up your temporary credentials and email them to you. You can then log in via our /career-portal."
+    answer: "Once you enroll in any of our services and your payment or enrollment is approved by our administration, we will set up your temporary credentials and email them to you. You can then log in via our /career-portal."
   },
   {
     question: "What makes a resume ATS-friendly?",
@@ -465,7 +465,7 @@ export default function TrainingPlacementPage() {
                   Tailored micro career services.
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Choose the exact services you need. Select an option to register as a lead and activate your dashboard.
+                  Choose the exact services you need. Select an option to enroll and activate your dashboard.
                 </p>
               </div>
 
@@ -662,7 +662,7 @@ export default function TrainingPlacementPage() {
                   Structured placement methodology.
                 </h2>
                 <p className="text-sm text-slate-500">
-                  How we guide you from lead registration to career success.
+                  How we guide you from enrollment to career success.
                 </p>
               </div>
 
@@ -673,7 +673,7 @@ export default function TrainingPlacementPage() {
                   </div>
                   <CardTitle className="text-lg mb-2">1. Registration & Assessment</CardTitle>
                   <CardDescription>
-                    Apply online and complete your lead profile. Your consultant reviews your current credentials and assigns personalized goals.
+                    Apply online and complete your onboarding profile. Your consultant reviews your current credentials and assigns personalized goals.
                   </CardDescription>
                 </Card>
 
@@ -867,7 +867,7 @@ export default function TrainingPlacementPage() {
                       disabled={isSubmittingLead}
                       className="w-full py-3 mt-4"
                     >
-                      {isSubmittingLead ? "Registering Lead..." : "Submit Enrollment Application"}
+                      {isSubmittingLead ? "Submitting Application..." : "Submit Enrollment Application"}
                     </Button>
                   </form>
                 </>
