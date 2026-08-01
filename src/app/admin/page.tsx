@@ -2250,6 +2250,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     }
   }, [isAuthenticated, activeTab, fetchReferralsData]);
 
+  React.useEffect(() => {
+    if (activeTab === "cms") {
+      loadBanners();
+    }
+  }, [activeTab, loadBanners]);
+
   const handleUpdateReferralStatus = async (referralId: string, newStatus: string) => {
     setUpdatingReferralStatus(referralId);
     try {
