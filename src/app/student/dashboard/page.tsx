@@ -470,6 +470,8 @@ export default function StudentDashboard() {
               title: "Admissions Open: Study in India 2026",
               subtitle: "Discover top-tier Indian universities, merit scholarships & hassle-free applications.",
               image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
+              desktop_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
+              mobile_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
               link_url: "/study-in-india",
               button_text: "Explore India Universities",
               target_destination: "India",
@@ -1098,8 +1100,10 @@ export default function StudentDashboard() {
 
               if (!activeBanner || bannerDismissed) return null;
 
-              const desktopImg = activeBanner.desktop_image_url || activeBanner.image_url;
-              const mobileImg = activeBanner.mobile_image_url || desktopImg;
+              const rawDesktop = (activeBanner.desktop_image_url || activeBanner.image_url || "").trim();
+              const rawMobile = (activeBanner.mobile_image_url || "").trim();
+              const desktopImg = rawDesktop || rawMobile;
+              const mobileImg = rawMobile || desktopImg;
 
               const BannerWrapper = activeBanner.link_url ? 'a' : 'div';
               const wrapperProps = activeBanner.link_url ? {
@@ -1111,18 +1115,20 @@ export default function StudentDashboard() {
               return (
                 <div className="relative rounded-3xl overflow-hidden shadow-sm border border-hairline/80 group animate-fade-in">
                   <BannerWrapper {...(wrapperProps as any)} className="block relative w-full overflow-hidden bg-slate-900">
-                    {/* Desktop PC Banner Image */}
-                    <img 
-                      src={desktopImg} 
-                      alt={`Banner ${activeBanner.target_destination || "India"}`} 
-                      className="hidden md:block w-full h-auto max-h-[300px] object-cover transition-transform duration-700 group-hover:scale-102"
-                    />
-                    {/* Mobile Banner Image */}
-                    <img 
-                      src={mobileImg} 
-                      alt={`Banner ${activeBanner.target_destination || "India"}`} 
-                      className="block md:hidden w-full h-auto max-h-[260px] object-cover transition-transform duration-700 group-hover:scale-102"
-                    />
+                    <picture className="block w-full">
+                      {desktopImg && <source media="(min-width: 768px)" srcSet={desktopImg} />}
+                      <img 
+                        src={mobileImg || desktopImg} 
+                        alt={`Banner ${activeBanner.target_destination || "India"}`} 
+                        className="w-full h-auto max-h-[300px] object-cover transition-transform duration-700 group-hover:scale-102"
+                        onError={(e) => {
+                          const target = e.currentTarget as HTMLImageElement;
+                          if (desktopImg && target.src !== desktopImg) {
+                            target.src = desktopImg;
+                          }
+                        }}
+                      />
+                    </picture>
                   </BannerWrapper>
 
                   {/* Dismiss Button */}

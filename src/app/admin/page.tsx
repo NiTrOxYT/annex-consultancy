@@ -678,12 +678,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       } else {
         const defaultBanner = [{
           id: "default-banner-1",
-          title: "Admissions Open: Study in India 2026",
-          subtitle: "Discover top-tier Indian universities, merit scholarships & hassle-free applications.",
-          image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
-          link_url: "/study-in-india",
-          button_text: "Explore India Universities",
           target_destination: "India",
+          image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
+          desktop_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
+          mobile_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
+          link_url: "/study-in-india",
           is_active: true,
           created_at: new Date().toISOString()
         }];
