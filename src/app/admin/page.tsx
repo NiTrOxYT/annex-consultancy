@@ -711,9 +711,13 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       const randomName = `banner_${type}_${Math.random().toString(36).substring(2, 12)}.${fileExt}`;
       const filePath = `cms_banners/${randomName}`;
       
+      const fileBuffer = await file.arrayBuffer();
       const { error: uploadErr } = await supabase.storage
         .from("student-files")
-        .upload(filePath, file);
+        .upload(filePath, fileBuffer, {
+          contentType: file.type || "image/jpeg",
+          upsert: true
+        });
 
       if (uploadErr) throw uploadErr;
 
