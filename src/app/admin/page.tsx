@@ -661,40 +661,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     is_active: true
   });
 
-  const loadBanners = React.useCallback(async () => {
-    setLoadingBanners(true);
-    try {
-      const { data, error } = await supabase
-        .from("cms_banners")
-        .select("*")
-        .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      setBanners(data || []);
-    } catch (err: any) {
-      const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
-      if (local) {
-        setBanners(JSON.parse(local));
-      } else {
-        const defaultBanner = [{
-          id: "default-banner-1",
-          target_destination: "India",
-          image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
-          desktop_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
-          mobile_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
-          link_url: "/study-in-india",
-          is_active: true,
-          created_at: new Date().toISOString()
-        }];
-        setBanners(defaultBanner);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("annex_cms_banners", JSON.stringify(defaultBanner));
-        }
-      }
-    } finally {
-      setLoadingBanners(false);
-    }
-  }, []);
 
   const handleUploadImageFile = async (e: React.ChangeEvent<HTMLInputElement>, type: "desktop" | "mobile") => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -740,6 +707,52 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     }
   };
 
+  const loadBanners = React.useCallback(async () => {
+    setLoadingBanners(true);
+    try {
+      const { data, error } = await supabase
+        .from("cms_banners")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        setBanners(data);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("annex_cms_banners", JSON.stringify(data));
+        }
+      } else {
+        const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
+        if (local && JSON.parse(local).length > 0) {
+          setBanners(JSON.parse(local));
+        } else {
+          const defaultBanner = [{
+            id: "default-banner-1",
+            target_destination: "India",
+            image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
+            desktop_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
+            mobile_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
+            link_url: "/study-in-india",
+            is_active: true,
+            created_at: new Date().toISOString()
+          }];
+          setBanners(defaultBanner);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("annex_cms_banners", JSON.stringify(defaultBanner));
+          }
+        }
+      }
+    } catch (err: any) {
+      const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
+      if (local) {
+        setBanners(JSON.parse(local));
+      }
+    } finally {
+      setLoadingBanners(false);
+    }
+  }, []);
+
   const handleSaveBanner = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bannerForm.desktop_image_url && !bannerForm.mobile_image_url) {
@@ -751,6 +764,17 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       desktop_image_url: bannerForm.desktop_image_url || bannerForm.mobile_image_url,
       mobile_image_url: bannerForm.mobile_image_url || bannerForm.desktop_image_url
     };
+    
+    // Update local state and localStorage instantly
+    const updatedList = editingBanner 
+      ? banners.map(b => b.id === editingBanner.id ? { ...b, ...payload, updated_at: new Date().toISOString() } : b)
+      : [{ id: `banner-${Date.now()}`, ...payload, created_at: new Date().toISOString() }, ...banners];
+    
+    setBanners(updatedList);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("annex_cms_banners", JSON.stringify(updatedList));
+    }
+    
     try {
       if (editingBanner) {
         const { error } = await supabase
@@ -768,13 +792,6 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       setIsBannerModalOpen(false);
       await loadBanners();
     } catch (err: any) {
-      const updated = editingBanner 
-        ? banners.map(b => b.id === editingBanner.id ? { ...b, ...payload, updated_at: new Date().toISOString() } : b)
-        : [{ id: `banner-${Date.now()}`, ...payload, created_at: new Date().toISOString() }, ...banners];
-      setBanners(updated);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("annex_cms_banners", JSON.stringify(updated));
-      }
       showToast(editingBanner ? "Banner updated (local)" : "Banner created (local)");
       setIsBannerModalOpen(false);
     }
