@@ -91,18 +91,18 @@ export function HomeCmsBanner() {
   };
 
   return (
-    <section className="w-full max-w-7xl mx-auto px-6 lg:px-8 pt-28 pb-4 animate-fade-in">
-      <div className="relative rounded-2xl md:rounded-3xl overflow-hidden shadow-sm border border-hairline/80 group bg-slate-950">
+    <section className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-2 animate-fade-in">
+      <div className="relative rounded-2xl md:rounded-3xl overflow-hidden shadow-md border border-hairline/80 group bg-white">
         <div 
           onClick={handleBannerClick}
-          className="block relative w-full overflow-hidden bg-slate-950 cursor-pointer"
+          className="block relative w-full overflow-hidden bg-white cursor-pointer"
         >
-          {/* Desktop Banner (Aspect Ratio 4:1 - 1200x300, NO CROP) */}
-          <div className="hidden md:block w-full aspect-[4/1] max-h-[300px] relative bg-slate-950">
+          {/* Desktop Banner (Aspect Ratio 4:1 - Full Width 1200x300 / 1600x400) */}
+          <div className="hidden md:block w-full aspect-[4/1] max-h-[360px] relative bg-white">
             <img 
               src={desktopImg} 
               alt="Promotional Banner" 
-              className="w-full h-full object-contain object-center rounded-2xl md:rounded-3xl"
+              className="w-full h-full object-cover object-center rounded-2xl md:rounded-3xl"
               onError={(e) => {
                 e.currentTarget.onerror = null;
                 if (mobileImg) e.currentTarget.src = mobileImg;
@@ -110,12 +110,12 @@ export function HomeCmsBanner() {
             />
           </div>
 
-          {/* Mobile Banner (Aspect Ratio 2:1 - 600x300, NO CROP) */}
-          <div className="block md:hidden w-full aspect-[2/1] max-h-[300px] relative bg-slate-950">
+          {/* Mobile Banner (Aspect Ratio 2:1 - Full Width 600x300 / 800x400) */}
+          <div className="block md:hidden w-full aspect-[2/1] max-h-[300px] relative bg-white">
             <img 
               src={mobileImg} 
               alt="Promotional Banner Mobile" 
-              className="w-full h-full object-contain object-center rounded-2xl"
+              className="w-full h-full object-cover object-center rounded-2xl"
               onError={(e) => {
                 e.currentTarget.onerror = null;
                 if (desktopImg) e.currentTarget.src = desktopImg;
@@ -127,7 +127,7 @@ export function HomeCmsBanner() {
         {/* Close / Dismiss Button */}
         <button
           onClick={handleDismiss}
-          className="absolute top-3 right-3 p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white/90 hover:text-white backdrop-blur-md transition-colors cursor-pointer z-30 shadow-md border border-white/10"
+          className="absolute top-3 right-3 p-1.5 rounded-full bg-black/50 hover:bg-black/80 text-white backdrop-blur-md transition-colors cursor-pointer z-30 shadow-md border border-white/20"
           title="Dismiss Banner"
         >
           <X size={16} weight="bold" />
