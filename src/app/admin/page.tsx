@@ -8086,17 +8086,20 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                             <tr key={ref.id} className="hover:bg-slate-50/50 transition-colors">
                               <td className="px-6 py-4.5">
                                 <p className="font-bold text-primary">{ref.referred_name}</p>
-                                <p className="text-[10px] text-slate-400">{ref.referred_email}</p>
-                                {ref.referred_phone && <p className="text-[10px] text-slate-400">{ref.referred_phone}</p>}
+                                {ref.referred_email && <p className="text-[10px] text-slate-400">{ref.referred_email}</p>}
+                                {ref.referred_phone && <p className="text-[10px] font-mono text-slate-500">{ref.referred_phone}</p>}
                               </td>
                               <td className="px-6 py-4.5">
-                                <p className="font-semibold text-slate-700">{ref.students?.name || "Deleted Student"}</p>
-                                <p className="text-[10px] text-slate-400">{ref.students?.email}</p>
-                                <span className="inline-block text-[9px] font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded mt-1">{ref.referral_code}</span>
+                                <p className="font-semibold text-slate-800">{ref.referrer_name || ref.students?.name || "Website Guest"}</p>
+                                <p className="text-[10px] text-slate-500">{ref.referrer_phone || ref.referrer_email || ref.students?.email || "No contact"}</p>
+                                {ref.referrer_city && <p className="text-[10px] text-purple-700 font-medium">📍 {ref.referrer_city}</p>}
+                                <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full mt-1 ${ref.source === "public_website" || ref.referrer_name ? "bg-purple-50 text-purple-700 border border-purple-200/60" : "bg-slate-100 text-slate-600"}`}>
+                                  {ref.source === "public_website" || ref.referrer_name ? "🌐 Public Web" : "🎓 Student Portal"}
+                                </span>
                               </td>
                               <td className="px-6 py-4.5">
-                                <p className="font-medium text-slate-700">{ref.preferred_country}</p>
-                                <p className="text-[10px] text-slate-400">{ref.preferred_intake}</p>
+                                <p className="font-bold text-slate-700">{ref.preferred_country}</p>
+                                <p className="text-[10px] text-slate-400 line-clamp-2 max-w-[180px]">{ref.notes || ref.preferred_intake || "General referral"}</p>
                               </td>
                               <td className="px-6 py-4.5 text-slate-400">
                                 {new Date(ref.created_at).toLocaleDateString()}
