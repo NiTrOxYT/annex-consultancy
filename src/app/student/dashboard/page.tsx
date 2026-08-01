@@ -117,6 +117,7 @@ export default function StudentDashboard() {
 
   // Forms / Actions state
   const [uploadingDoc, setUploadingDoc] = React.useState<string | null>(null);
+  const [uploadingOtherDoc, setUploadingOtherDoc] = React.useState(false);
   const [chatMessage, setChatMessage] = React.useState("");
   const [chatFile, setChatFile] = React.useState<File | null>(null);
   const [sendingMessage, setSendingMessage] = React.useState(false);
@@ -575,6 +576,37 @@ export default function StudentDashboard() {
       alert(err.message || "Error uploading document.");
     } finally {
       setUploadingDoc(null);
+    }
+  };
+
+  // Upload additional "Other Documents" (multiple allowed)
+  const handleUploadOtherDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    if (file.size > 10 * 1024 * 1024) { alert("File size exceeds 10MB limit."); return; }
+    setUploadingOtherDoc(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const randomName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      const filePath = `${studentId}/documents/other_${randomName}`;
+      const { error: uploadErr } = await supabase.storage.from("student-files").upload(filePath, file);
+      if (uploadErr) throw new Error("Failed to upload to storage.");
+      const { data: { publicUrl } } = supabase.storage.from("student-files").getPublicUrl(filePath);
+      const { error: dbErr } = await supabase.from("student_documents").insert({
+        student_id: studentId,
+        document_type: "Other Documents",
+        file_url: publicUrl,
+        file_name: file.name,
+        status: "Pending Review"
+      });
+      if (dbErr) throw dbErr;
+      await loadStudentData(studentId!);
+      await supabase.from("student_activity_logs").insert({ student_id: studentId, action: "Document Uploaded", details: `Type: Other Documents, File: ${file.name}` });
+    } catch (err: any) {
+      alert(err.message || "Error uploading document.");
+    } finally {
+      setUploadingOtherDoc(false);
+      e.target.value = "";
     }
   };
 
@@ -1392,13 +1424,11 @@ export default function StudentDashboard() {
                                 </button>
                                 <a 
                                   href={fileRecord.file_url} 
-                                  download
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                  download={fileRecord.file_name}
                                   className="px-3 py-1.5 rounded-full border border-hairline hover:bg-slate-50 text-xs font-semibold text-slate-600 transition-colors flex items-center gap-1"
                                 >
-                                  <ArrowSquareOut size={12} />
-                                  Get
+                                  <Download size={12} />
+                                  Download
                                 </a>
                               </>
                             )}
@@ -1432,6 +1462,76 @@ export default function StudentDashboard() {
                         </div>
                       );
                     })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Other Documents Section */}
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle>Other Documents</CardTitle>
+                  <CardDescription>Upload any additional supporting documents. Multiple files allowed.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="divide-y divide-hairline">
+                    {documents.filter(d => d.document_type === "Other Documents").map((doc: any) => (
+                      <div key={doc.id} className="py-4 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                            doc.status === "Approved" ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                            : doc.status === "Rejected" ? "bg-red-50 text-red-600 border border-red-100"
+                            : doc.status === "Requires Correction" ? "bg-amber-50 text-amber-600 border border-amber-100"
+                            : "bg-blue-50 text-blue-600 border border-blue-100 animate-pulse"
+                          }`}>
+                            <FileText size={18} weight="fill" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-primary">{doc.file_name}</h4>
+                            {doc.feedback && (
+                              <p className="text-xs text-red-600 font-medium bg-red-50 p-2 rounded-xl mt-1 border border-red-100">
+                                Counselor Feed: {doc.feedback}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2.5 sm:self-center ml-12 sm:ml-0">
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${
+                            doc.status === "Approved" ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                            : doc.status === "Rejected" ? "bg-red-50 text-red-600 border-red-200"
+                            : doc.status === "Requires Correction" ? "bg-amber-50 text-amber-600 border-amber-200"
+                            : "bg-blue-50 text-blue-600 border-blue-200"
+                          }`}>{doc.status}</span>
+                          <button
+                            onClick={() => { setPreviewUrl(doc.file_url); setPreviewName(doc.file_name); }}
+                            className="px-3 py-1.5 rounded-full border border-hairline hover:bg-slate-50 text-xs font-semibold text-slate-600 transition-colors cursor-pointer"
+                          >
+                            Preview
+                          </button>
+                          <a
+                            href={doc.file_url}
+                            download={doc.file_name}
+                            className="px-3 py-1.5 rounded-full border border-hairline hover:bg-slate-50 text-xs font-semibold text-slate-600 transition-colors flex items-center gap-1"
+                          >
+                            <Download size={12} />
+                            Download
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                    {documents.filter(d => d.document_type === "Other Documents").length === 0 && (
+                      <p className="text-xs text-slate-400 py-3">No additional documents uploaded yet.</p>
+                    )}
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-hairline">
+                    <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border transition-all cursor-pointer ${
+                      isImpersonating ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                      : uploadingOtherDoc ? "bg-slate-50 border-slate-200 text-slate-400"
+                      : "bg-primary text-white border-primary hover:bg-primary/95 shadow-sm"
+                    }`}>
+                      {uploadingOtherDoc ? <SpinnerGap size={14} className="animate-spin" /> : <UploadSimple size={14} />}
+                      {uploadingOtherDoc ? "Uploading..." : "Upload Other Document"}
+                      <input type="file" className="hidden" onChange={handleUploadOtherDocument} disabled={uploadingOtherDoc || isImpersonating} />
+                    </label>
                   </div>
                 </CardContent>
               </Card>

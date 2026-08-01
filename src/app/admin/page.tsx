@@ -9461,8 +9461,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                               <td className="px-6 py-3.5 text-slate-500 capitalize">{doc.uploaded_by}</td>
                               <td className="px-6 py-3.5 text-slate-400">{new Date(doc.created_at).toLocaleString()}</td>
                               <td className="px-6 py-3.5 text-right">
-                                <a href={doc.file_url} target="_blank" rel="noreferrer" className="text-primary hover:text-gold font-bold">
-                                  Download File
+                                <a href={doc.file_url} download={doc.title || "document"} target="_blank" rel="noreferrer" className="text-primary hover:text-gold font-bold flex items-center gap-1 justify-end">
+                                  <Download size={12} /> Download File
                                 </a>
                               </td>
                             </tr>
@@ -10542,7 +10542,14 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   <label className="font-bold text-primary uppercase tracking-wider">Destination Country *</label>
                   <select
                     value={studentForm.destination}
-                    onChange={(e) => setStudentForm({ ...studentForm, destination: e.target.value })}
+                    onChange={(e) => {
+                        const dest = e.target.value;
+                        const visaStages = ["Visa Processing", "Visa Approved"];
+                        const stageReset = dest === "India" && visaStages.includes(studentForm.current_stage)
+                          ? { current_stage: "Enrolled" }
+                          : {};
+                        setStudentForm({ ...studentForm, destination: dest, ...stageReset });
+                      }}
                     className="px-3.5 py-2 border border-hairline bg-white rounded-xl text-xs text-slate-800 focus:outline-none cursor-pointer"
                   >
                     <option value="UK">UK</option>
@@ -10594,7 +10601,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     onChange={(e) => setStudentForm({ ...studentForm, current_stage: e.target.value })}
                     className="px-3.5 py-2 border border-hairline bg-white rounded-xl text-xs text-slate-800 focus:outline-none cursor-pointer"
                   >
-                    {STAGES.map(stage => (
+                    {STAGES.filter(stage =>
+                        studentForm.destination === "India"
+                          ? stage !== "Visa Processing" && stage !== "Visa Approved"
+                          : true
+                      ).map(stage => (
                       <option key={stage} value={stage}>{stage}</option>
                     ))}
                   </select>
@@ -11376,7 +11387,16 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                               rel="noopener noreferrer"
                               className="px-3.5 py-1.5 border border-hairline hover:bg-slate-50 rounded-full text-xs font-bold text-slate-600 flex items-center gap-1 transition-colors"
                             >
-                              View file <ArrowSquareOut size={12} />
+                              View <ArrowSquareOut size={12} />
+                            </a>
+
+                            <a
+                              href={doc.file_url}
+                              download={doc.file_name}
+                              className="px-3.5 py-1.5 border border-hairline hover:bg-slate-50 rounded-full text-xs font-bold text-slate-600 flex items-center gap-1 transition-colors"
+                            >
+                              <Download size={12} />
+                              Download
                             </a>
 
                             {docFeedbackId === doc.id ? (
