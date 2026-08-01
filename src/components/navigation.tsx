@@ -323,18 +323,6 @@ export function Navigation() {
                 )}
               </Link>
 
-              {/* Referral Link Button */}
-              <Link
-                href="/referral"
-                className={cn(
-                  "text-xs font-bold transition-all relative py-1.5 px-3.5 rounded-full flex items-center gap-1.5 shadow-2xs",
-                  pathname === "/referral" || pathname === "/refer" ? "bg-gold text-slate-950 font-bold" : "bg-gold/20 text-slate-900 hover:bg-gold/40"
-                )}
-              >
-                <span>Refer & Earn</span>
-                <span className="bg-gold text-slate-950 text-[10px] font-bold px-1.5 py-0.2 rounded-md font-mono-data">₹10k</span>
-              </Link>
-
             </nav>
 
             {/* Header Action Buttons (CRO & Portal logins collapse) */}
@@ -571,16 +559,6 @@ export function Navigation() {
                   className="text-lg font-bold font-display tracking-tight text-slate-800"
                 >
                   About Us
-                </Link>
-              </div>
-
-              {/* Mobile Refer & Earn Link */}
-              <div className="py-2">
-                <Link
-                  href="/referral"
-                  className="inline-flex items-center gap-2 text-sm font-bold text-slate-950 bg-gold px-4 py-2 rounded-full shadow-xs"
-                >
-                  <span>🎁 Refer & Earn ₹10,000</span>
                 </Link>
               </div>
 
