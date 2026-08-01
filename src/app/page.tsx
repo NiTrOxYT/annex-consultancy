@@ -12,8 +12,6 @@ import { AnimatedCounter } from "@/components/animated-counter";
 import { SectionReveal } from "@/components/section-reveal";
 import { TopCollegesSection } from "@/components/top-colleges";
 
-import { HomeTopReferralBanner } from "@/components/home-referral-banner";
-
 // Seed images
 const HERO_IMAGE = "/images/hero.webp";
 const DEST_UK = "/images/uk.webp";
@@ -65,11 +63,10 @@ export default function Home() {
   return (
     <>
       <Navigation />
-      <HomeTopReferralBanner />
 
       <main className="flex-grow">
         {/* Asymmetric Hero Section */}
-        <section className="relative pt-12 pb-24 md:pt-16 md:pb-32 overflow-hidden bg-white">
+        <section className="relative pt-32 pb-24 md:pt-40 md:pb-32 overflow-hidden bg-white">
           <div className="max-w-7xl mx-auto px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
 
