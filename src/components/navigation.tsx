@@ -323,6 +323,24 @@ export function Navigation() {
                 )}
               </Link>
 
+              {/* Referral Link */}
+              <Link
+                href="/referral"
+                className={cn(
+                  "text-sm font-medium transition-colors relative py-1 group flex items-center gap-1",
+                  pathname === "/referral" ? "text-primary font-bold" : "text-slate-700 hover:text-primary"
+                )}
+              >
+                <span className="text-amber-500 font-bold">⭐</span> Referral
+                {pathname === "/referral" && (
+                  <motion.div
+                    layoutId="activeNavLine"
+                    className="absolute bottom-0 left-0 right-0 h-[2px] bg-gold"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+              </Link>
+
             </nav>
 
             {/* Header Action Buttons (CRO & Portal logins collapse) */}
@@ -553,12 +571,22 @@ export function Navigation() {
               </div>
 
               {/* Simple About Link */}
-              <div className="py-3">
+              <div className="py-2.5">
                 <Link
                   href="/about"
                   className="text-lg font-bold font-display tracking-tight text-slate-800"
                 >
                   About Us
+                </Link>
+              </div>
+
+              {/* Referral Link */}
+              <div className="py-2.5">
+                <Link
+                  href="/referral"
+                  className="text-lg font-bold font-display tracking-tight text-primary flex items-center gap-2"
+                >
+                  <span className="text-amber-500">⭐</span> Referral Program
                 </Link>
               </div>
 

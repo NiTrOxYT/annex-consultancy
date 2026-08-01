@@ -74,10 +74,10 @@ export function HomeCmsBanner() {
     const link = activeBanner.link_url || "";
     if (link.startsWith("http")) {
       window.open(link, "_blank");
-    } else if (link && link !== "/") {
+    } else if (link && link !== "/" && link !== "referrals") {
       router.push(link);
     } else {
-      router.push("/student-login");
+      router.push("/referral");
     }
   };
 
