@@ -46,6 +46,8 @@ const testimonials = [
   },
 ];
 
+import { HomeCmsBanner } from "@/components/home-cms-banner";
+
 export default function Home() {
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -63,6 +65,8 @@ export default function Home() {
   return (
     <>
       <Navigation />
+
+      <HomeCmsBanner />
 
       <main className="flex-grow">
         {/* Asymmetric Hero Section */}
