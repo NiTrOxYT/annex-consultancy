@@ -91,18 +91,18 @@ export function HomeCmsBanner() {
   };
 
   return (
-    <section className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-2 animate-fade-in">
+    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-2 animate-fade-in">
       <div className="relative rounded-2xl md:rounded-3xl overflow-hidden shadow-md border border-hairline/80 group bg-white">
         <div 
           onClick={handleBannerClick}
           className="block relative w-full overflow-hidden bg-white cursor-pointer"
         >
-          {/* Desktop Banner (Aspect Ratio 4:1 - Full Width 1600x400) */}
-          <div className="hidden md:block w-full aspect-[4/1] max-h-[400px] relative bg-white">
+          {/* Desktop Banner (Full Width 100% Visible - No Cropping) */}
+          <div className="hidden md:block w-full relative bg-white">
             <img 
               src={desktopImg} 
               alt="Promotional Banner" 
-              className="w-full h-full object-cover object-center rounded-2xl md:rounded-3xl"
+              className="w-full h-auto object-contain rounded-2xl md:rounded-3xl block"
               onError={(e) => {
                 e.currentTarget.onerror = null;
                 if (mobileImg) e.currentTarget.src = mobileImg;
@@ -110,12 +110,12 @@ export function HomeCmsBanner() {
             />
           </div>
 
-          {/* Mobile Banner (Aspect Ratio 2:1 - Full Width 600x300 / 800x400) */}
-          <div className="block md:hidden w-full aspect-[2/1] max-h-[300px] relative bg-white">
+          {/* Mobile Banner (Full Width 100% Visible - No Cropping) */}
+          <div className="block md:hidden w-full relative bg-white">
             <img 
               src={mobileImg} 
               alt="Promotional Banner Mobile" 
-              className="w-full h-full object-cover object-center rounded-2xl"
+              className="w-full h-auto object-contain rounded-2xl block"
               onError={(e) => {
                 e.currentTarget.onerror = null;
                 if (desktopImg) e.currentTarget.src = desktopImg;
