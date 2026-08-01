@@ -2255,12 +2255,15 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
           setReferrals(combined);
 
           const enrolled = combined.filter((r: any) => r.status === "enrolled" || r.status === "reward_paid").length;
+          const paidAmount = combined.filter((r: any) => r.status === "reward_paid").length * 10000;
           setReferralAnalytics({
             totalReferrals: combined.length,
             enrolledCount: enrolled,
             conversionRate: combined.length ? Math.round((enrolled / combined.length) * 100) : 0,
             pendingPayoutsCount: combined.filter((r: any) => r.status === "enrolled").length,
-            totalRewardsPaid: combined.filter((r: any) => r.status === "reward_paid").length * 10000
+            rewardsPaid: paidAmount,
+            totalRewardsPaid: paidAmount,
+            activeReferrers: new Set(combined.map((r: any) => r.referrer_name || r.referrer_phone || r.referrer_student_id)).size
           });
           return;
         }
@@ -2269,12 +2272,15 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       if (localList.length > 0) {
         setReferrals(localList);
         const enrolled = localList.filter((r: any) => r.status === "enrolled" || r.status === "reward_paid").length;
+        const paidAmount = localList.filter((r: any) => r.status === "reward_paid").length * 10000;
         setReferralAnalytics({
           totalReferrals: localList.length,
           enrolledCount: enrolled,
           conversionRate: localList.length ? Math.round((enrolled / localList.length) * 100) : 0,
           pendingPayoutsCount: localList.filter((r: any) => r.status === "enrolled").length,
-          totalRewardsPaid: localList.filter((r: any) => r.status === "reward_paid").length * 10000
+          rewardsPaid: paidAmount,
+          totalRewardsPaid: paidAmount,
+          activeReferrers: new Set(localList.map((r: any) => r.referrer_name || r.referrer_phone || r.referrer_student_id)).size
         });
       }
     } catch (err: any) {
@@ -7919,7 +7925,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 <Card className="p-5 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between min-h-[110px]">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rewards Approved/Paid</span>
                   <div className="mt-3">
-                    <span className="text-2xl font-bold font-display text-emerald-600">Rs. {referralAnalytics.rewardsPaid.toLocaleString()}</span>
+                    <span className="text-2xl font-bold font-display text-emerald-600">
+                      ₹{(referralAnalytics.rewardsPaid || referralAnalytics.totalRewardsPaid || 0).toLocaleString()}
+                    </span>
                     <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Approved cashback payout</p>
                   </div>
                 </Card>
