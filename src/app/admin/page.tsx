@@ -651,14 +651,13 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const [loadingBanners, setLoadingBanners] = React.useState(false);
   const [isBannerModalOpen, setIsBannerModalOpen] = React.useState(false);
   const [editingBanner, setEditingBanner] = React.useState<any | null>(null);
-  const [uploadingBannerImg, setUploadingBannerImg] = React.useState(false);
+  const [uploadingDesktopImg, setUploadingDesktopImg] = React.useState(false);
+  const [uploadingMobileImg, setUploadingMobileImg] = React.useState(false);
   const [bannerForm, setBannerForm] = React.useState({
-    title: "Study in India Admissions 2026",
-    subtitle: "Explore top universities, scholarships, and simplified application process.",
-    image_url: "",
-    link_url: "/study-in-india",
-    button_text: "Explore Programs",
     target_destination: "India",
+    desktop_image_url: "",
+    mobile_image_url: "",
+    link_url: "",
     is_active: true
   });
 
@@ -698,32 +697,77 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     }
   }, []);
 
-  const handleSaveBanner = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bannerForm.image_url) {
-      alert("Please upload or provide a Banner Image URL.");
+  const handleUploadImageFile = async (e: React.ChangeEvent<HTMLInputElement>, type: "desktop" | "mobile") => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File size exceeds 5MB limit.");
       return;
     }
+    if (type === "desktop") setUploadingDesktopImg(true);
+    else setUploadingMobileImg(true);
+
+    try {
+      const fileExt = file.name.split(".").pop();
+      const randomName = `banner_${type}_${Math.random().toString(36).substring(2, 12)}.${fileExt}`;
+      const filePath = `cms_banners/${randomName}`;
+      
+      const { error: uploadErr } = await supabase.storage
+        .from("student-files")
+        .upload(filePath, file);
+
+      if (uploadErr) throw uploadErr;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("student-files")
+        .getPublicUrl(filePath);
+
+      if (type === "desktop") {
+        setBannerForm(prev => ({ ...prev, desktop_image_url: publicUrl }));
+      } else {
+        setBannerForm(prev => ({ ...prev, mobile_image_url: publicUrl }));
+      }
+      showToast(`${type === "desktop" ? "PC / Desktop" : "Mobile"} banner uploaded!`);
+    } catch (err: any) {
+      alert("Upload failed: " + err.message);
+    } finally {
+      if (type === "desktop") setUploadingDesktopImg(false);
+      else setUploadingMobileImg(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleSaveBanner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bannerForm.desktop_image_url && !bannerForm.mobile_image_url) {
+      alert("Please upload at least one banner image (PC or Mobile).");
+      return;
+    }
+    const payload = {
+      ...bannerForm,
+      desktop_image_url: bannerForm.desktop_image_url || bannerForm.mobile_image_url,
+      mobile_image_url: bannerForm.mobile_image_url || bannerForm.desktop_image_url
+    };
     try {
       if (editingBanner) {
         const { error } = await supabase
           .from("cms_banners")
-          .update({ ...bannerForm, updated_at: new Date().toISOString() })
+          .update({ ...payload, updated_at: new Date().toISOString() })
           .eq("id", editingBanner.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("cms_banners")
-          .insert([{ ...bannerForm }]);
+          .insert([payload]);
         if (error) throw error;
       }
-      showToast(editingBanner ? "Banner updated successfully" : "Banner created successfully");
+      showToast(editingBanner ? "Banner updated" : "Banner created");
       setIsBannerModalOpen(false);
       await loadBanners();
     } catch (err: any) {
       const updated = editingBanner 
-        ? banners.map(b => b.id === editingBanner.id ? { ...b, ...bannerForm, updated_at: new Date().toISOString() } : b)
-        : [{ id: `banner-${Date.now()}`, ...bannerForm, created_at: new Date().toISOString() }, ...banners];
+        ? banners.map(b => b.id === editingBanner.id ? { ...b, ...payload, updated_at: new Date().toISOString() } : b)
+        : [{ id: `banner-${Date.now()}`, ...payload, created_at: new Date().toISOString() }, ...banners];
       setBanners(updated);
       if (typeof window !== "undefined") {
         localStorage.setItem("annex_cms_banners", JSON.stringify(updated));
@@ -769,39 +813,6 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
         localStorage.setItem("annex_cms_banners", JSON.stringify(updated));
       }
       showToast("Banner deleted");
-    }
-  };
-
-  const handleUploadBannerImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
-    if (file.size > 5 * 1024 * 1024) {
-      alert("File size exceeds 5MB limit.");
-      return;
-    }
-    setUploadingBannerImg(true);
-    try {
-      const fileExt = file.name.split(".").pop();
-      const randomName = `banner_${Math.random().toString(36).substring(2, 12)}.${fileExt}`;
-      const filePath = `cms_banners/${randomName}`;
-      
-      const { error: uploadErr } = await supabase.storage
-        .from("student-files")
-        .upload(filePath, file);
-
-      if (uploadErr) throw uploadErr;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from("student-files")
-        .getPublicUrl(filePath);
-
-      setBannerForm(prev => ({ ...prev, image_url: publicUrl }));
-      showToast("Banner image uploaded!");
-    } catch (err: any) {
-      alert("Upload failed: " + err.message);
-    } finally {
-      setUploadingBannerImg(false);
-      e.target.value = "";
     }
   };
 
@@ -9306,7 +9317,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <h2 className="font-display font-bold text-2xl text-primary">CMS & Banner Management</h2>
-                <p className="text-xs text-slate-400 mt-1">Manage dynamic portal promotional banners, destination targeting, and display specifications.</p>
+                <p className="text-xs text-slate-400 mt-1">Upload desktop and mobile banners per target location.</p>
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="secondary" size="sm" onClick={loadBanners} className="flex items-center gap-1.5">
@@ -9316,12 +9327,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   onClick={() => {
                     setEditingBanner(null);
                     setBannerForm({
-                      title: "Study in India Admissions 2026",
-                      subtitle: "Explore top universities, scholarships, and simplified application process.",
-                      image_url: "",
-                      link_url: "/study-in-india",
-                      button_text: "Explore Programs",
                       target_destination: "India",
+                      desktop_image_url: "",
+                      mobile_image_url: "",
+                      link_url: "",
                       is_active: true
                     });
                     setIsBannerModalOpen(true);
@@ -9330,73 +9339,35 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   size="sm"
                   className="flex items-center gap-1.5"
                 >
-                  <Plus size={16} /> Add New Banner
+                  <Plus size={16} /> Add Location Banner
                 </Button>
               </div>
             </div>
-
-            {/* Dimensions & Specifications Box */}
-            <Card className="bg-primary/5 border-primary/20 p-5 rounded-2xl">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
-                  <ImageSquare size={22} weight="fill" />
-                </div>
-                <div className="space-y-1 text-xs w-full">
-                  <h4 className="font-bold text-primary text-sm">Banner Image Dimensions & Guidelines</h4>
-                  <p className="text-slate-600 leading-relaxed">
-                    Banners auto-adapt responsively across mobile screens and desktop monitors. Please adhere to the recommended upload specs:
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3 pt-2 border-t border-primary/10">
-                    <div className="bg-white p-3.5 rounded-xl border border-hairline shadow-2xs">
-                      <span className="font-bold text-primary block text-xs">🖥️ Desktop Banner Dimensions</span>
-                      <span className="font-mono-data text-slate-700 block mt-1 font-bold text-xs">1200px × 300px (Aspect Ratio 4:1)</span>
-                      <span className="text-[11px] text-slate-400 block mt-0.5">Alternative: 1600px × 400px &middot; Max File Size: 2 MB</span>
-                    </div>
-                    <div className="bg-white p-3.5 rounded-xl border border-hairline shadow-2xs">
-                      <span className="font-bold text-primary block text-xs">📱 Mobile Banner Dimensions</span>
-                      <span className="font-mono-data text-slate-700 block mt-1 font-bold text-xs">600px × 300px (Aspect Ratio 2:1)</span>
-                      <span className="text-[11px] text-slate-400 block mt-0.5">Alternative: 800px × 400px &middot; Max File Size: 1 MB</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
 
             {/* Banners Grid */}
             {loadingBanners ? (
               <div className="text-center py-12 text-slate-400 text-xs font-semibold">Loading Banners...</div>
             ) : banners.length === 0 ? (
               <Card className="p-12 text-center text-slate-400 text-xs">
-                No promotional banners found. Click "Add New Banner" to create one.
+                No promotional banners found. Click "Add Location Banner" to upload one.
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {banners.map(banner => (
-                  <Card key={banner.id} className="overflow-hidden border border-hairline hover:shadow-md transition-shadow bg-white">
-                    <div className="relative h-48 bg-slate-900 overflow-hidden">
-                      <img src={banner.image_url} alt={banner.title} className="w-full h-full object-cover opacity-85" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent p-5 flex flex-col justify-end text-white">
-                        <span className="text-[10px] font-bold uppercase tracking-wider bg-gold text-slate-950 px-2.5 py-0.5 rounded-full w-fit mb-1.5 font-mono-data shadow-xs">
-                          Target: {banner.target_destination || "India"}
+                  <Card key={banner.id} className="overflow-hidden border border-hairline hover:shadow-md transition-shadow bg-white p-4">
+                    <div className="flex items-center justify-between mb-3 border-b border-hairline pb-3">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-gold text-slate-950 px-2.5 py-0.5 rounded-full font-mono-data">
+                          Location: {banner.target_destination || "India"}
                         </span>
-                        <h3 className="font-bold text-base leading-tight truncate">{banner.title}</h3>
-                        {banner.subtitle && <p className="text-xs text-slate-200 line-clamp-1 mt-0.5">{banner.subtitle}</p>}
                       </div>
-                    </div>
-                    <div className="p-4 flex items-center justify-between gap-3 text-xs bg-white border-t border-hairline">
-                      <div className="min-w-0">
-                        <span className="text-[10px] text-slate-400 uppercase font-bold block">Target URL</span>
-                        <a href={banner.link_url} target="_blank" rel="noreferrer" className="text-primary font-bold hover:underline truncate block">
-                          {banner.link_url} &rarr;
-                        </a>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2">
                         <button
                           onClick={() => toggleBannerStatus(banner.id, banner.is_active)}
                           className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
                             banner.is_active !== false
-                              ? "bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100" 
-                              : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
+                              ? "bg-emerald-50 text-emerald-600 border-emerald-200" 
+                              : "bg-slate-100 text-slate-500 border-slate-200"
                           }`}
                         >
                           {banner.is_active !== false ? "Active" : "Disabled"}
@@ -9405,28 +9376,50 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           onClick={() => {
                             setEditingBanner(banner);
                             setBannerForm({
-                              title: banner.title || "",
-                              subtitle: banner.subtitle || "",
-                              image_url: banner.image_url || "",
-                              link_url: banner.link_url || "/study-in-india",
-                              button_text: banner.button_text || "Explore Programs",
                               target_destination: banner.target_destination || "India",
+                              desktop_image_url: banner.desktop_image_url || banner.image_url || "",
+                              mobile_image_url: banner.mobile_image_url || banner.desktop_image_url || banner.image_url || "",
+                              link_url: banner.link_url || "",
                               is_active: banner.is_active !== false
                             });
                             setIsBannerModalOpen(true);
                           }}
                           className="p-1.5 text-slate-500 hover:text-primary hover:bg-slate-50 rounded transition-colors cursor-pointer"
-                          title="Edit Banner"
+                          title="Edit"
                         >
                           <Pencil size={16} />
                         </button>
                         <button
                           onClick={() => handleDeleteBanner(banner.id)}
                           className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                          title="Delete Banner"
+                          title="Delete"
                         >
                           <Trash size={16} />
                         </button>
+                      </div>
+                    </div>
+
+                    {/* Previews */}
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">🖥️ PC / Desktop (1200x300)</span>
+                        <div className="h-24 bg-slate-900 rounded-xl overflow-hidden border border-hairline">
+                          {banner.desktop_image_url || banner.image_url ? (
+                            <img src={banner.desktop_image_url || banner.image_url} alt="Desktop" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="h-full flex items-center justify-center text-slate-400 text-[10px]">No image</div>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">📱 Mobile (600x300)</span>
+                        <div className="h-24 bg-slate-900 rounded-xl overflow-hidden border border-hairline">
+                          {banner.mobile_image_url || banner.desktop_image_url || banner.image_url ? (
+                            <img src={banner.mobile_image_url || banner.desktop_image_url || banner.image_url} alt="Mobile" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="h-full flex items-center justify-center text-slate-400 text-[10px]">No image</div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </Card>
@@ -12757,116 +12750,106 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       {/* 5c. ADD/EDIT BANNER MODAL */}
       {isBannerModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in text-slate-700">
-          <Card className="max-w-2xl w-full p-6 relative bg-white shadow-2xl rounded-2xl border border-hairline">
+          <Card className="max-w-xl w-full p-6 relative bg-white shadow-2xl rounded-2xl border border-hairline">
             <button onClick={() => setIsBannerModalOpen(false)} className="absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer">
               <X size={20} />
             </button>
             <div className="flex items-center gap-2 mb-6 border-b border-hairline pb-4">
               <ImageSquare size={22} className="text-primary" />
               <div>
-                <CardTitle className="text-lg">{editingBanner ? "Edit Banner" : "Add New Promotional Banner"}</CardTitle>
-                <CardDescription className="text-xs">Manage student portal banner imagery, destination targeting, and CTA buttons.</CardDescription>
+                <CardTitle className="text-lg">{editingBanner ? "Edit Location Banner" : "Add Location Banner"}</CardTitle>
+                <CardDescription className="text-xs">Select target location and upload PC & Mobile banners.</CardDescription>
               </div>
             </div>
 
-            <form onSubmit={handleSaveBanner} className="flex flex-col gap-4 max-h-[75vh] overflow-y-auto pr-1 text-xs">
+            <form onSubmit={handleSaveBanner} className="flex flex-col gap-4 text-xs">
               
-              {/* Dimensions Info Banner in Modal */}
-              <div className="bg-blue-50/70 border border-blue-100 p-3 rounded-xl text-blue-900 text-[11px] space-y-1">
-                <span className="font-bold block">📐 Recommended Banner Dimensions:</span>
-                <span>• Desktop Container: <strong>1200px × 300px</strong> (Aspect Ratio 4:1)</span><br />
-                <span>• Mobile Container: <strong>600px × 300px</strong> (Aspect Ratio 2:1)</span><br />
-                <span>• Format: PNG, JPG, WebP (Max file size: 5MB)</span>
-              </div>
-
+              {/* Target Location Select */}
               <div className="flex flex-col gap-1.5">
-                <label className="font-bold text-primary uppercase tracking-wider">Banner Headline / Title *</label>
-                <input
-                  type="text"
-                  required
-                  value={bannerForm.title}
-                  onChange={(e) => setBannerForm({ ...bannerForm, title: e.target.value })}
-                  placeholder="e.g. Study in India - Top Admissions 2026"
-                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none focus:ring-1 focus:ring-primary/20 bg-white"
-                />
+                <label className="font-bold text-primary uppercase tracking-wider">Target Location / Destination *</label>
+                <select
+                  value={bannerForm.target_destination}
+                  onChange={(e) => setBannerForm({ ...bannerForm, target_destination: e.target.value })}
+                  className="px-3.5 py-2.5 border border-hairline bg-white rounded-xl text-xs text-slate-800 outline-none cursor-pointer font-bold"
+                >
+                  <option value="India">India</option>
+                  <option value="UK">UK</option>
+                  <option value="Australia">Australia</option>
+                  <option value="Europe">Europe</option>
+                  <option value="Dubai">Dubai</option>
+                  <option value="Italy">Italy</option>
+                  <option value="All">All Locations (Global Default)</option>
+                </select>
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="font-bold text-primary uppercase tracking-wider">Subtitle / Description</label>
-                <textarea
-                  rows={2}
-                  value={bannerForm.subtitle}
-                  onChange={(e) => setBannerForm({ ...bannerForm, subtitle: e.target.value })}
-                  placeholder="e.g. Explore premier universities, scholarships, and simplified application process."
-                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none focus:ring-1 focus:ring-primary/20 bg-white resize-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-bold text-primary uppercase tracking-wider">Target Destination *</label>
-                  <select
-                    value={bannerForm.target_destination}
-                    onChange={(e) => setBannerForm({ ...bannerForm, target_destination: e.target.value })}
-                    className="px-3.5 py-2 border border-hairline bg-white rounded-xl text-xs text-slate-800 outline-none cursor-pointer"
-                  >
-                    <option value="All">All Destinations</option>
-                    <option value="India">India</option>
-                    <option value="UK">UK</option>
-                    <option value="Australia">Australia</option>
-                    <option value="Europe">Europe</option>
-                    <option value="Dubai">Dubai</option>
-                    <option value="Italy">Italy</option>
-                  </select>
+              {/* Upload 1: Desktop / PC Banner */}
+              <div className="border border-hairline p-4 rounded-xl space-y-2 bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-primary uppercase tracking-wider text-xs">🖥️ PC / Desktop Banner (1200 × 300)</label>
+                  {bannerForm.desktop_image_url && <span className="text-[10px] text-emerald-600 font-bold">Uploaded ✓</span>}
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-bold text-primary uppercase tracking-wider">Button Text</label>
-                  <input
-                    type="text"
-                    value={bannerForm.button_text}
-                    onChange={(e) => setBannerForm({ ...bannerForm, button_text: e.target.value })}
-                    placeholder="e.g. Explore Programs"
-                    className="px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none focus:ring-1 focus:ring-primary/20 bg-white"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="font-bold text-primary uppercase tracking-wider">Click Destination URL / Link</label>
-                <input
-                  type="text"
-                  value={bannerForm.link_url}
-                  onChange={(e) => setBannerForm({ ...bannerForm, link_url: e.target.value })}
-                  placeholder="e.g. /study-in-india or https://..."
-                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none focus:ring-1 focus:ring-primary/20 bg-white"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="font-bold text-primary uppercase tracking-wider">Banner Image *</label>
                 <div className="flex items-center gap-3">
                   <input
                     type="text"
-                    required
-                    value={bannerForm.image_url}
-                    onChange={(e) => setBannerForm({ ...bannerForm, image_url: e.target.value })}
-                    placeholder="Paste Image URL or upload below..."
-                    className="flex-grow px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none focus:ring-1 focus:ring-primary/20 bg-white"
+                    value={bannerForm.desktop_image_url}
+                    onChange={(e) => setBannerForm({ ...bannerForm, desktop_image_url: e.target.value })}
+                    placeholder="Upload file or paste image URL..."
+                    className="flex-grow px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none bg-white"
                   />
-                  <label className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-hairline text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer shrink-0 flex items-center gap-1.5">
-                    {uploadingBannerImg ? <SpinnerGap size={14} className="animate-spin" /> : <UploadSimple size={14} />}
-                    <span>{uploadingBannerImg ? "Uploading..." : "Upload File"}</span>
-                    <input type="file" accept="image/*" className="hidden" onChange={handleUploadBannerImage} disabled={uploadingBannerImg} />
+                  <label className="px-4 py-2 bg-primary text-white hover:bg-primary/95 font-bold rounded-xl text-xs transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 shadow-sm">
+                    {uploadingDesktopImg ? <SpinnerGap size={14} className="animate-spin" /> : <UploadSimple size={14} />}
+                    <span>{uploadingDesktopImg ? "Uploading..." : "Upload PC Banner"}</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadImageFile(e, "desktop")} disabled={uploadingDesktopImg} />
                   </label>
                 </div>
-                {bannerForm.image_url && (
-                  <div className="mt-2 h-28 w-full rounded-xl overflow-hidden border border-hairline relative bg-slate-900">
-                    <img src={bannerForm.image_url} alt="Preview" className="w-full h-full object-cover" />
+                {bannerForm.desktop_image_url && (
+                  <div className="h-24 w-full rounded-xl overflow-hidden border border-hairline relative bg-slate-900 mt-2">
+                    <img src={bannerForm.desktop_image_url} alt="Desktop Preview" className="w-full h-full object-cover" />
                   </div>
                 )}
               </div>
 
-              <div className="flex items-center gap-2 pt-2">
+              {/* Upload 2: Mobile Banner */}
+              <div className="border border-hairline p-4 rounded-xl space-y-2 bg-slate-50/50">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-primary uppercase tracking-wider text-xs">📱 Mobile Banner (600 × 300)</label>
+                  {bannerForm.mobile_image_url && <span className="text-[10px] text-emerald-600 font-bold">Uploaded ✓</span>}
+                </div>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    value={bannerForm.mobile_image_url}
+                    onChange={(e) => setBannerForm({ ...bannerForm, mobile_image_url: e.target.value })}
+                    placeholder="Upload file or paste image URL..."
+                    className="flex-grow px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none bg-white"
+                  />
+                  <label className="px-4 py-2 bg-primary text-white hover:bg-primary/95 font-bold rounded-xl text-xs transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 shadow-sm">
+                    {uploadingMobileImg ? <SpinnerGap size={14} className="animate-spin" /> : <UploadSimple size={14} />}
+                    <span>{uploadingMobileImg ? "Uploading..." : "Upload Mobile Banner"}</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadImageFile(e, "mobile")} disabled={uploadingMobileImg} />
+                  </label>
+                </div>
+                {bannerForm.mobile_image_url && (
+                  <div className="h-24 w-full rounded-xl overflow-hidden border border-hairline relative bg-slate-900 mt-2">
+                    <img src={bannerForm.mobile_image_url} alt="Mobile Preview" className="w-full h-full object-cover" />
+                  </div>
+                )}
+              </div>
+
+              {/* Optional Link URL */}
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Click Target URL (Optional)</label>
+                <input
+                  type="text"
+                  value={bannerForm.link_url}
+                  onChange={(e) => setBannerForm({ ...bannerForm, link_url: e.target.value })}
+                  placeholder="e.g. /study-in-india"
+                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none bg-white"
+                />
+              </div>
+
+              {/* Active Switch */}
+              <div className="flex items-center gap-2 pt-1">
                 <input
                   type="checkbox"
                   id="banner_active"
@@ -12875,7 +12858,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   className="rounded border-hairline text-primary focus:ring-primary h-4 w-4 cursor-pointer"
                 />
                 <label htmlFor="banner_active" className="font-bold text-slate-700 cursor-pointer">
-                  Activate banner immediately
+                  Activate banner for students
                 </label>
               </div>
 

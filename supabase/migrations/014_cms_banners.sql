@@ -1,14 +1,12 @@
--- Migration 014: CMS Banners System for Student Dashboard & Portal
+-- Migration 014: Simple CMS Banners System (Desktop & Mobile Images per Location)
 CREATE TABLE IF NOT EXISTS public.cms_banners (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title TEXT NOT NULL,
-  subtitle TEXT,
-  image_url TEXT NOT NULL,
-  link_url TEXT DEFAULT '/study-in-india',
-  button_text TEXT DEFAULT 'Explore Programs',
+  desktop_image_url TEXT NOT NULL,
+  mobile_image_url TEXT,
   target_destination TEXT DEFAULT 'India', -- 'All', 'India', 'UK', etc.
+  title TEXT,
+  link_url TEXT,
   is_active BOOLEAN DEFAULT true,
-  display_order INT DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -16,7 +14,7 @@ CREATE TABLE IF NOT EXISTS public.cms_banners (
 -- Enable RLS
 ALTER TABLE public.cms_banners ENABLE ROW LEVEL SECURITY;
 
--- Allow public read access
+-- Allow public read access & admin full access
 DO $$
 BEGIN
   IF NOT EXISTS (

@@ -1098,48 +1098,41 @@ export default function StudentDashboard() {
 
               if (!activeBanner || bannerDismissed) return null;
 
+              const desktopImg = activeBanner.desktop_image_url || activeBanner.image_url;
+              const mobileImg = activeBanner.mobile_image_url || desktopImg;
+
+              const BannerWrapper = activeBanner.link_url ? 'a' : 'div';
+              const wrapperProps = activeBanner.link_url ? {
+                href: activeBanner.link_url,
+                target: activeBanner.link_url.startsWith("http") ? "_blank" : "_self",
+                rel: "noreferrer"
+              } : {};
+
               return (
                 <div className="relative rounded-3xl overflow-hidden shadow-sm border border-hairline/80 group animate-fade-in">
-                  <div className="relative min-h-[160px] sm:min-h-[190px] md:min-h-[210px] w-full bg-slate-900 overflow-hidden flex items-center">
+                  <BannerWrapper {...(wrapperProps as any)} className="block relative w-full overflow-hidden bg-slate-900">
+                    {/* Desktop PC Banner Image */}
                     <img 
-                      src={activeBanner.image_url} 
-                      alt={activeBanner.title} 
-                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      src={desktopImg} 
+                      alt={`Banner ${activeBanner.target_destination || "India"}`} 
+                      className="hidden md:block w-full h-auto max-h-[300px] object-cover transition-transform duration-700 group-hover:scale-102"
                     />
-                    {/* Dark gradient overlay for visual hierarchy & copy contrast */}
-                    <div className="relative z-10 p-6 md:p-8 flex flex-col justify-center max-w-xl text-white bg-gradient-to-r from-slate-950/85 via-slate-950/60 to-transparent w-full h-full">
-                      <span className="text-[9px] uppercase font-bold tracking-widest bg-gold text-slate-950 px-3 py-0.5 rounded-full w-fit mb-2 shadow-sm font-mono-data">
-                        Featured Announcement &middot; {activeBanner.target_destination || "India"}
-                      </span>
-                      <h3 className="font-display font-bold text-lg sm:text-xl md:text-2xl leading-tight text-white mb-1.5 drop-shadow-sm">
-                        {activeBanner.title}
-                      </h3>
-                      {activeBanner.subtitle && (
-                        <p className="text-xs md:text-sm text-slate-200 leading-relaxed mb-4 line-clamp-2">
-                          {activeBanner.subtitle}
-                        </p>
-                      )}
-                      {activeBanner.link_url && (
-                        <a
-                          href={activeBanner.link_url}
-                          target={activeBanner.link_url.startsWith("http") ? "_blank" : "_self"}
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white text-primary text-xs font-bold hover:bg-gold hover:text-slate-950 transition-all shadow-md w-fit cursor-pointer"
-                        >
-                          {activeBanner.button_text || "Explore Programs"}
-                          <ArrowSquareOut size={14} />
-                        </a>
-                      )}
-                    </div>
-                    {/* Dismiss Button */}
-                    <button
-                      onClick={() => setBannerDismissed(true)}
-                      className="absolute top-3.5 right-3.5 p-1.5 rounded-full bg-black/40 hover:bg-black/70 text-white/80 hover:text-white backdrop-blur-md transition-colors cursor-pointer z-20"
-                      title="Dismiss Banner"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
+                    {/* Mobile Banner Image */}
+                    <img 
+                      src={mobileImg} 
+                      alt={`Banner ${activeBanner.target_destination || "India"}`} 
+                      className="block md:hidden w-full h-auto max-h-[260px] object-cover transition-transform duration-700 group-hover:scale-102"
+                    />
+                  </BannerWrapper>
+
+                  {/* Dismiss Button */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setBannerDismissed(true); }}
+                    className="absolute top-3.5 right-3.5 p-1.5 rounded-full bg-black/40 hover:bg-black/70 text-white/80 hover:text-white backdrop-blur-md transition-colors cursor-pointer z-20"
+                    title="Dismiss Banner"
+                  >
+                    <X size={16} />
+                  </button>
                 </div>
               );
             })()}
