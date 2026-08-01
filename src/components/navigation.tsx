@@ -323,6 +323,27 @@ export function Navigation() {
                 )}
               </Link>
 
+              {/* Refer & Earn Link */}
+              <Link
+                href="/referral"
+                className={cn(
+                  "text-sm font-medium transition-colors relative py-1 group flex items-center gap-1.5",
+                  pathname === "/referral" ? "text-primary font-semibold" : "text-slate-600 hover:text-primary"
+                )}
+              >
+                <span>Refer & Earn</span>
+                <span className="text-[9px] font-bold uppercase tracking-wider bg-gold text-slate-950 px-1.5 py-0.5 rounded-full font-mono-data shrink-0 shadow-2xs">
+                  ₹10K
+                </span>
+                {pathname === "/referral" && (
+                  <motion.div
+                    layoutId="activeNavLine"
+                    className="absolute bottom-0 left-0 right-0 h-[2px] bg-gold"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
+              </Link>
+
             </nav>
 
             {/* Header Action Buttons (CRO & Portal logins collapse) */}
@@ -553,12 +574,27 @@ export function Navigation() {
               </div>
 
               {/* Simple About Link */}
-              <div className="py-3">
+              <div className="py-3 border-b border-hairline/60">
                 <Link
                   href="/about"
+                  onClick={() => setIsOpen(false)}
                   className="text-lg font-bold font-display tracking-tight text-slate-800"
                 >
                   About Us
+                </Link>
+              </div>
+
+              {/* Refer & Earn Link */}
+              <div className="py-3">
+                <Link
+                  href="/referral"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center justify-between text-lg font-bold font-display tracking-tight text-slate-800"
+                >
+                  <span>Refer & Earn</span>
+                  <span className="text-xs font-bold bg-gold text-slate-950 px-2.5 py-0.5 rounded-full font-mono-data">
+                    ₹10,000 Reward
+                  </span>
                 </Link>
               </div>
 
