@@ -3,9 +3,16 @@
 import * as React from "react";
 import AdminDashboard from "../page";
 
-export default function AdminTabPage({ params }: { params: Promise<{ tab: string }> }) {
-  // Resolve dynamic segment parameters asynchronously (Next.js 15+ convention)
-  const resolvedParams = React.use(params);
-  
-  return <AdminDashboard initialTab={resolvedParams.tab} />;
+export default function AdminTabPage({ params }: { params: { tab?: string } | Promise<{ tab?: string }> }) {
+  const [activeTabName, setActiveTabName] = React.useState<string>("bookings");
+
+  React.useEffect(() => {
+    Promise.resolve(params).then((p) => {
+      if (p?.tab) {
+        setActiveTabName(p.tab);
+      }
+    });
+  }, [params]);
+
+  return <AdminDashboard initialTab={activeTabName} />;
 }

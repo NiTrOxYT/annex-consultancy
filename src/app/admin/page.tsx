@@ -417,6 +417,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   // Dashboard Tabs
   const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat" | "counselors" | "settings" | "training" | "experts" | "notifications" | "roles" | "referrals" | "eligibility" | "cms">((initialTab as any) || "bookings");
 
+  React.useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab as any);
+    }
+  }, [initialTab]);
+
   const [userType, setUserType] = React.useState<"super-admin" | "counselor" | null>(null);
   const [userPermissions, setUserPermissions] = React.useState<string[]>([]);
   const [counselorProfile, setCounselorProfile] = React.useState<any | null>(null);
@@ -1139,7 +1145,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
   // Enforce redirection to the first permitted tab if activeTab is not accessible
   React.useEffect(() => {
-    if (isAuthenticated && visibleTabs.length > 0) {
+    if (isAuthenticated && !checkingAuth && visibleTabs.length > 0) {
       const isCurrentTabVisible = visibleTabs.some(t => t.id === activeTab);
       if (!isCurrentTabVisible) {
         const fallbackTab = visibleTabs[0].id;
@@ -1149,7 +1155,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
         }
       }
     }
-  }, [isAuthenticated, userPermissions, activeTab]);
+  }, [isAuthenticated, checkingAuth, userPermissions, activeTab]);
 
   // Auto-logout after 10 minutes of inactivity
   React.useEffect(() => {
