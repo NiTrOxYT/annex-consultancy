@@ -1102,7 +1102,8 @@ export default function StudentDashboard() {
 
               const rawDesktop = (activeBanner.desktop_image_url || activeBanner.image_url || "").trim();
               const rawMobile = (activeBanner.mobile_image_url || "").trim();
-              const desktopImg = rawDesktop || rawMobile;
+              const fallbackUrl = "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop";
+              const desktopImg = rawDesktop || rawMobile || fallbackUrl;
               const mobileImg = rawMobile || desktopImg;
 
               const BannerWrapper = activeBanner.link_url ? 'a' : 'div';
@@ -1114,21 +1115,31 @@ export default function StudentDashboard() {
 
               return (
                 <div className="relative rounded-3xl overflow-hidden shadow-sm border border-hairline/80 group animate-fade-in">
-                  <BannerWrapper {...(wrapperProps as any)} className="block relative w-full overflow-hidden bg-slate-900">
-                    <picture className="block w-full">
-                      {desktopImg && <source media="(min-width: 768px)" srcSet={desktopImg} />}
-                      <img 
-                        src={mobileImg || desktopImg} 
-                        alt={`Banner ${activeBanner.target_destination || "India"}`} 
-                        className="w-full h-auto max-h-[300px] object-cover transition-transform duration-700 group-hover:scale-102"
-                        onError={(e) => {
-                          const target = e.currentTarget as HTMLImageElement;
-                          if (desktopImg && target.src !== desktopImg) {
-                            target.src = desktopImg;
-                          }
-                        }}
-                      />
-                    </picture>
+                  <BannerWrapper {...(wrapperProps as any)} className="block relative w-full h-[160px] sm:h-[200px] md:h-[240px] bg-slate-900 overflow-hidden">
+                    {/* Desktop PC Banner Image */}
+                    <img 
+                      src={desktopImg} 
+                      alt={`Banner PC ${activeBanner.target_destination || "India"}`} 
+                      className="hidden md:block absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-102"
+                      onError={(e) => {
+                        const target = e.currentTarget as HTMLImageElement;
+                        if (target.src !== fallbackUrl) target.src = fallbackUrl;
+                      }}
+                    />
+                    {/* Mobile Banner Image */}
+                    <img 
+                      src={mobileImg} 
+                      alt={`Banner Mobile ${activeBanner.target_destination || "India"}`} 
+                      className="block md:hidden absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-102"
+                      onError={(e) => {
+                        const target = e.currentTarget as HTMLImageElement;
+                        if (target.src !== desktopImg) {
+                          target.src = desktopImg;
+                        } else if (target.src !== fallbackUrl) {
+                          target.src = fallbackUrl;
+                        }
+                      }}
+                    />
                   </BannerWrapper>
 
                   {/* Dismiss Button */}
