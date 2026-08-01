@@ -8,7 +8,7 @@ import {
   PaperPlaneRight, Paperclip, ArrowSquareOut, WarningCircle, 
   UploadSimple, Check, X, SpinnerGap, Bell, ArrowLeft,
   CalendarCheck, ShieldWarning, ChatCircleDots, Gear, Checks, Download,
-  VideoCamera, Phone, MapPin, ShareNetwork, Gift, MagnifyingGlass, Funnel
+  VideoCamera, Phone, MapPin, ShareNetwork, Gift, MagnifyingGlass, Funnel, ImageSquare
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "@/lib/supabase";
@@ -114,6 +114,8 @@ export default function StudentDashboard() {
   const [notifications, setNotifications] = React.useState<any[]>([]);
   const [meetings, setMeetings] = React.useState<any[]>([]);
   const [hasMoreMessages, setHasMoreMessages] = React.useState(false);
+  const [banners, setBanners] = React.useState<any[]>([]);
+  const [bannerDismissed, setBannerDismissed] = React.useState(false);
 
   // Forms / Actions state
   const [uploadingDoc, setUploadingDoc] = React.useState<string | null>(null);
@@ -450,7 +452,37 @@ export default function StudentDashboard() {
         console.error("Error loading notification preferences:", prefErr.message);
       }
 
-      // 10. Fetch Notification email history logs
+      // 10. Fetch CMS Promotional Banners
+      try {
+        const { data: bData } = await supabase
+          .from("cms_banners")
+          .select("*")
+          .eq("is_active", true)
+          .order("created_at", { ascending: false });
+        if (bData && bData.length > 0) {
+          setBanners(bData);
+        } else {
+          const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
+          if (local) setBanners(JSON.parse(local));
+          else {
+            setBanners([{
+              id: "default-banner-1",
+              title: "Admissions Open: Study in India 2026",
+              subtitle: "Discover top-tier Indian universities, merit scholarships & hassle-free applications.",
+              image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
+              link_url: "/study-in-india",
+              button_text: "Explore India Universities",
+              target_destination: "India",
+              is_active: true
+            }]);
+          }
+        }
+      } catch (e) {
+        const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
+        if (local) setBanners(JSON.parse(local));
+      }
+
+      // 11. Fetch Notification email history logs
       try {
         const { data: histData } = await supabase
           .from("notification_history")
@@ -1056,6 +1088,61 @@ export default function StudentDashboard() {
                 </div>
               </div>
             </div>
+
+            {/* Dynamic Promotional Banner (CMS Driven) */}
+            {(() => {
+              const activeBanner = banners.find(b => 
+                b.is_active !== false && 
+                (b.target_destination === "All" || b.target_destination === (studentData?.destination || "India"))
+              );
+
+              if (!activeBanner || bannerDismissed) return null;
+
+              return (
+                <div className="relative rounded-3xl overflow-hidden shadow-sm border border-hairline/80 group animate-fade-in">
+                  <div className="relative min-h-[160px] sm:min-h-[190px] md:min-h-[210px] w-full bg-slate-900 overflow-hidden flex items-center">
+                    <img 
+                      src={activeBanner.image_url} 
+                      alt={activeBanner.title} 
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                    {/* Dark gradient overlay for visual hierarchy & copy contrast */}
+                    <div className="relative z-10 p-6 md:p-8 flex flex-col justify-center max-w-xl text-white bg-gradient-to-r from-slate-950/85 via-slate-950/60 to-transparent w-full h-full">
+                      <span className="text-[9px] uppercase font-bold tracking-widest bg-gold text-slate-950 px-3 py-0.5 rounded-full w-fit mb-2 shadow-sm font-mono-data">
+                        Featured Announcement &middot; {activeBanner.target_destination || "India"}
+                      </span>
+                      <h3 className="font-display font-bold text-lg sm:text-xl md:text-2xl leading-tight text-white mb-1.5 drop-shadow-sm">
+                        {activeBanner.title}
+                      </h3>
+                      {activeBanner.subtitle && (
+                        <p className="text-xs md:text-sm text-slate-200 leading-relaxed mb-4 line-clamp-2">
+                          {activeBanner.subtitle}
+                        </p>
+                      )}
+                      {activeBanner.link_url && (
+                        <a
+                          href={activeBanner.link_url}
+                          target={activeBanner.link_url.startsWith("http") ? "_blank" : "_self"}
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white text-primary text-xs font-bold hover:bg-gold hover:text-slate-950 transition-all shadow-md w-fit cursor-pointer"
+                        >
+                          {activeBanner.button_text || "Explore Programs"}
+                          <ArrowSquareOut size={14} />
+                        </a>
+                      )}
+                    </div>
+                    {/* Dismiss Button */}
+                    <button
+                      onClick={() => setBannerDismissed(true)}
+                      className="absolute top-3.5 right-3.5 p-1.5 rounded-full bg-black/40 hover:bg-black/70 text-white/80 hover:text-white backdrop-blur-md transition-colors cursor-pointer z-20"
+                      title="Dismiss Banner"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Progress Bar & Stage display */}
             <Card>

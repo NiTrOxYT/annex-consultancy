@@ -7,7 +7,7 @@ import {
   Download, MagnifyingGlass, Funnel, ArrowSquareOut, Globe,
   Warning, WarningCircle, Check, X, SpinnerGap, GraduationCap, Star, Copy,
   User, Paperclip, PaperPlaneRight, Gear, UploadSimple, Lock, Key, Clock, Checks,
-  ChatCircleDots, Briefcase, Bell, ShareNetwork, Gift
+  ChatCircleDots, Briefcase, Bell, ShareNetwork, Gift, Pencil, ImageSquare
 } from "@phosphor-icons/react";
 import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
@@ -415,7 +415,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const [checkingAuth, setCheckingAuth] = React.useState(true);
 
   // Dashboard Tabs
-  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat" | "counselors" | "settings" | "training" | "experts" | "notifications" | "roles" | "referrals" | "eligibility">((initialTab as any) || "bookings");
+  const [activeTab, setActiveTab] = React.useState<"bookings" | "universities" | "blog" | "stories" | "students" | "chat" | "counselors" | "settings" | "training" | "experts" | "notifications" | "roles" | "referrals" | "eligibility" | "cms">((initialTab as any) || "bookings");
 
   const [userType, setUserType] = React.useState<"super-admin" | "counselor" | null>(null);
   const [userPermissions, setUserPermissions] = React.useState<string[]>([]);
@@ -645,6 +645,165 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const [trainingDetailMessages, setTrainingDetailMessages] = React.useState<any[]>([]);
   const [trainingNotesText, setTrainingNotesText] = React.useState("");
   const [savingTrainingNotes, setSavingTrainingNotes] = React.useState(false);
+
+  // CMS & Banner Management State
+  const [banners, setBanners] = React.useState<any[]>([]);
+  const [loadingBanners, setLoadingBanners] = React.useState(false);
+  const [isBannerModalOpen, setIsBannerModalOpen] = React.useState(false);
+  const [editingBanner, setEditingBanner] = React.useState<any | null>(null);
+  const [uploadingBannerImg, setUploadingBannerImg] = React.useState(false);
+  const [bannerForm, setBannerForm] = React.useState({
+    title: "Study in India Admissions 2026",
+    subtitle: "Explore top universities, scholarships, and simplified application process.",
+    image_url: "",
+    link_url: "/study-in-india",
+    button_text: "Explore Programs",
+    target_destination: "India",
+    is_active: true
+  });
+
+  const loadBanners = React.useCallback(async () => {
+    setLoadingBanners(true);
+    try {
+      const { data, error } = await supabase
+        .from("cms_banners")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setBanners(data || []);
+    } catch (err: any) {
+      const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
+      if (local) {
+        setBanners(JSON.parse(local));
+      } else {
+        const defaultBanner = [{
+          id: "default-banner-1",
+          title: "Admissions Open: Study in India 2026",
+          subtitle: "Discover top-tier Indian universities, merit scholarships & hassle-free applications.",
+          image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
+          link_url: "/study-in-india",
+          button_text: "Explore India Universities",
+          target_destination: "India",
+          is_active: true,
+          created_at: new Date().toISOString()
+        }];
+        setBanners(defaultBanner);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("annex_cms_banners", JSON.stringify(defaultBanner));
+        }
+      }
+    } finally {
+      setLoadingBanners(false);
+    }
+  }, []);
+
+  const handleSaveBanner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bannerForm.image_url) {
+      alert("Please upload or provide a Banner Image URL.");
+      return;
+    }
+    try {
+      if (editingBanner) {
+        const { error } = await supabase
+          .from("cms_banners")
+          .update({ ...bannerForm, updated_at: new Date().toISOString() })
+          .eq("id", editingBanner.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("cms_banners")
+          .insert([{ ...bannerForm }]);
+        if (error) throw error;
+      }
+      showToast(editingBanner ? "Banner updated successfully" : "Banner created successfully");
+      setIsBannerModalOpen(false);
+      await loadBanners();
+    } catch (err: any) {
+      const updated = editingBanner 
+        ? banners.map(b => b.id === editingBanner.id ? { ...b, ...bannerForm, updated_at: new Date().toISOString() } : b)
+        : [{ id: `banner-${Date.now()}`, ...bannerForm, created_at: new Date().toISOString() }, ...banners];
+      setBanners(updated);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("annex_cms_banners", JSON.stringify(updated));
+      }
+      showToast(editingBanner ? "Banner updated (local)" : "Banner created (local)");
+      setIsBannerModalOpen(false);
+    }
+  };
+
+  const toggleBannerStatus = async (bannerId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("cms_banners")
+        .update({ is_active: !currentStatus })
+        .eq("id", bannerId);
+      if (error) throw error;
+      showToast(`Banner ${!currentStatus ? 'activated' : 'deactivated'}`);
+      await loadBanners();
+    } catch (err: any) {
+      const updated = banners.map(b => b.id === bannerId ? { ...b, is_active: !currentStatus } : b);
+      setBanners(updated);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("annex_cms_banners", JSON.stringify(updated));
+      }
+      showToast(`Banner ${!currentStatus ? 'activated' : 'deactivated'}`);
+    }
+  };
+
+  const handleDeleteBanner = async (bannerId: string) => {
+    if (!confirm("Are you sure you want to delete this banner?")) return;
+    try {
+      const { error } = await supabase
+        .from("cms_banners")
+        .delete()
+        .eq("id", bannerId);
+      if (error) throw error;
+      showToast("Banner deleted");
+      await loadBanners();
+    } catch (err: any) {
+      const updated = banners.filter(b => b.id !== bannerId);
+      setBanners(updated);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("annex_cms_banners", JSON.stringify(updated));
+      }
+      showToast("Banner deleted");
+    }
+  };
+
+  const handleUploadBannerImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File size exceeds 5MB limit.");
+      return;
+    }
+    setUploadingBannerImg(true);
+    try {
+      const fileExt = file.name.split(".").pop();
+      const randomName = `banner_${Math.random().toString(36).substring(2, 12)}.${fileExt}`;
+      const filePath = `cms_banners/${randomName}`;
+      
+      const { error: uploadErr } = await supabase.storage
+        .from("student-files")
+        .upload(filePath, file);
+
+      if (uploadErr) throw uploadErr;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("student-files")
+        .getPublicUrl(filePath);
+
+      setBannerForm(prev => ({ ...prev, image_url: publicUrl }));
+      showToast("Banner image uploaded!");
+    } catch (err: any) {
+      alert("Upload failed: " + err.message);
+    } finally {
+      setUploadingBannerImg(false);
+      e.target.value = "";
+    }
+  };
 
   // Task form
   const [careerTaskForm, setCareerTaskForm] = React.useState({
@@ -879,7 +1038,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
       experts: "Training & Placement",
       notifications: "Notifications",
       settings: "Settings",
-      roles: "System Administration"
+      roles: "System Administration",
+      cms: "Blog"
     };
     return mapping[tabId] || "";
   };
@@ -902,6 +1062,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     { id: "stories", label: `Success stories (${stories.length})` },
     { id: "experts", label: `Career Experts (${experts.length})` },
     { id: "notifications", label: "Notifications" },
+    { id: "cms", label: `CMS & Banners (${banners.length})` },
     { id: "settings", label: "Email Status" },
     { id: "roles", label: "Roles & Permissions" }
   ];
@@ -9139,6 +9300,142 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
           </section>
         )}
 
+        {/* ===================== CMS & BANNERS TAB ===================== */}
+        {activeTab === "cms" && (
+          <section className="flex flex-col gap-6 animate-fade-in text-slate-700">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="font-display font-bold text-2xl text-primary">CMS & Banner Management</h2>
+                <p className="text-xs text-slate-400 mt-1">Manage dynamic portal promotional banners, destination targeting, and display specifications.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" size="sm" onClick={loadBanners} className="flex items-center gap-1.5">
+                  <SpinnerGap className={loadingBanners ? "animate-spin" : ""} size={14} /> Refresh
+                </Button>
+                <Button
+                  onClick={() => {
+                    setEditingBanner(null);
+                    setBannerForm({
+                      title: "Study in India Admissions 2026",
+                      subtitle: "Explore top universities, scholarships, and simplified application process.",
+                      image_url: "",
+                      link_url: "/study-in-india",
+                      button_text: "Explore Programs",
+                      target_destination: "India",
+                      is_active: true
+                    });
+                    setIsBannerModalOpen(true);
+                  }}
+                  variant="primary"
+                  size="sm"
+                  className="flex items-center gap-1.5"
+                >
+                  <Plus size={16} /> Add New Banner
+                </Button>
+              </div>
+            </div>
+
+            {/* Dimensions & Specifications Box */}
+            <Card className="bg-primary/5 border-primary/20 p-5 rounded-2xl">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+                  <ImageSquare size={22} weight="fill" />
+                </div>
+                <div className="space-y-1 text-xs w-full">
+                  <h4 className="font-bold text-primary text-sm">Banner Image Dimensions & Guidelines</h4>
+                  <p className="text-slate-600 leading-relaxed">
+                    Banners auto-adapt responsively across mobile screens and desktop monitors. Please adhere to the recommended upload specs:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3 pt-2 border-t border-primary/10">
+                    <div className="bg-white p-3.5 rounded-xl border border-hairline shadow-2xs">
+                      <span className="font-bold text-primary block text-xs">🖥️ Desktop Banner Dimensions</span>
+                      <span className="font-mono-data text-slate-700 block mt-1 font-bold text-xs">1200px × 300px (Aspect Ratio 4:1)</span>
+                      <span className="text-[11px] text-slate-400 block mt-0.5">Alternative: 1600px × 400px &middot; Max File Size: 2 MB</span>
+                    </div>
+                    <div className="bg-white p-3.5 rounded-xl border border-hairline shadow-2xs">
+                      <span className="font-bold text-primary block text-xs">📱 Mobile Banner Dimensions</span>
+                      <span className="font-mono-data text-slate-700 block mt-1 font-bold text-xs">600px × 300px (Aspect Ratio 2:1)</span>
+                      <span className="text-[11px] text-slate-400 block mt-0.5">Alternative: 800px × 400px &middot; Max File Size: 1 MB</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Banners Grid */}
+            {loadingBanners ? (
+              <div className="text-center py-12 text-slate-400 text-xs font-semibold">Loading Banners...</div>
+            ) : banners.length === 0 ? (
+              <Card className="p-12 text-center text-slate-400 text-xs">
+                No promotional banners found. Click "Add New Banner" to create one.
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {banners.map(banner => (
+                  <Card key={banner.id} className="overflow-hidden border border-hairline hover:shadow-md transition-shadow bg-white">
+                    <div className="relative h-48 bg-slate-900 overflow-hidden">
+                      <img src={banner.image_url} alt={banner.title} className="w-full h-full object-cover opacity-85" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent p-5 flex flex-col justify-end text-white">
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-gold text-slate-950 px-2.5 py-0.5 rounded-full w-fit mb-1.5 font-mono-data shadow-xs">
+                          Target: {banner.target_destination || "India"}
+                        </span>
+                        <h3 className="font-bold text-base leading-tight truncate">{banner.title}</h3>
+                        {banner.subtitle && <p className="text-xs text-slate-200 line-clamp-1 mt-0.5">{banner.subtitle}</p>}
+                      </div>
+                    </div>
+                    <div className="p-4 flex items-center justify-between gap-3 text-xs bg-white border-t border-hairline">
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-slate-400 uppercase font-bold block">Target URL</span>
+                        <a href={banner.link_url} target="_blank" rel="noreferrer" className="text-primary font-bold hover:underline truncate block">
+                          {banner.link_url} &rarr;
+                        </a>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => toggleBannerStatus(banner.id, banner.is_active)}
+                          className={`px-3 py-1 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
+                            banner.is_active !== false
+                              ? "bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100" 
+                              : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
+                          }`}
+                        >
+                          {banner.is_active !== false ? "Active" : "Disabled"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingBanner(banner);
+                            setBannerForm({
+                              title: banner.title || "",
+                              subtitle: banner.subtitle || "",
+                              image_url: banner.image_url || "",
+                              link_url: banner.link_url || "/study-in-india",
+                              button_text: banner.button_text || "Explore Programs",
+                              target_destination: banner.target_destination || "India",
+                              is_active: banner.is_active !== false
+                            });
+                            setIsBannerModalOpen(true);
+                          }}
+                          className="p-1.5 text-slate-500 hover:text-primary hover:bg-slate-50 rounded transition-colors cursor-pointer"
+                          title="Edit Banner"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteBanner(banner.id)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                          title="Delete Banner"
+                        >
+                          <Trash size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
       </div>
 
       {/* MODALS */}
@@ -12454,6 +12751,141 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 </div>
               </form>
             </CardContent>
+          </Card>
+        </div>
+      )}
+      {/* 5c. ADD/EDIT BANNER MODAL */}
+      {isBannerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in text-slate-700">
+          <Card className="max-w-2xl w-full p-6 relative bg-white shadow-2xl rounded-2xl border border-hairline">
+            <button onClick={() => setIsBannerModalOpen(false)} className="absolute top-6 right-6 p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all cursor-pointer">
+              <X size={20} />
+            </button>
+            <div className="flex items-center gap-2 mb-6 border-b border-hairline pb-4">
+              <ImageSquare size={22} className="text-primary" />
+              <div>
+                <CardTitle className="text-lg">{editingBanner ? "Edit Banner" : "Add New Promotional Banner"}</CardTitle>
+                <CardDescription className="text-xs">Manage student portal banner imagery, destination targeting, and CTA buttons.</CardDescription>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveBanner} className="flex flex-col gap-4 max-h-[75vh] overflow-y-auto pr-1 text-xs">
+              
+              {/* Dimensions Info Banner in Modal */}
+              <div className="bg-blue-50/70 border border-blue-100 p-3 rounded-xl text-blue-900 text-[11px] space-y-1">
+                <span className="font-bold block">📐 Recommended Banner Dimensions:</span>
+                <span>• Desktop Container: <strong>1200px × 300px</strong> (Aspect Ratio 4:1)</span><br />
+                <span>• Mobile Container: <strong>600px × 300px</strong> (Aspect Ratio 2:1)</span><br />
+                <span>• Format: PNG, JPG, WebP (Max file size: 5MB)</span>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Banner Headline / Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={bannerForm.title}
+                  onChange={(e) => setBannerForm({ ...bannerForm, title: e.target.value })}
+                  placeholder="e.g. Study in India - Top Admissions 2026"
+                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none focus:ring-1 focus:ring-primary/20 bg-white"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Subtitle / Description</label>
+                <textarea
+                  rows={2}
+                  value={bannerForm.subtitle}
+                  onChange={(e) => setBannerForm({ ...bannerForm, subtitle: e.target.value })}
+                  placeholder="e.g. Explore premier universities, scholarships, and simplified application process."
+                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none focus:ring-1 focus:ring-primary/20 bg-white resize-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-bold text-primary uppercase tracking-wider">Target Destination *</label>
+                  <select
+                    value={bannerForm.target_destination}
+                    onChange={(e) => setBannerForm({ ...bannerForm, target_destination: e.target.value })}
+                    className="px-3.5 py-2 border border-hairline bg-white rounded-xl text-xs text-slate-800 outline-none cursor-pointer"
+                  >
+                    <option value="All">All Destinations</option>
+                    <option value="India">India</option>
+                    <option value="UK">UK</option>
+                    <option value="Australia">Australia</option>
+                    <option value="Europe">Europe</option>
+                    <option value="Dubai">Dubai</option>
+                    <option value="Italy">Italy</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-bold text-primary uppercase tracking-wider">Button Text</label>
+                  <input
+                    type="text"
+                    value={bannerForm.button_text}
+                    onChange={(e) => setBannerForm({ ...bannerForm, button_text: e.target.value })}
+                    placeholder="e.g. Explore Programs"
+                    className="px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none focus:ring-1 focus:ring-primary/20 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Click Destination URL / Link</label>
+                <input
+                  type="text"
+                  value={bannerForm.link_url}
+                  onChange={(e) => setBannerForm({ ...bannerForm, link_url: e.target.value })}
+                  placeholder="e.g. /study-in-india or https://..."
+                  className="px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none focus:ring-1 focus:ring-primary/20 bg-white"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Banner Image *</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    required
+                    value={bannerForm.image_url}
+                    onChange={(e) => setBannerForm({ ...bannerForm, image_url: e.target.value })}
+                    placeholder="Paste Image URL or upload below..."
+                    className="flex-grow px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none focus:ring-1 focus:ring-primary/20 bg-white"
+                  />
+                  <label className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-hairline text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer shrink-0 flex items-center gap-1.5">
+                    {uploadingBannerImg ? <SpinnerGap size={14} className="animate-spin" /> : <UploadSimple size={14} />}
+                    <span>{uploadingBannerImg ? "Uploading..." : "Upload File"}</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={handleUploadBannerImage} disabled={uploadingBannerImg} />
+                  </label>
+                </div>
+                {bannerForm.image_url && (
+                  <div className="mt-2 h-28 w-full rounded-xl overflow-hidden border border-hairline relative bg-slate-900">
+                    <img src={bannerForm.image_url} alt="Preview" className="w-full h-full object-cover" />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="banner_active"
+                  checked={bannerForm.is_active}
+                  onChange={(e) => setBannerForm({ ...bannerForm, is_active: e.target.checked })}
+                  className="rounded border-hairline text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                />
+                <label htmlFor="banner_active" className="font-bold text-slate-700 cursor-pointer">
+                  Activate banner immediately
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-hairline pt-4 mt-2">
+                <Button type="submit" variant="primary" size="sm">
+                  {editingBanner ? "Update Banner" : "Save Banner"}
+                </Button>
+                <Button type="button" onClick={() => setIsBannerModalOpen(false)} variant="ghost" size="sm">Cancel</Button>
+              </div>
+            </form>
           </Card>
         </div>
       )}
