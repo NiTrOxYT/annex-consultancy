@@ -733,7 +733,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
             image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
             desktop_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
             mobile_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
-            link_url: "/study-in-india",
+            link_url: "referrals",
             is_active: true,
             created_at: new Date().toISOString()
           }];

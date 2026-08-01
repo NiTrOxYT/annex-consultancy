@@ -1248,17 +1248,23 @@ export default function StudentDashboard() {
               const desktopImg = rawDesktop || rawMobile || fallbackUrl;
               const mobileImg = rawMobile || rawDesktop || fallbackUrl;
 
-              const BannerWrapper = activeBanner.link_url ? 'a' : 'div';
-              const wrapperProps = activeBanner.link_url ? {
-                href: activeBanner.link_url,
-                target: activeBanner.link_url.startsWith("http") ? "_blank" : "_self",
-                rel: "noreferrer"
-              } : {};
+              const handleBannerClick = (e: React.MouseEvent) => {
+                if (activeBanner.link_url && activeBanner.link_url.startsWith("http")) {
+                  window.open(activeBanner.link_url, "_blank");
+                } else if (activeBanner.link_url && activeBanner.link_url !== "referrals" && activeBanner.link_url !== "/referrals" && activeBanner.link_url !== "") {
+                  router.push(activeBanner.link_url);
+                } else {
+                  setActiveTab("referrals");
+                  setPreviewUrl(null);
+                }
+              };
 
               return (
                 <div className="relative rounded-2xl md:rounded-3xl overflow-hidden shadow-sm border border-hairline/80 group animate-fade-in bg-slate-950">
-                  <BannerWrapper {...(wrapperProps as any)} className="block relative w-full overflow-hidden bg-slate-950">
-                    
+                  <div 
+                    onClick={handleBannerClick} 
+                    className="block relative w-full overflow-hidden bg-slate-950 cursor-pointer"
+                  >
                     {/* Desktop Banner Container (1200x300 - Aspect 4:1) */}
                     <div className="hidden md:block w-full aspect-[4/1] max-h-[300px] relative bg-slate-950">
                       <img 
@@ -1266,8 +1272,8 @@ export default function StudentDashboard() {
                         alt={`Desktop Banner ${activeBanner.target_destination || "India"}`} 
                         className="w-full h-full object-contain object-center rounded-2xl md:rounded-3xl"
                         onError={(e) => {
-                          const target = e.currentTarget as HTMLImageElement;
-                          if (target.src !== fallbackUrl) target.src = fallbackUrl;
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = fallbackUrl;
                         }}
                       />
                     </div>
@@ -1279,16 +1285,12 @@ export default function StudentDashboard() {
                         alt={`Mobile Banner ${activeBanner.target_destination || "India"}`} 
                         className="w-full h-full object-contain object-center rounded-2xl"
                         onError={(e) => {
-                          const target = e.currentTarget as HTMLImageElement;
-                          if (target.src !== desktopImg) {
-                            target.src = desktopImg;
-                          } else if (target.src !== fallbackUrl) {
-                            target.src = fallbackUrl;
-                          }
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = desktopImg || fallbackUrl;
                         }}
                       />
                     </div>
-                  </BannerWrapper>
+                  </div>
 
                   {/* Session Storage Dismiss Close Button */}
                   <button
