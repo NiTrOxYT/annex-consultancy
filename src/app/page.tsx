@@ -65,8 +65,21 @@ export default function Home() {
       <Navigation />
 
       <main className="flex-grow">
+        {/* Top Referral Announcement Banner Bar */}
+        <div className="bg-primary text-white pt-24 md:pt-28 pb-3 px-4 text-center text-xs font-medium border-b border-hairline/20 relative z-30">
+          <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 flex-wrap">
+            <span className="bg-gold text-slate-950 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full font-mono-data">
+              🎁 Referral Reward
+            </span>
+            <span>Refer a friend to ANNEX & earn <strong className="text-gold font-bold">₹10,000 Cash Reward</strong> for every confirmed admission!</span>
+            <Link href="/referral" className="font-bold text-gold underline hover:text-white transition-colors inline-flex items-center gap-1 ml-1 cursor-pointer">
+              Claim Reward &rarr;
+            </Link>
+          </div>
+        </div>
+
         {/* Asymmetric Hero Section */}
-        <section className="relative pt-32 pb-24 md:pt-40 md:pb-32 overflow-hidden bg-white">
+        <section className="relative pt-12 pb-24 md:pt-16 md:pb-32 overflow-hidden bg-white">
           <div className="max-w-7xl mx-auto px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
 
