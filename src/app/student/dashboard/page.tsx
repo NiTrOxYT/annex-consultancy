@@ -8,7 +8,7 @@ import {
   PaperPlaneRight, Paperclip, ArrowSquareOut, WarningCircle, 
   UploadSimple, Check, X, SpinnerGap, Bell, ArrowLeft,
   CalendarCheck, ShieldWarning, ChatCircleDots, Gear, Checks, Download,
-  VideoCamera, Phone, MapPin, ShareNetwork, Gift, MagnifyingGlass, Funnel, ImageSquare
+  VideoCamera, Phone, MapPin, ShareNetwork, Gift, MagnifyingGlass, Funnel, ImageSquare, List
 } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "@/lib/supabase";
@@ -116,6 +116,26 @@ export default function StudentDashboard() {
   const [hasMoreMessages, setHasMoreMessages] = React.useState(false);
   const [banners, setBanners] = React.useState<any[]>([]);
   const [bannerDismissed, setBannerDismissed] = React.useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+
+  // Check sessionStorage for dismissed banner
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const dismissed = sessionStorage.getItem("annex_banner_dismissed");
+      if (dismissed === "true") {
+        setBannerDismissed(true);
+      }
+    }
+  }, []);
+
+  const handleDismissBanner = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setBannerDismissed(true);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("annex_banner_dismissed", "true");
+    }
+  };
 
   // Forms / Actions state
   const [uploadingDoc, setUploadingDoc] = React.useState<string | null>(null);
@@ -970,7 +990,7 @@ export default function StudentDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col lg:flex-row relative">
       
       {/* Impersonating Alert Header */}
       {isImpersonating && (
@@ -989,8 +1009,130 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* Sidebar Navigation */}
-      <aside className={`w-full md:w-64 bg-white border-r border-hairline/80 flex flex-col shrink-0 ${isImpersonating ? "pt-12" : ""}`}>
+      {/* Mobile Top Header (Visible on Mobile & Tablet < lg) */}
+      <header className={`lg:hidden bg-white border-b border-hairline/80 px-4 py-3 flex items-center justify-between sticky top-0 z-40 shadow-2xs ${isImpersonating ? "mt-10" : ""}`}>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="p-2 rounded-xl text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            title="Open Navigation Menu"
+          >
+            <List size={24} weight="bold" />
+          </button>
+          <div className="flex items-center">
+            <AnnexLogo size={26} showText={true} />
+          </div>
+        </div>
+        <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-1 rounded-full font-mono-data">
+          Student Portal
+        </span>
+      </header>
+
+      {/* Mobile Slide Drawer Menu */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            {/* Backdrop Blur */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+
+            {/* Left Slide Panel */}
+            <motion.div
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 220 }}
+              className="relative w-72 max-w-[80vw] h-full bg-white flex flex-col shadow-2xl z-10"
+            >
+              <div className="p-5 border-b border-hairline/60 flex items-center justify-between">
+                <div>
+                  <AnnexLogo size={28} showText={true} />
+                  <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mt-1">Student Portal</p>
+                </div>
+                <button
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Navigation items */}
+              <nav className="flex-grow p-4 space-y-1 overflow-y-auto">
+                {[
+                  { id: "dashboard", label: "Dashboard", icon: User },
+                  { id: "documents", label: "Document Center", icon: FileArrowUp },
+                  { id: "offers", label: "Offer Letters", icon: FileText },
+                  ...(studentData?.destination !== "India" ? [{ id: "visa", label: "Visa Timeline", icon: Calendar }] : []),
+                  { id: "chat", label: "Counselor Chat", icon: ChatCircleDots },
+                  { id: "appointments", label: "Scheduled Meetings", icon: CalendarCheck },
+                  { id: "referrals", label: "Referrals", icon: ShareNetwork },
+                  { id: "profile", label: "My Profile", icon: Gear },
+                  { id: "notifications", label: "Notification Settings", icon: Bell }
+                ].map(tab => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => {
+                        setActiveTab(tab.id as any);
+                        setPreviewUrl(null);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-semibold transition-all cursor-pointer ${
+                        isActive 
+                          ? "bg-primary text-white shadow-md shadow-primary/10" 
+                          : "text-slate-600 hover:text-primary hover:bg-slate-50"
+                      }`}
+                    >
+                      <Icon size={18} weight={isActive ? "fill" : "regular"} />
+                      <span>{tab.label}</span>
+                      {tab.id === "chat" && (() => {
+                        const unreadCount = messages.filter(m => m.sender_type === "counselor" && m.status !== "read").length;
+                        if (unreadCount === 0) return null;
+                        return (
+                          <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[18px] text-center">
+                            {unreadCount}
+                          </span>
+                        );
+                      })()}
+                    </button>
+                  );
+                })}
+              </nav>
+
+              {/* Drawer footer profile */}
+              <div className="p-4 border-t border-hairline/60 bg-slate-50 flex items-center justify-between">
+                <div className="flex items-center gap-2.5 overflow-hidden">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs uppercase shrink-0">
+                    {studentData?.name?.charAt(0) || "S"}
+                  </div>
+                  <div className="overflow-hidden">
+                    <p className="text-xs font-bold text-primary truncate leading-tight">{studentData?.name}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{studentData?.email}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => { setIsMobileMenuOpen(false); handleLogout(); }}
+                  className="p-1.5 rounded-full hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
+                  title="Log Out"
+                >
+                  <SignOut size={18} />
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Desktop Sidebar Navigation (Visible on lg+) */}
+      <aside className={`hidden lg:flex w-64 bg-white border-r border-hairline/80 flex-col shrink-0 ${isImpersonating ? "pt-12" : ""}`}>
         <div className="p-6 border-b border-hairline/60">
           <div className="flex items-center">
             <AnnexLogo size={32} showText={true} />
@@ -1104,7 +1246,7 @@ export default function StudentDashboard() {
               const rawMobile = (activeBanner.mobile_image_url || "").trim();
               const fallbackUrl = "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop";
               const desktopImg = rawDesktop || rawMobile || fallbackUrl;
-              const mobileImg = rawMobile || desktopImg;
+              const mobileImg = rawMobile || rawDesktop || fallbackUrl;
 
               const BannerWrapper = activeBanner.link_url ? 'a' : 'div';
               const wrapperProps = activeBanner.link_url ? {
@@ -1114,41 +1256,47 @@ export default function StudentDashboard() {
               } : {};
 
               return (
-                <div className="relative rounded-3xl overflow-hidden shadow-sm border border-hairline/80 group animate-fade-in">
-                  <BannerWrapper {...(wrapperProps as any)} className="block relative w-full h-[160px] sm:h-[200px] md:h-[240px] bg-slate-900 overflow-hidden">
-                    {/* Desktop PC Banner Image */}
-                    <img 
-                      src={desktopImg} 
-                      alt={`Banner PC ${activeBanner.target_destination || "India"}`} 
-                      className="hidden md:block absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-102"
-                      onError={(e) => {
-                        const target = e.currentTarget as HTMLImageElement;
-                        if (target.src !== fallbackUrl) target.src = fallbackUrl;
-                      }}
-                    />
-                    {/* Mobile Banner Image */}
-                    <img 
-                      src={mobileImg} 
-                      alt={`Banner Mobile ${activeBanner.target_destination || "India"}`} 
-                      className="block md:hidden absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-102"
-                      onError={(e) => {
-                        const target = e.currentTarget as HTMLImageElement;
-                        if (target.src !== desktopImg) {
-                          target.src = desktopImg;
-                        } else if (target.src !== fallbackUrl) {
-                          target.src = fallbackUrl;
-                        }
-                      }}
-                    />
+                <div className="relative rounded-2xl md:rounded-3xl overflow-hidden shadow-sm border border-hairline/80 group animate-fade-in bg-slate-950">
+                  <BannerWrapper {...(wrapperProps as any)} className="block relative w-full overflow-hidden bg-slate-950">
+                    
+                    {/* Desktop Banner Container (1200x300 - Aspect 4:1) */}
+                    <div className="hidden md:block w-full aspect-[4/1] max-h-[300px] relative bg-slate-950">
+                      <img 
+                        src={desktopImg} 
+                        alt={`Desktop Banner ${activeBanner.target_destination || "India"}`} 
+                        className="w-full h-full object-contain object-center rounded-2xl md:rounded-3xl"
+                        onError={(e) => {
+                          const target = e.currentTarget as HTMLImageElement;
+                          if (target.src !== fallbackUrl) target.src = fallbackUrl;
+                        }}
+                      />
+                    </div>
+
+                    {/* Mobile Banner Container (Aspect 2:1, max-h 300px, 100% width, object-contain NO CROP) */}
+                    <div className="block md:hidden w-full aspect-[2/1] max-h-[300px] relative bg-slate-950">
+                      <img 
+                        src={mobileImg} 
+                        alt={`Mobile Banner ${activeBanner.target_destination || "India"}`} 
+                        className="w-full h-full object-contain object-center rounded-2xl"
+                        onError={(e) => {
+                          const target = e.currentTarget as HTMLImageElement;
+                          if (target.src !== desktopImg) {
+                            target.src = desktopImg;
+                          } else if (target.src !== fallbackUrl) {
+                            target.src = fallbackUrl;
+                          }
+                        }}
+                      />
+                    </div>
                   </BannerWrapper>
 
-                  {/* Dismiss Button */}
+                  {/* Session Storage Dismiss Close Button */}
                   <button
-                    onClick={(e) => { e.stopPropagation(); setBannerDismissed(true); }}
-                    className="absolute top-3.5 right-3.5 p-1.5 rounded-full bg-black/40 hover:bg-black/70 text-white/80 hover:text-white backdrop-blur-md transition-colors cursor-pointer z-20"
+                    onClick={handleDismissBanner}
+                    className="absolute top-3 right-3 p-1.5 rounded-full bg-black/60 hover:bg-black/80 text-white/90 hover:text-white backdrop-blur-md transition-colors cursor-pointer z-30 shadow-md border border-white/10"
                     title="Dismiss Banner"
                   >
-                    <X size={16} />
+                    <X size={16} weight="bold" />
                   </button>
                 </div>
               );
