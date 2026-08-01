@@ -95,33 +95,22 @@ export function HomeCmsBanner() {
       <div className="relative rounded-2xl md:rounded-3xl overflow-hidden shadow-md border border-hairline/80 group bg-white">
         <div 
           onClick={handleBannerClick}
-          className="block relative w-full overflow-hidden bg-white cursor-pointer"
+          className="block relative w-full min-h-[140px] overflow-hidden bg-white cursor-pointer"
         >
-          {/* Desktop Banner (Full Width 100% Visible - No Cropping) */}
-          <div className="hidden md:block w-full relative bg-white">
+          <picture className="block w-full">
+            {desktopImg && <source media="(min-width: 768px)" srcSet={desktopImg} />}
             <img 
-              src={desktopImg} 
+              src={mobileImg || desktopImg} 
               alt="Promotional Banner" 
-              className="w-full h-auto object-contain rounded-2xl md:rounded-3xl block"
+              className="w-full h-auto min-h-[140px] max-h-[400px] object-contain rounded-2xl md:rounded-3xl block"
               onError={(e) => {
                 e.currentTarget.onerror = null;
-                if (mobileImg) e.currentTarget.src = mobileImg;
+                if (desktopImg && e.currentTarget.src !== desktopImg) {
+                  e.currentTarget.src = desktopImg;
+                }
               }}
             />
-          </div>
-
-          {/* Mobile Banner (Full Width 100% Visible - No Cropping) */}
-          <div className="block md:hidden w-full relative bg-white">
-            <img 
-              src={mobileImg} 
-              alt="Promotional Banner Mobile" 
-              className="w-full h-auto object-contain rounded-2xl block"
-              onError={(e) => {
-                e.currentTarget.onerror = null;
-                if (desktopImg) e.currentTarget.src = desktopImg;
-              }}
-            />
-          </div>
+          </picture>
         </div>
 
         {/* Close / Dismiss Button */}

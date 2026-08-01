@@ -1259,33 +1259,24 @@ export default function StudentDashboard() {
                 <div className="relative rounded-2xl md:rounded-3xl overflow-hidden shadow-sm border border-hairline/80 group animate-fade-in bg-slate-950">
                   <div 
                     onClick={handleBannerClick} 
-                    className="block relative w-full overflow-hidden bg-slate-950 cursor-pointer"
+                    className="block relative w-full min-h-[140px] overflow-hidden bg-slate-950 cursor-pointer"
                   >
-                    {/* Desktop Banner Container (1200x300 - Aspect 4:1) */}
-                    <div className="hidden md:block w-full aspect-[4/1] max-h-[300px] relative bg-slate-950">
+                    <picture className="block w-full">
+                      {desktopImg && <source media="(min-width: 768px)" srcSet={desktopImg} />}
                       <img 
-                        src={desktopImg} 
-                        alt={`Desktop Banner ${activeBanner.target_destination || "India"}`} 
-                        className="w-full h-full object-contain object-center rounded-2xl md:rounded-3xl"
+                        src={mobileImg || desktopImg} 
+                        alt={`Banner ${activeBanner.target_destination || "India"}`} 
+                        className="w-full h-auto min-h-[140px] max-h-[300px] object-contain rounded-2xl md:rounded-3xl block"
                         onError={(e) => {
                           e.currentTarget.onerror = null;
-                          e.currentTarget.src = fallbackUrl;
+                          if (desktopImg && e.currentTarget.src !== desktopImg) {
+                            e.currentTarget.src = desktopImg;
+                          } else if (e.currentTarget.src !== fallbackUrl) {
+                            e.currentTarget.src = fallbackUrl;
+                          }
                         }}
                       />
-                    </div>
-
-                    {/* Mobile Banner Container (Aspect 2:1, max-h 300px, 100% width, object-contain NO CROP) */}
-                    <div className="block md:hidden w-full aspect-[2/1] max-h-[300px] relative bg-slate-950">
-                      <img 
-                        src={mobileImg} 
-                        alt={`Mobile Banner ${activeBanner.target_destination || "India"}`} 
-                        className="w-full h-full object-contain object-center rounded-2xl"
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = desktopImg || fallbackUrl;
-                        }}
-                      />
-                    </div>
+                    </picture>
                   </div>
 
                   {/* Session Storage Dismiss Close Button */}
