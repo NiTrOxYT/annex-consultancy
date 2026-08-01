@@ -896,9 +896,18 @@ export default function StudentDashboard() {
     }
   };
 
+  // Filter STAGES for India destination
+  const visibleStages = React.useMemo(() => {
+    return STAGES.filter(stage => 
+      studentData?.destination === "India" 
+        ? (stage !== "Visa Processing" && stage !== "Visa Approved") 
+        : true
+    );
+  }, [studentData?.destination]);
+
   // Calculate overall progress percentage
-  const currentStageIndex = studentData ? STAGES.indexOf(studentData.current_stage) : 0;
-  const progressPercent = Math.round(((currentStageIndex + 1) / STAGES.length) * 100);
+  const currentStageIndex = studentData ? visibleStages.indexOf(studentData.current_stage) : 0;
+  const progressPercent = Math.round(((Math.max(0, currentStageIndex) + 1) / visibleStages.length) * 100);
 
   // Find nearest upcoming meeting
   const upcomingMeeting = React.useMemo(() => {
@@ -961,7 +970,7 @@ export default function StudentDashboard() {
             { id: "dashboard", label: "Dashboard", icon: User },
             { id: "documents", label: "Document Center", icon: FileArrowUp },
             { id: "offers", label: "Offer Letters", icon: FileText },
-            { id: "visa", label: "Visa Timeline", icon: Calendar },
+            ...(studentData?.destination !== "India" ? [{ id: "visa", label: "Visa Timeline", icon: Calendar }] : []),
             { id: "chat", label: "Counselor Chat", icon: ChatCircleDots },
             { id: "appointments", label: "Scheduled Meetings", icon: CalendarCheck },
             { id: "referrals", label: "Referrals", icon: ShareNetwork },
@@ -1078,7 +1087,7 @@ export default function StudentDashboard() {
                 <div className="block md:hidden">
                   {/* Vertical Stepper for Mobile */}
                   <div className="relative pl-6 border-l border-slate-200 space-y-4 py-2 ml-3">
-                    {STAGES.map((stage, idx) => {
+                    {visibleStages.map((stage, idx) => {
                       const isDone = idx < currentStageIndex;
                       const isCurrent = idx === currentStageIndex;
                       const isUpcoming = idx > currentStageIndex;
@@ -1116,7 +1125,7 @@ export default function StudentDashboard() {
                 <div className="hidden md:block">
                   {/* Horizontal Scrollable Stepper for Desktop */}
                   <div className="flex items-stretch gap-4 overflow-x-auto pb-4 pt-1 snap-x scrollbar-thin">
-                    {STAGES.map((stage, idx) => {
+                    {visibleStages.map((stage, idx) => {
                       const isDone = idx < currentStageIndex;
                       const isCurrent = idx === currentStageIndex;
                       const isUpcoming = idx > currentStageIndex;
@@ -1357,7 +1366,7 @@ export default function StudentDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="divide-y divide-hairline">
-                    {DOC_TYPES.map(type => {
+                    {DOC_TYPES.filter(type => studentData?.destination === "India" ? type !== "Visa Documents" : true).map(type => {
                       const fileRecord = documents.find(d => d.document_type === type);
                       const isUploading = uploadingDoc === type;
                       

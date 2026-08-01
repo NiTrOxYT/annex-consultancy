@@ -11247,7 +11247,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 { id: "progress", label: "Tasks & Progress" },
                 { id: "documents", label: "Documents Collection" },
                 { id: "offers", label: "Offer Letters" },
-                { id: "visa", label: "Visa Timeline" },
+                ...(selectedStudent.destination !== "India" ? [{ id: "visa", label: "Visa Timeline" }] : []),
                 { id: "chat", label: "Counselor Chat" },
                 { id: "logs", label: "Activity Logs" },
                 { id: "meetings", label: "Schedule Meetings" },
