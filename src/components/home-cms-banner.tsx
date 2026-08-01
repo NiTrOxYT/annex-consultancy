@@ -97,8 +97,8 @@ export function HomeCmsBanner() {
           onClick={handleBannerClick}
           className="block relative w-full overflow-hidden bg-white cursor-pointer"
         >
-          {/* Desktop Banner (Aspect Ratio 4:1 - Full Width 1200x300 / 1600x400) */}
-          <div className="hidden md:block w-full aspect-[4/1] max-h-[360px] relative bg-white">
+          {/* Desktop Banner (Aspect Ratio 4:1 - Full Width 1600x400) */}
+          <div className="hidden md:block w-full aspect-[4/1] max-h-[400px] relative bg-white">
             <img 
               src={desktopImg} 
               alt="Promotional Banner" 
