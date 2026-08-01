@@ -377,6 +377,26 @@ function ReferralForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to submit referral");
       
+      if (typeof window !== "undefined") {
+        const item = data.referral || {
+          id: `ref-${Date.now()}`,
+          referrer_name: form.referrer_name,
+          referrer_email: form.referrer_email,
+          referrer_phone: form.referrer_phone,
+          referrer_city: form.referrer_city,
+          referred_name: form.student_name,
+          referred_phone: form.student_phone,
+          preferred_country: form.preferred_country,
+          notes: form.message,
+          status: "pending_contact",
+          created_at: new Date().toISOString()
+        };
+        const local = localStorage.getItem("annex_submitted_referrals");
+        const list = local ? JSON.parse(local) : [];
+        list.unshift(item);
+        localStorage.setItem("annex_submitted_referrals", JSON.stringify(list));
+      }
+
       setSubmitted(true);
     } catch (err: any) {
       alert("Error: " + err.message);

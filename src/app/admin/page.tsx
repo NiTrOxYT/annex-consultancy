@@ -2230,20 +2230,53 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     setLoadingReferrals(true);
     setLoadingReferralAnalytics(true);
     try {
+      const local = typeof window !== "undefined" ? localStorage.getItem("annex_submitted_referrals") : null;
+      const localList = local ? JSON.parse(local) : [];
+
       const token = getAdminCredentials();
       const res = await fetch(`/api/admin/referrals?status=${referralStatusFilter}&search=${encodeURIComponent(referralSearch)}`, {
         headers: {
           "Authorization": `Bearer ${token}`
         }
       });
-      if (!res.ok) throw new Error("Failed to fetch referrals data");
-      const data = await res.json();
-      if (data.success) {
-        setReferrals(data.referrals || []);
-        setReferralAnalytics(data.analytics || null);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.referrals) {
+          const combinedMap = new Map();
+          localList.forEach((r: any) => combinedMap.set(r.id, r));
+          (data.referrals || []).forEach((r: any) => combinedMap.set(r.id, r));
+          const combined = Array.from(combinedMap.values());
+          setReferrals(combined);
+
+          const enrolled = combined.filter((r: any) => r.status === "enrolled" || r.status === "reward_paid").length;
+          setReferralAnalytics({
+            totalReferrals: combined.length,
+            enrolledCount: enrolled,
+            conversionRate: combined.length ? Math.round((enrolled / combined.length) * 100) : 0,
+            pendingPayoutsCount: combined.filter((r: any) => r.status === "enrolled").length,
+            totalRewardsPaid: combined.filter((r: any) => r.status === "reward_paid").length * 10000
+          });
+          return;
+        }
+      }
+
+      if (localList.length > 0) {
+        setReferrals(localList);
+        const enrolled = localList.filter((r: any) => r.status === "enrolled" || r.status === "reward_paid").length;
+        setReferralAnalytics({
+          totalReferrals: localList.length,
+          enrolledCount: enrolled,
+          conversionRate: localList.length ? Math.round((enrolled / localList.length) * 100) : 0,
+          pendingPayoutsCount: localList.filter((r: any) => r.status === "enrolled").length,
+          totalRewardsPaid: localList.filter((r: any) => r.status === "reward_paid").length * 10000
+        });
       }
     } catch (err: any) {
       console.error("Error loading referrals data:", err.message);
+      const local = typeof window !== "undefined" ? localStorage.getItem("annex_submitted_referrals") : null;
+      if (local) {
+        setReferrals(JSON.parse(local));
+      }
     } finally {
       setLoadingReferrals(false);
       setLoadingReferralAnalytics(false);

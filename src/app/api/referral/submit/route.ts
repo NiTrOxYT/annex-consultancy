@@ -13,39 +13,33 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log("[Public Referral Submission]", {
+    const newReferral = {
+      id: `ref-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       referrer_name,
-      referrer_email,
+      referrer_email: referrer_email || "",
       referrer_phone,
-      referrer_city,
-      student_name,
-      student_phone,
-      preferred_country,
-      message,
-      timestamp: new Date().toISOString()
-    });
+      referrer_city: referrer_city || "",
+      referred_name: student_name,
+      referred_phone: student_phone,
+      referred_email: "",
+      preferred_country: preferred_country || "India",
+      notes: message || "Public website submission",
+      status: "pending_contact",
+      created_at: new Date().toISOString()
+    };
 
-    // Optionally insert into student_referrals or referrals table if available
+    console.log("[Public Referral Submission]", newReferral);
+
     try {
-      await supabase.from("referrals").insert([{
-        referrer_name,
-        referrer_email,
-        referrer_phone,
-        referrer_city,
-        referred_name: student_name,
-        referred_phone: student_phone,
-        preferred_country: preferred_country || "India",
-        notes: message || "Public website submission",
-        status: "pending_contact",
-        created_at: new Date().toISOString()
-      }]);
+      await supabase.from("referrals").insert([newReferral]);
     } catch (dbErr: any) {
-      console.warn("Database insert skipped or schema fallback:", dbErr.message);
+      console.warn("DB insert fallback:", dbErr.message);
     }
 
     return NextResponse.json({
       success: true,
-      message: "Referral submitted successfully! Our team will get in touch shortly."
+      message: "Referral submitted successfully!",
+      referral: newReferral
     });
   } catch (err: any) {
     console.error("Referral submit API error:", err);
