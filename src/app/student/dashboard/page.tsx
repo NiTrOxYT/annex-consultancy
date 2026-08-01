@@ -483,25 +483,21 @@ export default function StudentDashboard() {
           setBanners(bData);
         } else {
           const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
-          if (local) setBanners(JSON.parse(local));
-          else {
-            setBanners([{
-              id: "default-banner-1",
-              title: "Admissions Open: Study in India 2026",
-              subtitle: "Discover top-tier Indian universities, merit scholarships & hassle-free applications.",
-              image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
-              desktop_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
-              mobile_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
-              link_url: "/study-in-india",
-              button_text: "Explore India Universities",
-              target_destination: "India",
-              is_active: true
-            }]);
+          if (local) {
+            const parsed = JSON.parse(local);
+            setBanners(Array.isArray(parsed) ? parsed.filter((b: any) => b.is_active !== false) : []);
+          } else {
+            setBanners([]);
           }
         }
       } catch (e) {
         const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
-        if (local) setBanners(JSON.parse(local));
+        if (local) {
+          const parsed = JSON.parse(local);
+          setBanners(Array.isArray(parsed) ? parsed.filter((b: any) => b.is_active !== false) : []);
+        } else {
+          setBanners([]);
+        }
       }
 
       // 11. Fetch Notification email history logs

@@ -727,26 +727,15 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
         if (local && JSON.parse(local).length > 0) {
           setBanners(JSON.parse(local));
         } else {
-          const defaultBanner = [{
-            id: "default-banner-1",
-            target_destination: "India",
-            image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
-            desktop_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
-            mobile_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
-            link_url: "referrals",
-            is_active: true,
-            created_at: new Date().toISOString()
-          }];
-          setBanners(defaultBanner);
-          if (typeof window !== "undefined") {
-            localStorage.setItem("annex_cms_banners", JSON.stringify(defaultBanner));
-          }
+          setBanners([]);
         }
       }
     } catch (err: any) {
       const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
       if (local) {
         setBanners(JSON.parse(local));
+      } else {
+        setBanners([]);
       }
     } finally {
       setLoadingBanners(false);
