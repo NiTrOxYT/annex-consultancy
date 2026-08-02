@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 interface CmsBannerProps {
   location: "homepage" | "student_dashboard" | "referral_page" | "global";
   className?: string;
+  onSelectTab?: (tab: string) => void;
 }
 
 const DEFAULT_BANNER = {
@@ -21,7 +22,7 @@ const DEFAULT_BANNER = {
   is_active: true
 };
 
-export function CmsBanner({ location, className = "" }: CmsBannerProps) {
+export function CmsBanner({ location, className = "", onSelectTab }: CmsBannerProps) {
   const router = useRouter();
   const [bannerData, setBannerData] = React.useState<{ desktop: any; mobile: any; active: any } | null>(null);
   const [dismissed, setDismissed] = React.useState(false);
@@ -86,11 +87,14 @@ export function CmsBanner({ location, className = "" }: CmsBannerProps) {
 
   const handleClick = () => {
     const link = (active?.link_url || "").trim();
-    if (!link) return;
     if (link.startsWith("http")) {
       window.open(link, "_blank");
-    } else {
+    } else if (onSelectTab) {
+      onSelectTab("referrals");
+    } else if (link && link !== "/" && link !== "referrals" && link !== "/referrals") {
       router.push(link);
+    } else {
+      router.push("/referral");
     }
   };
 

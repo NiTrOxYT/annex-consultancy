@@ -1222,7 +1222,7 @@ export default function StudentDashboard() {
             </div>
 
             {/* Dynamic Promotional Banner (CMS Driven) */}
-            <CmsBanner location="student_dashboard" className="my-4 px-0" />
+            <CmsBanner location="student_dashboard" className="my-4 px-0" onSelectTab={() => { setActiveTab("referrals"); setPreviewUrl(null); }} />
 
             {/* Progress Bar & Stage display */}
             <Card>
