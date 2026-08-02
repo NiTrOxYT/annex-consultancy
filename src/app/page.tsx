@@ -65,11 +65,11 @@ export default function Home() {
     <>
       <Navigation />
 
-      <HomeCmsBanner />
+      <main className="flex-grow pt-24 md:pt-28">
+        <HomeCmsBanner />
 
-      <main className="flex-grow">
         {/* Asymmetric Hero Section */}
-        <section className="relative pt-6 pb-20 md:pt-8 md:pb-28 overflow-hidden bg-white">
+        <section className="relative pb-20 md:pb-28 overflow-hidden bg-white">
           <div className="max-w-7xl mx-auto px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
 
