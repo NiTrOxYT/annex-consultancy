@@ -663,6 +663,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const [uploadingMobileImg, setUploadingMobileImg] = React.useState(false);
   const [bannerForm, setBannerForm] = React.useState({
     target_destination: "India",
+    display_location: "homepage",
     desktop_image_url: "",
     mobile_image_url: "",
     link_url: "",
@@ -9569,6 +9570,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     setEditingBanner(null);
                     setBannerForm({
                       target_destination: "India",
+                      display_location: "homepage",
                       desktop_image_url: "",
                       mobile_image_url: "",
                       link_url: "",
@@ -9597,9 +9599,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 {banners.map(banner => (
                   <Card key={banner.id} className="overflow-hidden border border-hairline hover:shadow-md transition-shadow bg-white p-4">
                     <div className="flex items-center justify-between mb-3 border-b border-hairline pb-3">
-                      <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider bg-gold text-slate-950 px-2.5 py-0.5 rounded-full font-mono-data">
-                          Location: {banner.target_destination || "India"}
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2.5 py-0.5 rounded-full font-mono-data">
+                          {banner.target_destination === "All" ? "🌐" : banner.target_destination === "India" ? "🇮🇳" : banner.target_destination === "UK" ? "🇬🇧" : banner.target_destination === "Australia" ? "🇦🇺" : banner.target_destination === "Europe" ? "🇪🇺" : banner.target_destination === "Dubai" ? "🇦🇪" : banner.target_destination === "Italy" ? "🇮🇹" : "🌍"} {banner.target_destination || "India"}
+                        </span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200/60 px-2.5 py-0.5 rounded-full font-mono-data ml-1.5">
+                          {banner.display_location === "homepage" ? "🏠 Homepage" : banner.display_location === "student_dashboard" ? "🎓 Student Dashboard" : banner.display_location === "referral_page" ? "🎁 Referral Page" : banner.display_location === "consultation" ? "📞 Consultation" : banner.display_location === "university_listing" ? "🏛️ Universities" : banner.display_location === "blog" ? "📝 Blog" : banner.display_location === "country_page" ? "🗺️ Country Page" : banner.display_location === "success_stories" ? "⭐ Success Stories" : banner.display_location === "global" ? "🌐 Global (All Pages)" : "🏠 Homepage"}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -9618,6 +9623,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                             setEditingBanner(banner);
                             setBannerForm({
                               target_destination: banner.target_destination || "India",
+                              display_location: banner.display_location || "homepage",
                               desktop_image_url: banner.desktop_image_url || banner.image_url || "",
                               mobile_image_url: banner.mobile_image_url || banner.desktop_image_url || banner.image_url || "",
                               link_url: banner.link_url || "",
@@ -9662,6 +9668,11 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                           )}
                         </div>
                       </div>
+                    </div>
+                    {/* Meta row: updated at */}
+                    <div className="mt-3 pt-3 border-t border-hairline flex items-center justify-between text-[10px] text-slate-400">
+                      <span>Last updated: {banner.updated_at ? new Date(banner.updated_at).toLocaleDateString() : new Date(banner.created_at).toLocaleDateString()}</span>
+                      <span className={`font-bold ${banner.is_active !== false ? "text-emerald-600" : "text-slate-400"}`}>{banner.is_active !== false ? "● Active" : "○ Inactive"}</span>
                     </div>
                   </Card>
                 ))}
@@ -13005,21 +13016,41 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
             <form onSubmit={handleSaveBanner} className="flex flex-col gap-4 text-xs">
               
+              {/* Display Location Select */}
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Display Location *</label>
+                <select
+                  value={bannerForm.display_location}
+                  onChange={(e) => setBannerForm({ ...bannerForm, display_location: e.target.value })}
+                  className="px-3.5 py-2.5 border border-hairline bg-white rounded-xl text-xs text-slate-800 outline-none cursor-pointer font-bold"
+                >
+                  <option value="homepage">🏠 Homepage Hero</option>
+                  <option value="student_dashboard">🎓 Student Portal Dashboard</option>
+                  <option value="referral_page">🎁 Referral Landing Page</option>
+                  <option value="consultation">📞 Consultation Page</option>
+                  <option value="university_listing">🏛️ University Listing</option>
+                  <option value="blog">📝 Blog Page</option>
+                  <option value="country_page">🗺️ Country Landing Page</option>
+                  <option value="success_stories">⭐ Success Stories</option>
+                  <option value="global">🌐 Global Banner (All Pages)</option>
+                </select>
+              </div>
+
               {/* Target Location Select */}
               <div className="flex flex-col gap-1.5">
-                <label className="font-bold text-primary uppercase tracking-wider">Target Location / Destination *</label>
+                <label className="font-bold text-primary uppercase tracking-wider">Target Country *</label>
                 <select
                   value={bannerForm.target_destination}
                   onChange={(e) => setBannerForm({ ...bannerForm, target_destination: e.target.value })}
                   className="px-3.5 py-2.5 border border-hairline bg-white rounded-xl text-xs text-slate-800 outline-none cursor-pointer font-bold"
                 >
-                  <option value="India">India</option>
-                  <option value="UK">UK</option>
-                  <option value="Australia">Australia</option>
-                  <option value="Europe">Europe</option>
-                  <option value="Dubai">Dubai</option>
-                  <option value="Italy">Italy</option>
-                  <option value="All">All Locations (Global Default)</option>
+                  <option value="India">🇮🇳 India</option>
+                  <option value="UK">🇬🇧 UK</option>
+                  <option value="Australia">🇦🇺 Australia</option>
+                  <option value="Europe">🇪🇺 Europe</option>
+                  <option value="Dubai">🇦🇪 Dubai</option>
+                  <option value="Italy">🇮🇹 Italy</option>
+                  <option value="All">🌍 All Locations (Global Default)</option>
                 </select>
               </div>
 

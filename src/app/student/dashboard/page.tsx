@@ -478,6 +478,7 @@ export default function StudentDashboard() {
           .from("cms_banners")
           .select("*")
           .eq("is_active", true)
+          .in("display_location", ["student_dashboard", "global"])
           .order("created_at", { ascending: false });
         if (bData && bData.length > 0) {
           setBanners(bData);
@@ -1259,24 +1260,36 @@ export default function StudentDashboard() {
                 <div className="relative rounded-2xl md:rounded-3xl overflow-hidden shadow-sm border border-hairline/80 group animate-fade-in bg-slate-950">
                   <div 
                     onClick={handleBannerClick} 
-                    className="block relative w-full min-h-[140px] overflow-hidden bg-slate-950 cursor-pointer"
+                    className="block relative w-full cursor-pointer"
                   >
-                    <picture className="block w-full">
-                      {desktopImg && <source media="(min-width: 768px)" srcSet={desktopImg} />}
-                      <img 
-                        src={mobileImg || desktopImg} 
-                        alt={`Banner ${activeBanner.target_destination || "India"}`} 
-                        className="w-full h-auto min-h-[140px] max-h-[300px] object-contain rounded-2xl md:rounded-3xl block"
-                        onError={(e) => {
-                          e.currentTarget.onerror = null;
-                          if (desktopImg && e.currentTarget.src !== desktopImg) {
-                            e.currentTarget.src = desktopImg;
-                          } else if (e.currentTarget.src !== fallbackUrl) {
-                            e.currentTarget.src = fallbackUrl;
-                          }
-                        }}
-                      />
-                    </picture>
+                    {/* DESKTOP banner — md+ */}
+                    <img
+                      src={desktopImg}
+                      alt={`Banner ${activeBanner.target_destination || "India"}`}
+                      className="hidden md:block w-full h-auto max-h-[300px] object-cover rounded-2xl md:rounded-3xl"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        if (mobileImg && e.currentTarget.src !== mobileImg) {
+                          e.currentTarget.src = mobileImg;
+                        } else if (e.currentTarget.src !== fallbackUrl) {
+                          e.currentTarget.src = fallbackUrl;
+                        }
+                      }}
+                    />
+                    {/* MOBILE banner — below md */}
+                    <img
+                      src={mobileImg}
+                      alt={`Banner ${activeBanner.target_destination || "India"}`}
+                      className="block md:hidden w-full h-auto object-cover rounded-2xl"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        if (desktopImg && e.currentTarget.src !== desktopImg) {
+                          e.currentTarget.src = desktopImg;
+                        } else if (e.currentTarget.src !== fallbackUrl) {
+                          e.currentTarget.src = fallbackUrl;
+                        }
+                      }}
+                    />
                   </div>
 
                   {/* Session Storage Dismiss Close Button */}
