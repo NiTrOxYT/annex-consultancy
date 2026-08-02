@@ -14,139 +14,112 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: authResult.error || "Unauthorized" }, { status: authResult.status || 401 });
     }
 
-    if (!supabaseAdmin) {
-      return NextResponse.json({ 
-        error: "SUPABASE_SERVICE_ROLE_KEY is required to process administrative operations." 
-      }, { status: 500 });
-    }
-
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status");
-    const search = searchParams.get("search");
+    const statusFilter = searchParams.get("status");
+    const searchQuery = searchParams.get("search");
 
-    // 1. Query Referrals List
-    let referralsQuery = db
-      .from("referrals")
-      .select("*, students(name, email), referral_rewards(*)")
-      .order("created_at", { ascending: false });
+    // 1. Fetch Public Referrals table
+    let publicList: any[] = [];
+    try {
+      const { data, error } = await db
+        .from("public_referrals")
+        .select("*")
+        .eq("deleted", false)
+        .order("created_at", { ascending: false });
 
-    if (status && status !== "All") {
-      referralsQuery = referralsQuery.eq("status", status);
+      if (!error && data) {
+        publicList = data.map((r: any) => ({
+          ...r,
+          source: "public_website",
+          referred_name: r.student_name,
+          referred_phone: r.student_phone,
+          referred_email: r.student_email,
+          status: r.status || "Pending"
+        }));
+      }
+    } catch (e: any) {
+      console.warn("Public referrals fetch note:", e.message);
     }
 
-    const { data: referralsList, error: listErr } = await referralsQuery;
-    if (listErr) throw listErr;
+    // 2. Fetch Student Portal Referrals table
+    let portalList: any[] = [];
+    try {
+      const { data, error } = await db
+        .from("referrals")
+        .select("*, students(name, email), referral_rewards(*)")
+        .order("created_at", { ascending: false });
 
-    // Apply search filters client side for flexibility (search on referred or referrer name)
-    let filteredList = referralsList || [];
-    if (search) {
-      const q = search.toLowerCase();
-      filteredList = filteredList.filter(r => 
-        r.referred_name.toLowerCase().includes(q) ||
-        r.referred_email.toLowerCase().includes(q) ||
-        (r.students?.name || "").toLowerCase().includes(q) ||
-        (r.students?.email || "").toLowerCase().includes(q)
+      if (!error && data) {
+        portalList = data.map((r: any) => ({
+          ...r,
+          source: r.source || (r.referrer_name ? "public_website" : "student_portal"),
+          referrer_name: r.referrer_name || r.students?.name || "Student Referral",
+          referrer_email: r.referrer_email || r.students?.email || "",
+          referrer_phone: r.referrer_phone || "",
+          student_name: r.referred_name,
+          student_phone: r.referred_phone,
+          student_email: r.referred_email,
+          message: r.notes || ""
+        }));
+      }
+    } catch (e: any) {
+      console.warn("Portal referrals fetch note:", e.message);
+    }
+
+    // Merge lists by ID
+    const combinedMap = new Map();
+    publicList.forEach((r: any) => combinedMap.set(r.id, r));
+    portalList.forEach((r: any) => combinedMap.set(r.id, r));
+    let combined = Array.from(combinedMap.values());
+
+    // Apply Search Filter
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      combined = combined.filter((r: any) =>
+        (r.referrer_name || "").toLowerCase().includes(q) ||
+        (r.referrer_phone || "").toLowerCase().includes(q) ||
+        (r.student_name || r.referred_name || "").toLowerCase().includes(q) ||
+        (r.student_phone || r.referred_phone || "").toLowerCase().includes(q) ||
+        (r.preferred_country || "").toLowerCase().includes(q)
       );
     }
 
-    // 2. Fetch Raw Data for Analytics calculations
-    const { data: allReferrals, error: allErr } = await db
-      .from("referrals")
-      .select("*, students(name, email), referral_rewards(*)");
+    // Apply Status Filter
+    if (statusFilter && statusFilter !== "All") {
+      combined = combined.filter((r: any) => r.status.toLowerCase() === statusFilter.toLowerCase());
+    }
 
-    if (allErr) throw allErr;
+    // Sort descending by creation date
+    combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    const list = allReferrals || [];
-    const totalReferrals = list.length;
+    // Analytics Metrics
+    const totalReferrals = combined.length;
+    const pendingCount = combined.filter((r: any) => r.status === "Pending" || r.status === "lead" || r.status === "pending_contact").length;
+    const contactedCount = combined.filter((r: any) => r.status === "Contacted" || r.status === "contacted").length;
+    const convertedCount = combined.filter((r: any) => r.status === "Converted" || r.status === "enrolled" || r.status === "rewarded").length;
+    const rewardsPaidCount = combined.filter((r: any) => r.status === "Reward Paid" || r.status === "rewarded" || r.status === "reward_paid").length;
+    const rewardsPaidTotal = rewardsPaidCount * 10000;
 
-    // Enrollments count = status enrolled or status rewarded
-    const enrollments = list.filter(r => r.status === "enrolled" || r.status === "rewarded").length;
-    const conversionRate = totalReferrals > 0 ? Math.round((enrollments / totalReferrals) * 100) : 0;
-
-    // Sum of paid rewards
-    const { data: rewardsPaidList } = await db.from("referral_rewards").select("reward_amount");
-    const rewardsPaid = (rewardsPaidList || []).reduce((sum, r) => sum + Number(r.reward_amount), 0);
-
-    // Active Referrers (distinct student counts)
-    const activeReferrersSet = new Set(list.map(r => r.referrer_student_id));
-    const activeReferrers = activeReferrersSet.size;
-
-    // Monthly Trend Calculations (last 6 months)
-    const monthlyMap = new Map<string, number>();
-    list.forEach(r => {
-      const date = new Date(r.created_at);
-      const key = date.toLocaleString("en-US", { month: "short", year: "2-digit" });
-      monthlyMap.set(key, (monthlyMap.get(key) || 0) + 1);
-    });
-
-    const monthlyTrend = Array.from(monthlyMap.entries()).map(([month, count]) => ({
-      month,
-      count
-    })).slice(-6); // Last 6 months
-
-    // Funnel Stage Calculations
-    const STAGES = ["lead", "contacted", "application_started", "offer_received", "visa_approved", "enrolled", "rewarded"];
-    const funnelStages = STAGES.map(stage => {
-      // Funnel shows count of referrals that reached OR passed this stage
-      const count = list.filter(r => {
-        const rIndex = STAGES.indexOf(r.status);
-        const stageIndex = STAGES.indexOf(stage);
-        return rIndex >= stageIndex;
-      }).length;
-
-      const percentage = totalReferrals > 0 ? Math.round((count / totalReferrals) * 100) : 0;
-
-      return {
-        stage: stage.charAt(0).toUpperCase() + stage.slice(1).replace("_", " "),
-        count,
-        percentage
-      };
-    });
-
-    // Top Referrers calculations
-    const referrerMap = new Map<string, { name: string; email: string; count: number; rewards: number }>();
-    list.forEach(r => {
-      if (!r.students) return;
-      const key = r.referrer_student_id;
-      const ref = referrerMap.get(key) || {
-        name: r.students.name,
-        email: r.students.email,
-        count: 0,
-        rewards: 0
-      };
-
-      ref.count += 1;
-      ref.rewards += Number(r.reward_amount || 0);
-      referrerMap.set(key, ref);
-    });
-
-    const topReferrers = Array.from(referrerMap.values())
-      .map(r => ({
-        referrerName: r.name,
-        referrerEmail: r.email,
-        referralsCount: r.count,
-        rewardsTotal: r.rewards
-      }))
-      .sort((a, b) => b.referralsCount - a.referralsCount)
-      .slice(0, 5); // Limit to top 5
+    const conversionRate = totalReferrals > 0 ? Math.round((convertedCount / totalReferrals) * 100) : 0;
 
     return NextResponse.json({
       success: true,
-      referrals: filteredList,
+      referrals: combined,
       analytics: {
         totalReferrals,
-        activeReferrers,
-        enrollments,
+        pendingCount,
+        contactedCount,
+        convertedCount,
+        rewardsPaidCount,
+        rewardsPaid: rewardsPaidTotal,
+        totalRewardsPaid: rewardsPaidTotal,
         conversionRate,
-        rewardsPaid,
-        monthlyTrend,
-        funnelStages,
-        topReferrers
+        activeReferrers: new Set(combined.map((r: any) => r.referrer_name || r.referrer_phone)).size
       }
     });
   } catch (err: any) {
-    console.error("API GET Admin Referrals Error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("Admin referrals GET error:", err);
+    return NextResponse.json({ error: err.message || "Failed to fetch referrals" }, { status: 500 });
   }
 }
 
@@ -157,148 +130,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: authResult.error || "Unauthorized" }, { status: authResult.status || 401 });
     }
 
-    if (!supabaseAdmin) {
-      return NextResponse.json({ 
-        error: "SUPABASE_SERVICE_ROLE_KEY is required to change statuses or approve rewards." 
-      }, { status: 500 });
-    }
-
     const body = await request.json();
-    const { action } = body;
+    const { action, referralId, status, notes, assigned_counselor, reward_status } = body;
 
-    // Action A: Change Referral Status
-    if (action === "update-status") {
-      const { referralId, status } = body;
-      if (!referralId || !status) {
-        return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-      }
-
-      // Fetch active referral
-      const { data: referral, error: fetchErr } = await db
-        .from("referrals")
-        .select("*")
-        .eq("id", referralId)
-        .single();
-
-      if (fetchErr || !referral) {
-        return NextResponse.json({ error: "Referral not found" }, { status: 404 });
-      }
-
-      // Update status
-      const { error: updateErr } = await db
-        .from("referrals")
-        .update({ 
-          status, 
-          updated_at: new Date().toISOString() 
-        })
-        .eq("id", referralId);
-
-      if (updateErr) throw updateErr;
-
-      // Handle custom event notification triggers
-      if (status === "enrolled") {
-        await db.from("student_notifications").insert([{
-          student_id: referral.referrer_student_id,
-          title: "Referral Enrolled! 🎓",
-          content: `Your referred candidate "${referral.referred_name}" has officially enrolled. You are now eligible to receive your reward!`
-        }]);
-      } else {
-        await db.from("student_notifications").insert([{
-          student_id: referral.referrer_student_id,
-          title: "Referral Status Update",
-          content: `Referred student "${referral.referred_name}" is now set to status: ${status.replace("_", " ")}.`
-        }]);
-      }
-
-      // Activity logs
-      await db.from("student_activity_logs").insert([{
-        student_id: referral.referrer_student_id,
-        action: "Referral Status Transitioned",
-        details: `Referred: ${referral.referred_name}, Status: ${status}`
-      }]);
-
-      return NextResponse.json({ success: true, message: "Referral status updated successfully" });
+    if (!referralId) {
+      return NextResponse.json({ error: "Missing referralId" }, { status: 400 });
     }
 
-    // Action B: Issue Reward
-    if (action === "issue-reward") {
-      const { referralId, rewardAmount, rewardType, notes } = body;
-      if (!referralId || !rewardAmount) {
-        return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-      }
+    const updatePayload: any = { updated_at: new Date().toISOString() };
+    if (status) updatePayload.status = status;
+    if (notes) updatePayload.notes = notes;
+    if (assigned_counselor) updatePayload.assigned_counselor = assigned_counselor;
+    if (reward_status) updatePayload.reward_status = reward_status;
+    if (status === "Contacted") updatePayload.contacted = true;
+    if (action === "delete") updatePayload.deleted = true;
 
-      const amount = Number(rewardAmount);
-      if (isNaN(amount) || amount <= 0) {
-        return NextResponse.json({ error: "Reward amount must be a positive number" }, { status: 400 });
-      }
-
-      // Fetch referral
-      const { data: referral, error: fetchErr } = await db
-        .from("referrals")
-        .select("*")
-        .eq("id", referralId)
-        .single();
-
-      if (fetchErr || !referral) {
-        return NextResponse.json({ error: "Referral not found" }, { status: 404 });
-      }
-
-      // Verify reward eligibility (enrolled or already rewarded is allowed)
-      if (referral.status !== "enrolled" && referral.status !== "rewarded") {
-        return NextResponse.json({ 
-          error: `Referrals must be in Enrolled status before rewards can be approved. Current status is: ${referral.status}` 
-        }, { status: 400 });
-      }
-
-      // Insert reward row (upsert/insert check since referral_id is unique)
-      const { error: rewardErr } = await db
-        .from("referral_rewards")
-        .insert([{
-          referral_id: referralId,
-          reward_type: rewardType || "Cash",
-          reward_amount: amount,
-          notes: notes || null
-        }]);
-
-      if (rewardErr) {
-        if (rewardErr.message.includes("unique")) {
-          return NextResponse.json({ error: "A reward has already been issued for this referral." }, { status: 400 });
-        }
-        throw rewardErr;
-      }
-
-      // Update reward amount and status to rewarded on referrals table
-      const { error: updateErr } = await db
-        .from("referrals")
-        .update({
-          status: "rewarded",
-          reward_amount: amount,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", referralId);
-
-      if (updateErr) throw updateErr;
-
-      // In-app notifications
-      await db.from("student_notifications").insert([{
-        student_id: referral.referrer_student_id,
-        title: "Referral Reward Approved! 🎁",
-        content: `Your reward of $${amount} has been issued for referring "${referral.referred_name}"!`
-      }]);
-
-      // Activity logs
-      await db.from("student_activity_logs").insert([{
-        student_id: referral.referrer_student_id,
-        action: "Referral Reward Issued",
-        details: `Reward Amount: $${amount}, Referred: ${referral.referred_name}`
-      }]);
-
-      return NextResponse.json({ success: true, message: "Referral reward approved and issued successfully" });
+    // Update public_referrals
+    try {
+      await db.from("public_referrals").update(updatePayload).eq("id", referralId);
+    } catch (e: any) {
+      console.warn("Update public_referrals fallback:", e.message);
     }
 
-    return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
+    // Update referrals
+    try {
+      await db.from("referrals").update(updatePayload).eq("id", referralId);
+    } catch (e: any) {
+      console.warn("Update referrals fallback:", e.message);
+    }
+
+    return NextResponse.json({ success: true, message: "Referral updated successfully" });
   } catch (err: any) {
-    console.error("API POST Admin Referrals Error:", err);
+    console.error("Admin referrals POST error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

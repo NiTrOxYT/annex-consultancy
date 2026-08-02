@@ -7,8 +7,9 @@ import {
   Download, MagnifyingGlass, Funnel, ArrowSquareOut, Globe,
   Warning, WarningCircle, Check, X, SpinnerGap, GraduationCap, Star, Copy,
   User, Paperclip, PaperPlaneRight, Gear, UploadSimple, Lock, Key, Clock, Checks,
-  ChatCircleDots, Briefcase, Bell, ShareNetwork, Gift, Pencil, ImageSquare
+  ChatCircleDots, Briefcase, Bell, ShareNetwork, Gift, Pencil, ImageSquare, DownloadSimple
 } from "@phosphor-icons/react";
+import { motion, AnimatePresence } from "motion/react";
 import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle, CardDescription, CardHeader, CardContent } from "@/components/ui/card";
@@ -453,6 +454,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const [isRewardModalOpen, setIsRewardModalOpen] = React.useState(false);
   const [rewardAmount, setRewardAmount] = React.useState("10000");
   const [selectedReferral, setSelectedReferral] = React.useState<any | null>(null);
+  const [selectedReferralDrawer, setSelectedReferralDrawer] = React.useState<any | null>(null);
   const [issuingReward, setIssuingReward] = React.useState(false);
   const [updatingReferralStatus, setUpdatingReferralStatus] = React.useState<string | null>(null);
 
@@ -1075,10 +1077,12 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     return userPermissions.includes(permKey);
   };
 
+  const pendingReferralsCount = referrals.filter(r => r.status === "Pending" || r.status === "lead" || r.status === "pending_contact").length;
+
   const allTabsList = [
     { id: "bookings", label: `Consultations (${bookings.length})` },
     { id: "students", label: `Students (${students.length})` },
-    { id: "referrals", label: `Referrals (${referrals.length})` },
+    { id: "referrals", label: pendingReferralsCount > 0 ? `Public Referrals (${pendingReferralsCount})` : "Public Referrals" },
     { id: "eligibility", label: `Eligibility Leads (${eligibilityCount})` },
     { id: "counselors", label: `Counselors (${counselors.length})` },
     { id: "chat", label: "Messaging" },
@@ -2227,8 +2231,62 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     link.setAttribute("download", `Annex_Eligibility_Leads_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
     showToast(`Exported ${leadsToExport.length} leads successfully`);
+  };
+
+  const exportReferralsToCSV = () => {
+    if (!referrals || referrals.length === 0) {
+      alert("No referral records available to export.");
+      return;
+    }
+
+    const headers = [
+      "ID",
+      "Created Date",
+      "Source",
+      "Referrer Name",
+      "Referrer Phone",
+      "Referrer Email",
+      "Referrer City",
+      "Student Name",
+      "Student Phone",
+      "Student Email",
+      "Preferred Country",
+      "Status",
+      "Reward Amount",
+      "Reward Status",
+      "Notes"
+    ];
+
+    const rows = referrals.map(r => [
+      r.id,
+      new Date(r.created_at).toLocaleDateString(),
+      r.source === "public_website" || r.referrer_name ? "Public Website" : "Student Portal",
+      r.referrer_name || r.students?.name || "Website Guest",
+      r.referrer_phone || r.students?.email || "",
+      r.referrer_email || r.students?.email || "",
+      r.referrer_city || "",
+      r.student_name || r.referred_name || "",
+      r.student_phone || r.referred_phone || "",
+      r.student_email || r.referred_email || "",
+      r.preferred_country || "India",
+      r.status || "Pending",
+      r.reward_amount || 10000,
+      r.reward_status || "Not Eligible",
+      (r.notes || r.message || "").replace(/\n/g, " ")
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8,"
+      + [headers.join(","), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Annex_Public_Referrals_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${referrals.length} referral records successfully`);
   };
 
 
@@ -7897,121 +7955,63 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
               </Button>
             </div>
 
-            {/* Analytics Dashboard */}
+            {/* 5 Referral Dashboard Cards */}
             {loadingReferralAnalytics ? (
               <div className="py-8 flex flex-col items-center justify-center text-slate-400">
                 <SpinnerGap size={24} className="animate-spin text-primary mb-2" />
                 <p className="text-xs">Calculating analytics metrics...</p>
               </div>
-            ) : referralAnalytics ? (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {/* Stats Cards */}
-                <Card className="p-5 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between min-h-[110px]">
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <Card className="p-4 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Referrals</span>
-                  <div className="mt-3">
-                    <span className="text-2xl font-bold font-display text-primary">{referralAnalytics.totalReferrals}</span>
-                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Leads submitted</p>
+                  <div className="mt-2">
+                    <span className="text-2xl font-bold font-display text-primary">{referralAnalytics?.totalReferrals || referrals.length}</span>
+                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Total submissions</p>
                   </div>
                 </Card>
 
-                <Card className="p-5 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between min-h-[110px]">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Conversion Rate</span>
-                  <div className="mt-3">
-                    <span className="text-2xl font-bold font-display text-primary">{referralAnalytics.conversionRate}%</span>
-                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Enrollment conversion</p>
-                  </div>
-                </Card>
-
-                <Card className="p-5 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between min-h-[110px]">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rewards Approved/Paid</span>
-                  <div className="mt-3">
-                    <span className="text-2xl font-bold font-display text-emerald-600">
-                      ₹{(referralAnalytics.rewardsPaid || referralAnalytics.totalRewardsPaid || 0).toLocaleString()}
+                <Card className="p-4 bg-amber-50/20 border border-amber-200/60 rounded-2xl flex flex-col justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Pending</span>
+                  <div className="mt-2">
+                    <span className="text-2xl font-bold font-display text-amber-600">
+                      {referrals.filter(r => r.status === "Pending" || r.status === "lead" || r.status === "pending_contact").length}
                     </span>
-                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Approved cashback payout</p>
+                    <p className="text-[10px] text-amber-500 font-semibold mt-0.5">Awaiting contact</p>
                   </div>
                 </Card>
 
-                <Card className="p-5 bg-white border border-hairline/80 rounded-2xl flex flex-col justify-between min-h-[110px]">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Active Referrers</span>
-                  <div className="mt-3">
-                    <span className="text-2xl font-bold font-display text-primary">{referralAnalytics.activeReferrers}</span>
-                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Students referring</p>
+                <Card className="p-4 bg-blue-50/20 border border-blue-200/60 rounded-2xl flex flex-col justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Contacted</span>
+                  <div className="mt-2">
+                    <span className="text-2xl font-bold font-display text-blue-600">
+                      {referrals.filter(r => r.status === "Contacted" || r.status === "contacted").length}
+                    </span>
+                    <p className="text-[10px] text-blue-500 font-semibold mt-0.5">In counseling</p>
                   </div>
                 </Card>
 
-                {/* Funnel Stage Chart */}
-                <Card className="md:col-span-2 p-5 bg-white border border-hairline/80 rounded-2xl">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Referral Stage Funnel</h4>
-                  <div className="space-y-3">
-                    {referralAnalytics.funnelStages?.map((stage: any) => (
-                      <div key={stage.stage} className="space-y-1">
-                        <div className="flex items-center justify-between text-xs font-semibold">
-                          <span className="text-slate-600">{stage.stage}</span>
-                          <span className="text-primary">{stage.count} ({stage.percentage}%)</span>
-                        </div>
-                        <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-                          <div
-                            className="bg-primary h-full rounded-full transition-all"
-                            style={{ width: `${stage.percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
+                <Card className="p-4 bg-purple-50/20 border border-purple-200/60 rounded-2xl flex flex-col justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600">Converted</span>
+                  <div className="mt-2">
+                    <span className="text-2xl font-bold font-display text-purple-700">
+                      {referrals.filter(r => ["Converted", "enrolled", "rewarded", "Reward Paid"].includes(r.status)).length}
+                    </span>
+                    <p className="text-[10px] text-purple-500 font-semibold mt-0.5">Enrolled students</p>
                   </div>
                 </Card>
 
-                {/* Monthly Trend Chart */}
-                <Card className="p-5 bg-white border border-hairline/80 rounded-2xl">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Monthly Trend</h4>
-                  {referralAnalytics.monthlyTrend && referralAnalytics.monthlyTrend.length > 0 ? (
-                    <div className="space-y-3">
-                      {referralAnalytics.monthlyTrend.map((trend: any) => (
-                        <div key={trend.month} className="flex items-center justify-between py-1 border-b border-hairline/40 last:border-0 text-xs">
-                          <span className="text-slate-500 font-semibold">{trend.month}</span>
-                          <div className="flex-grow mx-4">
-                            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                              <div
-                                className="bg-gold h-full rounded-full"
-                                style={{
-                                  width: `${referralAnalytics.totalReferrals > 0 ? (trend.count / referralAnalytics.totalReferrals) * 100 : 0}%`
-                                }}
-                              />
-                            </div>
-                          </div>
-                          <span className="text-primary font-bold">{trend.count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-slate-400 text-xs text-center py-6">No historical data available</p>
-                  )}
-                </Card>
-
-                {/* Top Referrers */}
-                <Card className="p-5 bg-white border border-hairline/80 rounded-2xl">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Top Referrers List</h4>
-                  {referralAnalytics.topReferrers && referralAnalytics.topReferrers.length > 0 ? (
-                    <div className="divide-y divide-hairline">
-                      {referralAnalytics.topReferrers.map((ref: any, idx: number) => (
-                        <div key={idx} className="flex items-center justify-between py-2 first:pt-0 last:pb-0 text-xs">
-                          <div>
-                            <p className="font-bold text-primary">{ref.referrerName}</p>
-                            <p className="text-[10px] text-slate-400 truncate max-w-[150px]">{ref.referrerEmail}</p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <span className="font-bold text-slate-700">{ref.referralsCount} referrals</span>
-                            <p className="text-[10px] text-emerald-600 font-semibold">Rs. {ref.rewardsTotal.toLocaleString()}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-slate-400 text-xs text-center py-6">No referrers active yet</p>
-                  )}
+                <Card className="p-4 bg-emerald-50/20 border border-emerald-200/60 rounded-2xl flex flex-col justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Rewards Paid</span>
+                  <div className="mt-2">
+                    <span className="text-xl font-bold font-display text-emerald-600">
+                      ₹{(referralAnalytics?.rewardsPaid || referralAnalytics?.totalRewardsPaid || 0).toLocaleString()}
+                    </span>
+                    <p className="text-[10px] text-emerald-500 font-semibold mt-0.5">Cashback disbursed</p>
+                  </div>
                 </Card>
               </div>
-            ) : null}
+            )}
 
             {/* Filter and Table Audit */}
             <Card>
@@ -8041,16 +8041,23 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       onChange={(e) => setReferralStatusFilter(e.target.value)}
                       className="bg-transparent outline-none text-xs font-semibold cursor-pointer text-slate-600"
                     >
-                      <option value="All">All Milestones</option>
-                      <option value="lead">Lead</option>
-                      <option value="contacted">Contacted</option>
-                      <option value="application_started">Application Started</option>
-                      <option value="offer_received">Offer Received</option>
-                      <option value="visa_approved">Visa Approved</option>
-                      <option value="enrolled">Enrolled</option>
-                      <option value="rewarded">Rewarded</option>
+                      <option value="All">All Statuses</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Contacted">Contacted</option>
+                      <option value="Converted">Converted</option>
+                      <option value="Rejected">Rejected</option>
+                      <option value="Reward Paid">Reward Paid</option>
                     </select>
                   </div>
+
+                  <Button
+                    onClick={exportReferralsToCSV}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1 text-xs rounded-full"
+                  >
+                    <DownloadSimple size={14} /> Export CSV
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
@@ -8133,8 +8140,14 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                   <span className="text-slate-400 italic">None issued</span>
                                 )}
                               </td>
-                              <td className="px-6 py-4.5 text-right">
-                                {["enrolled", "rewarded"].includes(ref.status) && (!ref.referral_rewards || ref.referral_rewards.length === 0) ? (
+                              <td className="px-6 py-4.5 text-right flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => setSelectedReferralDrawer(ref)}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-100 text-slate-700 text-xs font-bold rounded-full hover:bg-slate-200 transition-all cursor-pointer shadow-2xs"
+                                >
+                                  View Details
+                                </button>
+                                {["enrolled", "rewarded", "Converted"].includes(ref.status) && (!ref.referral_rewards || ref.referral_rewards.length === 0) && (
                                   <button
                                     onClick={() => {
                                       setSelectedReferral(ref);
@@ -8145,8 +8158,6 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                     <Gift size={12} />
                                     Issue Reward
                                   </button>
-                                ) : (
-                                  <span className="text-slate-400 text-xs italic">-</span>
                                 )}
                               </td>
                             </tr>
@@ -8158,6 +8169,170 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 )}
               </CardContent>
             </Card>
+
+            {/* REFERRAL DETAILS SIDE DRAWER */}
+            <AnimatePresence>
+              {selectedReferralDrawer && (
+                <div className="fixed inset-0 z-50 overflow-hidden bg-black/40 backdrop-blur-xs flex justify-end">
+                  <motion.div
+                    initial={{ x: "100%" }}
+                    animate={{ x: 0 }}
+                    exit={{ x: "100%" }}
+                    transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                    className="w-full max-w-lg bg-white h-full shadow-2xl overflow-y-auto p-6 flex flex-col justify-between"
+                  >
+                    <div className="space-y-6">
+                      {/* Drawer Header */}
+                      <div className="flex items-center justify-between border-b border-hairline pb-4">
+                        <div>
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                            {selectedReferralDrawer.source === "public_website" || selectedReferralDrawer.referrer_name ? "🌐 Public Referral" : "🎓 Portal Referral"}
+                          </span>
+                          <h3 className="font-display font-bold text-xl text-primary mt-2">Referral Entry Details</h3>
+                          <p className="text-[10px] text-slate-400">ID: {selectedReferralDrawer.id}</p>
+                        </div>
+                        <button
+                          onClick={() => setSelectedReferralDrawer(null)}
+                          className="p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 transition-colors"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+
+                      {/* Referrer Section */}
+                      <div className="bg-slate-50 p-4 rounded-2xl border border-hairline space-y-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Referrer Information</span>
+                        <p className="font-bold text-sm text-primary">{selectedReferralDrawer.referrer_name || selectedReferralDrawer.students?.name || "Website Guest"}</p>
+                        <p className="text-xs text-slate-600">📞 {selectedReferralDrawer.referrer_phone || "No phone"}</p>
+                        <p className="text-xs text-slate-600">✉️ {selectedReferralDrawer.referrer_email || selectedReferralDrawer.students?.email || "No email"}</p>
+                        {selectedReferralDrawer.referrer_city && <p className="text-xs text-purple-700 font-medium">📍 {selectedReferralDrawer.referrer_city}</p>}
+                      </div>
+
+                      {/* Referred Student Section */}
+                      <div className="bg-slate-50 p-4 rounded-2xl border border-hairline space-y-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Referred Student Information</span>
+                        <p className="font-bold text-sm text-primary">{selectedReferralDrawer.student_name || selectedReferralDrawer.referred_name}</p>
+                        <p className="text-xs text-slate-600">📞 {selectedReferralDrawer.student_phone || selectedReferralDrawer.referred_phone || "No phone"}</p>
+                        {selectedReferralDrawer.student_email && <p className="text-xs text-slate-600">✉️ {selectedReferralDrawer.student_email}</p>}
+                        <p className="text-xs font-bold text-slate-700">🌍 Preferred Country: {selectedReferralDrawer.preferred_country || "India"}</p>
+                        {selectedReferralDrawer.message && (
+                          <div className="mt-2 pt-2 border-t border-hairline/60">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase block">Student Message / Notes:</span>
+                            <p className="text-xs text-slate-600 italic bg-white p-2 rounded-xl mt-1 border border-hairline/60">{selectedReferralDrawer.message || selectedReferralDrawer.notes}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Status & Management Controls */}
+                      <div className="space-y-4 pt-2">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs font-bold text-slate-700">Lifecycle Status</label>
+                            <select
+                              value={selectedReferralDrawer.status}
+                              onChange={(e) => {
+                                const newStatus = e.target.value;
+                                setSelectedReferralDrawer({ ...selectedReferralDrawer, status: newStatus });
+                                handleUpdateReferralStatus(selectedReferralDrawer.id, newStatus);
+                              }}
+                              className="px-3 py-2 border border-hairline rounded-xl text-xs font-bold bg-white"
+                            >
+                              <option value="Pending">Pending</option>
+                              <option value="Contacted">Contacted</option>
+                              <option value="Converted">Converted</option>
+                              <option value="Rejected">Rejected</option>
+                              <option value="Reward Paid">Reward Paid</option>
+                            </select>
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs font-bold text-slate-700">Reward Status</label>
+                            <select
+                              value={selectedReferralDrawer.reward_status || "Not Eligible"}
+                              onChange={(e) => {
+                                const newRew = e.target.value;
+                                setSelectedReferralDrawer({ ...selectedReferralDrawer, reward_status: newRew });
+                              }}
+                              className="px-3 py-2 border border-hairline rounded-xl text-xs font-bold bg-white"
+                            >
+                              <option value="Not Eligible">Not Eligible</option>
+                              <option value="Eligible">Eligible</option>
+                              <option value="Paid">Paid (₹10,000)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Internal Notes */}
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs font-bold text-slate-700">Internal Admin Notes</label>
+                          <textarea
+                            rows={3}
+                            value={selectedReferralDrawer.notes || ""}
+                            onChange={(e) => setSelectedReferralDrawer({ ...selectedReferralDrawer, notes: e.target.value })}
+                            placeholder="Add counseling notes or payout tracking details..."
+                            className="p-3 border border-hairline rounded-xl text-xs outline-none bg-slate-50 focus:bg-white resize-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Drawer Footer Actions */}
+                    <div className="border-t border-hairline pt-4 mt-6 space-y-3">
+                      <Button
+                        onClick={() => {
+                          handleUpdateReferralStatus(selectedReferralDrawer.id, "Contacted");
+                          setSelectedReferralDrawer({ ...selectedReferralDrawer, status: "Contacted", contacted: true });
+                          showToast("Marked as Contacted");
+                        }}
+                        variant="outline"
+                        className="w-full text-xs font-bold"
+                      >
+                        <CheckCircle size={14} className="text-emerald-500 mr-1.5" /> Mark Contacted
+                      </Button>
+
+                      <Button
+                        onClick={() => {
+                          handleUpdateReferralStatus(selectedReferralDrawer.id, "Reward Paid");
+                          setSelectedReferralDrawer({ ...selectedReferralDrawer, status: "Reward Paid", reward_status: "Paid" });
+                          showToast("Reward Marked Paid (₹10,000)");
+                        }}
+                        variant="outline"
+                        className="w-full text-xs font-bold border-emerald-200 text-emerald-700 bg-emerald-50/50"
+                      >
+                        <Gift size={14} className="text-emerald-600 mr-1.5" /> Mark Reward Paid (₹10,000)
+                      </Button>
+
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          onClick={() => {
+                            showToast("Changes saved successfully");
+                            setSelectedReferralDrawer(null);
+                          }}
+                          variant="primary"
+                          className="flex-grow text-xs font-bold"
+                        >
+                          Save Changes
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            if (confirm("Are you sure you want to delete this referral entry?")) {
+                              handleUpdateReferralStatus(selectedReferralDrawer.id, "deleted");
+                              setReferrals(prev => prev.filter(r => r.id !== selectedReferralDrawer.id));
+                              setSelectedReferralDrawer(null);
+                              showToast("Referral deleted");
+                            }
+                          }}
+                          variant="outline"
+                          className="text-xs font-bold border-red-200 text-red-600 hover:bg-red-50"
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
           </section>
         )}
 

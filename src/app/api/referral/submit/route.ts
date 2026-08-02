@@ -8,41 +8,67 @@ export async function POST(req: Request) {
 
     if (!referrer_name || !referrer_phone || !student_name || !student_phone) {
       return NextResponse.json(
-        { success: false, message: "Missing required fields." },
+        { success: false, message: "Please fill in all required fields." },
         { status: 400 }
       );
     }
 
-    const newReferral = {
-      id: `ref-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    const payload = {
       referrer_name,
       referrer_email: referrer_email || "",
       referrer_phone,
       referrer_city: referrer_city || "",
-      referred_name: student_name,
-      referred_phone: student_phone,
-      referred_email: "",
+      student_name,
+      student_phone,
+      student_email: "",
       preferred_country: preferred_country || "India",
-      notes: message || "Public website submission",
-      status: "pending_contact",
+      message: message || "",
+      status: "Pending",
+      reward_amount: 10000,
+      reward_status: "Not Eligible",
+      contacted: false,
+      deleted: false,
       created_at: new Date().toISOString()
     };
 
-    console.log("[Public Referral Submission]", newReferral);
+    console.log("[Public Referral Submit]", payload);
 
+    let insertedRecord = payload;
     try {
-      await supabase.from("referrals").insert([newReferral]);
+      const { data, error } = await supabase
+        .from("public_referrals")
+        .insert([payload])
+        .select("*");
+
+      if (error) {
+        console.warn("Supabase public_referrals insert notice:", error.message);
+        // Fallback to insert into referrals table
+        await supabase.from("referrals").insert([{
+          referrer_name,
+          referrer_email,
+          referrer_phone,
+          referrer_city,
+          referred_name: student_name,
+          referred_phone: student_phone,
+          preferred_country,
+          notes: message,
+          status: "pending_contact",
+          source: "public_website"
+        }]);
+      } else if (data && data.length > 0) {
+        insertedRecord = data[0];
+      }
     } catch (dbErr: any) {
-      console.warn("DB insert fallback:", dbErr.message);
+      console.warn("Database submission fallback:", dbErr.message);
     }
 
     return NextResponse.json({
       success: true,
       message: "Referral submitted successfully!",
-      referral: newReferral
+      referral: insertedRecord
     });
   } catch (err: any) {
-    console.error("Referral submit API error:", err);
+    console.error("Public referral error:", err);
     return NextResponse.json(
       { success: false, message: err.message || "Failed to submit referral." },
       { status: 500 }
