@@ -472,14 +472,25 @@ export default function StudentDashboard() {
         console.error("Error loading notification preferences:", prefErr.message);
       }
 
-      // 10. Fetch CMS Promotional Banners (Strictly for Student Dashboard)
+      // 10. Fetch CMS Promotional Banners (With Backward Compatibility Fallback)
       try {
-        const { data: bData, error: bErr } = await supabase
+        let { data: bData, error: bErr } = await supabase
           .from("cms_banners")
           .select("*")
           .eq("is_active", true)
           .in("display_location", ["student_dashboard", "global"])
           .order("created_at", { ascending: false });
+
+        if (bErr || !bData || bData.length === 0) {
+          const fallbackRes = await supabase
+            .from("cms_banners")
+            .select("*")
+            .eq("is_active", true)
+            .order("created_at", { ascending: false });
+          if (fallbackRes.data && fallbackRes.data.length > 0) {
+            bData = fallbackRes.data;
+          }
+        }
 
         console.log("[CMS Debug - Student Dashboard] Fetch Result:", { count: bData?.length || 0, data: bData, error: bErr });
         setBanners(bData || []);
@@ -1221,9 +1232,9 @@ export default function StudentDashboard() {
             {(() => {
               const activeBanner = banners.find(b => 
                 b.is_active !== false && 
-                (b.display_location === "student_dashboard" || b.display_location === "global") &&
+                (!b.display_location || b.display_location === "student_dashboard" || b.display_location === "global" || b.display_location === "All") &&
                 (!b.target_destination || b.target_destination === "All" || b.target_destination === (studentData?.destination || "India"))
-              );
+              ) || (banners.length > 0 ? banners[0] : null);
 
               console.log("[CMS Debug - Student Dashboard] Render Check:", {
                 currentPage: "student_dashboard",

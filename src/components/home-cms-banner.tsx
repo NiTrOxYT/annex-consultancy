@@ -22,20 +22,24 @@ export function HomeCmsBanner() {
 
     const loadBanners = async () => {
       try {
-        const isMobileDevice = typeof window !== "undefined" ? window.innerWidth < 768 : false;
-        console.log("[CMS Query Debug - Home Banner] Executing Query:", {
-          table: "cms_banners",
-          filter: "is_active = true",
-          isMobile: isMobileDevice,
-          viewportWidth: typeof window !== "undefined" ? window.innerWidth : null
-        });
-
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from("cms_banners")
           .select("*")
           .eq("is_active", true)
           .in("display_location", ["homepage", "global"])
           .order("created_at", { ascending: false });
+
+        // Backward compatibility fallback if display_location column does not exist in DB yet
+        if (error || !data || data.length === 0) {
+          const fallbackRes = await supabase
+            .from("cms_banners")
+            .select("*")
+            .eq("is_active", true)
+            .order("created_at", { ascending: false });
+          if (fallbackRes.data && fallbackRes.data.length > 0) {
+            data = fallbackRes.data;
+          }
+        }
 
         console.log("[CMS Debug - Home Banner] Result:", {
           count: data?.length || 0,
@@ -43,7 +47,7 @@ export function HomeCmsBanner() {
           error
         });
 
-        if (!error && data && data.length > 0) {
+        if (data && data.length > 0) {
           setBanners(data);
         } else {
           setBanners([]);
@@ -64,11 +68,11 @@ export function HomeCmsBanner() {
     return null;
   }
 
-  // Find active banner strictly for homepage or global
+  // Find active banner for homepage or global or unmigrated (no location property)
   const activeBanner = banners.find(b => 
     b.is_active !== false && 
-    (b.display_location === "homepage" || b.display_location === "global")
-  );
+    (!b.display_location || b.display_location === "homepage" || b.display_location === "global" || b.display_location === "All")
+  ) || (banners.length > 0 ? banners[0] : null);
 
   console.log("[CMS Debug - Home Banner] Selected Banner:", activeBanner);
 
