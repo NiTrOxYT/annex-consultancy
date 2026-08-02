@@ -22,11 +22,25 @@ export function HomeCmsBanner() {
 
     const loadBanners = async () => {
       try {
+        const isMobileDevice = typeof window !== "undefined" ? window.innerWidth < 768 : false;
+        console.log("[CMS Query Debug - Home Banner] Executing Query:", {
+          table: "cms_banners",
+          filter: "is_active = true",
+          isMobile: isMobileDevice,
+          viewportWidth: typeof window !== "undefined" ? window.innerWidth : null
+        });
+
         const { data, error } = await supabase
           .from("cms_banners")
           .select("*")
           .eq("is_active", true)
           .order("created_at", { ascending: false });
+
+        console.log("[CMS Query Debug - Home Banner] Result:", {
+          count: data?.length || 0,
+          rows: data,
+          error
+        });
 
         if (!error && data && data.length > 0) {
           setBanners(data);
@@ -40,6 +54,7 @@ export function HomeCmsBanner() {
           }
         }
       } catch (err) {
+        console.warn("[CMS Query Debug - Home Banner] Fetch Error:", err);
         const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
         if (local) {
           const parsed = JSON.parse(local);

@@ -474,12 +474,27 @@ export default function StudentDashboard() {
 
       // 10. Fetch CMS Promotional Banners
       try {
+        const isMobileDevice = typeof window !== "undefined" ? window.innerWidth < 768 : false;
+        console.log("[CMS Query Debug - Student Dashboard] Executing Query:", {
+          table: "cms_banners",
+          filter: "is_active = true",
+          isMobile: isMobileDevice,
+          viewportWidth: typeof window !== "undefined" ? window.innerWidth : null,
+          studentDestination: studentData?.destination || "India"
+        });
+
         const { data: bData, error: bErr } = await supabase
           .from("cms_banners")
           .select("*")
           .eq("is_active", true)
           .order("created_at", { ascending: false });
-        console.log("[CMS Debug] Banners API Response:", { count: bData?.length, data: bData, error: bErr });
+
+        console.log("[CMS Query Debug - Student Dashboard] Result:", {
+          count: bData?.length || 0,
+          rows: bData,
+          error: bErr
+        });
+
         if (bData && bData.length > 0) {
           setBanners(bData);
         } else {
@@ -492,7 +507,7 @@ export default function StudentDashboard() {
           }
         }
       } catch (e) {
-        console.warn("[CMS Debug] Banners fetch error:", e);
+        console.warn("[CMS Query Debug - Student Dashboard] Fetch Error:", e);
         const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
         if (local) {
           const parsed = JSON.parse(local);
