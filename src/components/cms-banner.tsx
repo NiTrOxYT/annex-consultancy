@@ -10,6 +10,17 @@ interface CmsBannerProps {
   className?: string;
 }
 
+const DEFAULT_BANNER = {
+  id: "default-banner",
+  title: "Annex Educational Consultancy",
+  display_location: "homepage",
+  target_device: "all",
+  desktop_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
+  mobile_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
+  link_url: "/contact",
+  is_active: true
+};
+
 export function CmsBanner({ location, className = "" }: CmsBannerProps) {
   const router = useRouter();
   const [bannerData, setBannerData] = React.useState<{ desktop: any; mobile: any; active: any } | null>(null);
@@ -37,23 +48,20 @@ export function CmsBanner({ location, className = "" }: CmsBannerProps) {
         const desktopMatch = validList.find((b: any) =>
           (!b.display_location || b.display_location === location || b.display_location === "global" || b.display_location === "All") &&
           (b.target_device === "desktop" || !b.target_device || (b.desktop_image_url && !b.mobile_image_url))
-        ) || (validList.length > 0 ? validList[0] : null);
+        ) || validList[0] || DEFAULT_BANNER;
 
         // Find mobile specific match
         const mobileMatch = validList.find((b: any) =>
           (!b.display_location || b.display_location === location || b.display_location === "global" || b.display_location === "All") &&
           (b.target_device === "mobile" || b.mobile_image_url)
-        ) || desktopMatch;
+        ) || desktopMatch || DEFAULT_BANNER;
 
-        const mainActive = mobileMatch || desktopMatch;
+        const mainActive = mobileMatch || desktopMatch || DEFAULT_BANNER;
 
-        if (mainActive) {
-          setBannerData({ desktop: desktopMatch, mobile: mobileMatch, active: mainActive });
-        } else {
-          setBannerData(null);
-        }
+        setBannerData({ desktop: desktopMatch, mobile: mobileMatch, active: mainActive });
       } catch (err) {
         console.warn("[CMS Banner] Fetch error:", err);
+        setBannerData({ desktop: DEFAULT_BANNER, mobile: DEFAULT_BANNER, active: DEFAULT_BANNER });
       } finally {
         setLoading(false);
       }
@@ -68,7 +76,7 @@ export function CmsBanner({ location, className = "" }: CmsBannerProps) {
 
   const { desktop, mobile, active } = bannerData;
 
-  const fallbackSrc = "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop";
+  const fallbackSrc = DEFAULT_BANNER.desktop_image_url;
 
   const rawDesktop = (desktop?.desktop_image_url || active?.desktop_image_url || active?.image_url || "").trim();
   const rawMobile = (mobile?.mobile_image_url || active?.mobile_image_url || active?.image_url || rawDesktop).trim();
@@ -101,27 +109,18 @@ export function CmsBanner({ location, className = "" }: CmsBannerProps) {
           onClick={handleClick}
           className="block relative w-full cursor-pointer overflow-hidden min-h-[140px] md:min-h-[180px]"
         >
-          {/* DESKTOP BANNER IMAGE (Shown on screen sizes >= 768px) */}
-          <img
-            src={finalDesktop}
-            alt={active.title || "Promotional Banner"}
-            className="hidden md:block w-full h-auto min-h-[180px] max-h-[360px] object-cover rounded-2xl md:rounded-3xl transition-transform duration-500 group-hover:scale-[1.01]"
-            onError={(e) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = fallbackSrc;
-            }}
-          />
-
-          {/* MOBILE BANNER IMAGE (Shown on screen sizes < 768px) */}
-          <img
-            src={finalMobile}
-            alt={active.title || "Promotional Banner"}
-            className="block md:hidden w-full h-auto min-h-[140px] max-h-[260px] object-cover rounded-2xl transition-transform duration-500 group-hover:scale-[1.01]"
-            onError={(e) => {
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = fallbackSrc;
-            }}
-          />
+          <picture className="w-full h-full">
+            <source media="(min-width: 768px)" srcSet={finalDesktop} />
+            <img
+              src={finalMobile}
+              alt={active.title || "Promotional Banner"}
+              className="w-full h-auto min-h-[140px] max-h-[360px] object-cover rounded-2xl md:rounded-3xl transition-transform duration-500 group-hover:scale-[1.01]"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = fallbackSrc;
+              }}
+            />
+          </picture>
         </div>
 
         {/* Close / Dismiss Button */}
