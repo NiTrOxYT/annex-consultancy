@@ -11,6 +11,7 @@ import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { AnimatedCounter } from "@/components/animated-counter";
 import { SectionReveal } from "@/components/section-reveal";
 import { TopCollegesSection } from "@/components/top-colleges";
+import { HomeCmsBanner } from "@/components/home-cms-banner";
 
 // Seed images
 const HERO_IMAGE = "/images/hero.webp";
@@ -46,8 +47,6 @@ const testimonials = [
   },
 ];
 
-import { HomeCmsBanner } from "@/components/home-cms-banner";
-
 export default function Home() {
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -66,9 +65,11 @@ export default function Home() {
     <>
       <Navigation />
 
+      <HomeCmsBanner />
+
       <main className="flex-grow">
         {/* Asymmetric Hero Section */}
-        <section className="relative pt-28 pb-20 md:pt-36 md:pb-28 overflow-hidden bg-white">
+        <section className="relative pt-6 pb-20 md:pt-8 md:pb-28 overflow-hidden bg-white">
           <div className="max-w-7xl mx-auto px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
 

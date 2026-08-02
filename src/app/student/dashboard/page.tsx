@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { AnnexLogo } from "@/components/branding/annex-logo";
 import { Card, CardTitle, CardDescription, CardHeader, CardContent } from "@/components/ui/card";
+import { CmsBanner } from "@/components/cms-banner";
 
 // Stages of application progress
 const STAGES = [
@@ -1220,7 +1221,8 @@ export default function StudentDashboard() {
               </div>
             </div>
 
-
+            {/* Dynamic Promotional Banner (CMS Driven) */}
+            <CmsBanner location="student_dashboard" className="my-4 px-0" />
 
             {/* Progress Bar & Stage display */}
             <Card>
