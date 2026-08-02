@@ -16,7 +16,7 @@ const DEFAULT_BANNER = {
   display_location: "homepage",
   target_device: "all",
   desktop_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
-  mobile_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
+  mobile_image_url: "https://res.cloudinary.com/dcmbneyre/image/upload/v1785691570/70A612D1-8AD5-4EC7-93D7-5BC1DBB5820C_bf8kj5.png",
   link_url: "/contact",
   is_active: true
 };
