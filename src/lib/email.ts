@@ -111,7 +111,7 @@ export async function sendEmail({
   const { activeProvider, emailFrom } = getEmailConfigStatus();
 
   // Inject branding logo header in HTML body if standard container div matches
-  const logoUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://annex-consultancy.vercel.app"}/branding/annex-logo.png`;
+  const logoUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://annex-consultancy.vercel.app"}/images/logo.jpeg`;
   const headerHtml = `
     <div style="text-align: center; margin-bottom: 24px; border-bottom: 1px solid #f1f5f9; padding-bottom: 16px;">
       <img src="${logoUrl}" alt="ANNEX Logo" style="width: 48px; height: 48px; vertical-align: middle; margin-right: 8px;" />

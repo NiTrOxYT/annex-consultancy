@@ -13,12 +13,11 @@ export function AnnexLogo({
   showText = true,
   className = ""
 }: AnnexLogoProps) {
-  // Map size to a responsive variant if not specified
   return (
     <div className={`flex items-center gap-2 md:gap-2.5 select-none ${className}`}>
       <img
-        src="/branding/annex-logo.png"
-        alt="Annex International Educational Consultancy"
+        src="/images/logo.jpeg"
+        alt="ANNEX Consultancy"
         width={size}
         height={size}
         style={{
@@ -28,6 +27,10 @@ export function AnnexLogo({
           imageRendering: "crisp-edges",
         }}
         className="shrink-0 transition-transform duration-300 group-hover:scale-[1.03]"
+        onError={(e) => {
+          // Fallback: hide broken image gracefully
+          (e.currentTarget as HTMLImageElement).style.display = "none";
+        }}
       />
       {showText && (
         <span className="font-display font-bold tracking-tight text-primary text-sm sm:text-base md:text-lg lg:text-xl transition-colors hidden sm:inline-block">

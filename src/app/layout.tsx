@@ -49,9 +49,9 @@ export const metadata: Metadata = {
     images: ["https://annex-consultancy.vercel.app/og-image.png"],
   },
   icons: {
-    icon: "/branding/annex-logo.png",
-    shortcut: "/branding/annex-logo.png",
-    apple: "/branding/annex-logo.png",
+    icon: "/images/logo.jpeg",
+    shortcut: "/images/logo.jpeg",
+    apple: "/images/logo.jpeg",
   },
 };
 

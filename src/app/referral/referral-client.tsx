@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -348,13 +349,18 @@ function ReferralBenefits() {
 // ==========================================
 // 5. REFERRAL FORM SECTION
 // ==========================================
-function ReferralForm() {
+// Thin shell: only this component calls useSearchParams — must be inside Suspense
+function ReferralFormShell() {
   const searchParams = useSearchParams();
-  // Read referral code from URL: /referral?ref=ANNEX-XXXX
   const referralCodeFromUrl = React.useMemo(() => {
     const ref = searchParams.get("ref");
     return ref ? ref.trim().toUpperCase() : null;
   }, [searchParams]);
+  return <ReferralForm referralCode={referralCodeFromUrl} />;
+}
+
+function ReferralForm({ referralCode }: { referralCode: string | null }) {
+  const referralCodeFromUrl = referralCode;
 
   const [form, setForm] = React.useState({
     referrer_name: "",
@@ -759,7 +765,9 @@ export default function ReferralPageClient() {
         <ReferralSteps />
         <RewardSection />
         <ReferralBenefits />
-        <ReferralForm />
+        <Suspense fallback={<div className="py-20 flex items-center justify-center"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>}>
+          <ReferralFormShell />
+        </Suspense>
         <ReferralFAQ />
         <ReferralCTA />
       </main>
