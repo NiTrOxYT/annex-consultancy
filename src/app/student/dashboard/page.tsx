@@ -499,21 +499,40 @@ export default function StudentDashboard() {
           setBanners(bData);
         } else {
           const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
-          if (local) {
+          if (local && JSON.parse(local).length > 0) {
             const parsed = JSON.parse(local);
             setBanners(Array.isArray(parsed) ? parsed.filter((b: any) => b.is_active !== false) : []);
           } else {
-            setBanners([]);
+            // Default referral banner fallback if database is empty/unpopulated
+            setBanners([{
+              id: "default-referral-banner",
+              desktop_image_url: "/images/hero.webp",
+              mobile_image_url: "/images/hero.webp",
+              target_destination: "All",
+              display_location: "global",
+              link_url: "/referral",
+              is_active: true,
+              title: "ANNEX Referral Program"
+            }]);
           }
         }
       } catch (e) {
         console.warn("[CMS Query Debug - Student Dashboard] Fetch Error:", e);
         const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
-        if (local) {
+        if (local && JSON.parse(local).length > 0) {
           const parsed = JSON.parse(local);
           setBanners(Array.isArray(parsed) ? parsed.filter((b: any) => b.is_active !== false) : []);
         } else {
-          setBanners([]);
+          setBanners([{
+            id: "default-referral-banner",
+            desktop_image_url: "/images/hero.webp",
+            mobile_image_url: "/images/hero.webp",
+            target_destination: "All",
+            display_location: "global",
+            link_url: "/referral",
+            is_active: true,
+            title: "ANNEX Referral Program"
+          }]);
         }
       }
 
