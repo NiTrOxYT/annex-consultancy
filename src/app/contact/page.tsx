@@ -7,6 +7,8 @@ import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { LocalBusinessSchema } from "@/components/seo/structured-data";
+import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 
 export default function Contact() {
   const [formData, setFormData] = React.useState({
@@ -29,7 +31,6 @@ export default function Contact() {
     setLoading(true);
     setError(null);
 
-    // Simple validation
     if (!formData.name || !formData.email || !formData.phone || !formData.preferred_date || !formData.preferred_time) {
       setError("Please fill in all required fields.");
       setLoading(false);
@@ -55,12 +56,10 @@ export default function Contact() {
 
         if (dbError) throw dbError;
       } else {
-        // LocalStorage Fallback for local dev testing
         const existing = JSON.parse(localStorage.getItem("annex_bookings") || "[]");
         existing.push({
-          id: crypto.randomUUID(),
+          id: Date.now().toString(),
           ...formData,
-          status: "Pending",
           created_at: new Date().toISOString(),
         });
         localStorage.setItem("annex_bookings", JSON.stringify(existing));
@@ -78,7 +77,8 @@ export default function Contact() {
         notes: "",
       });
     } catch (err: any) {
-      setError(err.message || "Something went wrong. Please try again.");
+      console.error("Booking error:", err);
+      setError(err.message || "Failed to submit booking. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -86,189 +86,187 @@ export default function Contact() {
 
   return (
     <>
+      <LocalBusinessSchema />
       <Navigation />
 
-      <main className="flex-grow pt-32 pb-24 bg-white text-left">
+      <main className="flex-grow pt-24 md:pt-28 pb-24 bg-white text-left">
+        <Breadcrumbs items={[{ name: "Contact Us", url: "https://annex-consultancy.com/contact" }]} />
+
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          
           {/* Header */}
           <div className="max-w-3xl mb-16">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-subtle-gray border border-hairline/80 text-[10px] uppercase tracking-[0.2em] font-semibold text-primary mb-6">
               <Sparkle size={12} className="text-gold" weight="fill" />
-              Get In Touch
+              Local & Global Consultations
             </div>
-            <h1 className="font-display font-bold text-4xl md:text-5xl text-primary tracking-tighter leading-none mb-6">
-              Book a consultation.
+            <h1 className="font-display font-bold text-4xl md:text-6xl text-primary tracking-tight leading-[1.08] mb-6">
+              Book Your Free Overseas Counseling Session.
             </h1>
-            <p className="text-base md:text-lg text-slate-500 leading-relaxed">
-              Schedule a focused study abroad or test prep consultation. Speak with our certified global academic advisors.
+            <p className="text-base md:text-lg text-slate-600 leading-relaxed">
+              Connect with our certified study abroad advisors. Whether in person at our office or via online video consultation, we evaluate your profile in 24 hours.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* Form Column */}
-            <div className="lg:col-span-8">
-              <Card className="p-6 md:p-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+            
+            {/* Left Column: Form */}
+            <div className="lg:col-span-7">
+              <Card className="p-8 md:p-10 border-hairline/80 shadow-md">
+                <CardTitle className="text-2xl font-bold text-primary mb-2">Schedule Free Appointment</CardTitle>
+                <CardDescription className="mb-8 text-xs text-slate-500">
+                  Select your preferred date and time slot for a personalized session.
+                </CardDescription>
+
                 {success ? (
-                  <div className="text-center py-12 flex flex-col items-center justify-center">
-                    <div className="w-12 h-12 rounded-full bg-green-50 text-green-600 border border-green-100 flex items-center justify-center mb-4">
-                      <Checks size={24} weight="bold" />
+                  <div className="p-6 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 space-y-3">
+                    <div className="flex items-center gap-2 font-bold text-lg">
+                      <Checks size={24} className="text-emerald-600" />
+                      Consultation Request Confirmed!
                     </div>
-                    <h3 className="font-display font-bold text-xl text-primary mb-2">Booking Submitted Successfully</h3>
-                    <p className="text-sm text-slate-500 max-w-[40ch] mb-6">
-                      Thank you. Our counseling coordinators will review your preferences and contact you via email or phone to confirm the schedule.
+                    <p className="text-xs leading-relaxed">
+                      Thank you for scheduling with Annex Consultancy. Our senior admissions advisor will call you to confirm your slot and review your academic documents.
                     </p>
-                    <Button variant="secondary" onClick={() => setSuccess(false)}>
-                      Book Another Consultation
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setSuccess(false)}
+                      className="mt-2 text-xs"
+                    >
+                      Book Another Session
                     </Button>
                   </div>
                 ) : (
-                  <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+                  <form onSubmit={handleSubmit} className="space-y-6">
                     {error && (
-                      <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-xs font-semibold text-red-600">
+                      <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
                         {error}
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Name */}
-                      <div className="flex flex-col gap-2">
-                        <label htmlFor="name" className="text-xs font-bold text-primary uppercase tracking-wider">
-                          Full Name *
-                        </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Full Name *</label>
                         <input
                           type="text"
-                          id="name"
+                          required
                           value={formData.name}
                           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                          className="px-4 py-3 border border-hairline rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800"
-                          placeholder="Your full name"
-                          required
+                          placeholder="e.g. Rahul Sharma"
+                          className="w-full px-4 py-3 rounded-xl border border-hairline bg-subtle-gray/30 text-xs outline-none focus:border-primary transition-colors"
                         />
                       </div>
 
-                      {/* Email */}
-                      <div className="flex flex-col gap-2">
-                        <label htmlFor="email" className="text-xs font-bold text-primary uppercase tracking-wider">
-                          Email Address *
-                        </label>
-                        <input
-                          type="email"
-                          id="email"
-                          value={formData.email}
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                          className="px-4 py-3 border border-hairline rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800"
-                          placeholder="name@email.com"
-                          required
-                        />
-                      </div>
-
-                      {/* Phone */}
-                      <div className="flex flex-col gap-2">
-                        <label htmlFor="phone" className="text-xs font-bold text-primary uppercase tracking-wider">
-                          Phone Number *
-                        </label>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Phone / WhatsApp *</label>
                         <input
                           type="tel"
-                          id="phone"
+                          required
                           value={formData.phone}
                           onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                          className="px-4 py-3 border border-hairline rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800"
-                          placeholder="+977-9800000000"
-                          required
-                        />
-                      </div>
-
-                      {/* Study Level */}
-                      <div className="flex flex-col gap-2">
-                        <label htmlFor="study_level" className="text-xs font-bold text-primary uppercase tracking-wider">
-                          Current Education Level
-                        </label>
-                        <select
-                          id="study_level"
-                          value={formData.study_level}
-                          onChange={(e) => setFormData({ ...formData, study_level: e.target.value })}
-                          className="px-4 py-3 border border-hairline rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 cursor-pointer"
-                        >
-                          <option>High School</option>
-                          <option>Undergraduate</option>
-                          <option>Postgraduate</option>
-                          <option>Test Prep Only</option>
-                        </select>
-                      </div>
-
-                      {/* Study Destination */}
-                      <div className="flex flex-col gap-2">
-                        <label htmlFor="destination" className="text-xs font-bold text-primary uppercase tracking-wider">
-                          Target Destination
-                        </label>
-                        <select
-                          id="destination"
-                          value={formData.destination}
-                          onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
-                          className="px-4 py-3 border border-hairline rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 cursor-pointer"
-                        >
-                          <option>UK</option>
-                          <option>Australia</option>
-                          <option>Europe</option>
-                          <option>Dubai</option>
-                          <option>Italy</option>
-                          <option>India</option>
-                        </select>
-                      </div>
-
-                      {/* Booking Date */}
-                      <div className="flex flex-col gap-2">
-                        <label htmlFor="preferred_date" className="text-xs font-bold text-primary uppercase tracking-wider">
-                          Preferred Date *
-                        </label>
-                        <input
-                          type="date"
-                          id="preferred_date"
-                          value={formData.preferred_date}
-                          onChange={(e) => setFormData({ ...formData, preferred_date: e.target.value })}
-                          className="px-4 py-3 border border-hairline rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800"
-                          required
-                        />
-                      </div>
-
-                      {/* Booking Time */}
-                      <div className="flex flex-col gap-2">
-                        <label htmlFor="preferred_time" className="text-xs font-bold text-primary uppercase tracking-wider">
-                          Preferred Time *
-                        </label>
-                        <input
-                          type="time"
-                          id="preferred_time"
-                          value={formData.preferred_time}
-                          onChange={(e) => setFormData({ ...formData, preferred_time: e.target.value })}
-                          className="px-4 py-3 border border-hairline rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800"
-                          required
+                          placeholder="+91 98765 43210"
+                          className="w-full px-4 py-3 rounded-xl border border-hairline bg-subtle-gray/30 text-xs outline-none focus:border-primary transition-colors"
                         />
                       </div>
                     </div>
 
-                    {/* Notes */}
-                    <div className="flex flex-col gap-2">
-                      <label htmlFor="notes" className="text-xs font-bold text-primary uppercase tracking-wider">
-                        Additional Information
-                      </label>
-                      <textarea
-                        id="notes"
-                        value={formData.notes}
-                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                        className="px-4 py-3 border border-hairline rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 min-h-[120px] resize-none"
-                        placeholder="Detail your academic scores, target intakes, or IELTS / PTE levels..."
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Email Address *</label>
+                      <input
+                        type="email"
+                        required
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        placeholder="rahul@example.com"
+                        className="w-full px-4 py-3 rounded-xl border border-hairline bg-subtle-gray/30 text-xs outline-none focus:border-primary transition-colors"
                       />
                     </div>
 
-                    <Button type="submit" variant="primary" disabled={loading} className="w-full md:w-max mt-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Preferred Country *</label>
+                        <select
+                          value={formData.destination}
+                          onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
+                          className="w-full px-4 py-3 rounded-xl border border-hairline bg-white text-xs outline-none focus:border-primary transition-colors font-medium"
+                        >
+                          <option value="UK">United Kingdom</option>
+                          <option value="Australia">Australia</option>
+                          <option value="Canada">Canada</option>
+                          <option value="USA">United States</option>
+                          <option value="Germany">Germany</option>
+                          <option value="Italy">Italy (DSU Scholarship)</option>
+                          <option value="Dubai">Dubai (UAE)</option>
+                          <option value="Europe">Other Europe</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Target Degree *</label>
+                        <select
+                          value={formData.study_level}
+                          onChange={(e) => setFormData({ ...formData, study_level: e.target.value })}
+                          className="w-full px-4 py-3 rounded-xl border border-hairline bg-white text-xs outline-none focus:border-primary transition-colors font-medium"
+                        >
+                          <option value="Undergraduate">Undergraduate (Bachelor's)</option>
+                          <option value="Postgraduate">Postgraduate (Master's / MBA)</option>
+                          <option value="Diploma">Diploma / Post-Grad Cert</option>
+                          <option value="PhD">Doctorate / PhD</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Preferred Date *</label>
+                        <input
+                          type="date"
+                          required
+                          value={formData.preferred_date}
+                          onChange={(e) => setFormData({ ...formData, preferred_date: e.target.value })}
+                          className="w-full px-4 py-3 rounded-xl border border-hairline bg-subtle-gray/30 text-xs outline-none focus:border-primary transition-colors"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Preferred Time Slot *</label>
+                        <select
+                          value={formData.preferred_time}
+                          onChange={(e) => setFormData({ ...formData, preferred_time: e.target.value })}
+                          className="w-full px-4 py-3 rounded-xl border border-hairline bg-white text-xs outline-none focus:border-primary transition-colors font-medium"
+                        >
+                          <option value="">Select Time Slot</option>
+                          <option value="11:00 AM">11:00 AM - 12:00 PM</option>
+                          <option value="02:00 PM">02:00 PM - 03:00 PM</option>
+                          <option value="04:00 PM">04:00 PM - 05:00 PM</option>
+                          <option value="06:00 PM">06:00 PM - 07:00 PM</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Academic Background / Notes</label>
+                      <textarea
+                        rows={3}
+                        value={formData.notes}
+                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                        placeholder="Mention your percentage, GPA, IELTS score (if taken), or specific course preference..."
+                        className="w-full px-4 py-3 rounded-xl border border-hairline bg-subtle-gray/30 text-xs outline-none focus:border-primary transition-colors resize-none"
+                      />
+                    </div>
+
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="lg"
+                      disabled={loading}
+                      className="w-full font-bold"
+                    >
                       {loading ? (
-                        <>
-                          <SpinnerGap className="animate-spin" size={16} /> Submitting...
-                        </>
+                        <span className="flex items-center gap-2">
+                          <SpinnerGap size={18} className="animate-spin" /> Confirming Booking...
+                        </span>
                       ) : (
-                        "Submit Booking Request"
+                        "Confirm Free Counseling Slot"
                       )}
                     </Button>
                   </form>
@@ -276,70 +274,54 @@ export default function Contact() {
               </Card>
             </div>
 
-            {/* Sidebar Column: Contact Info */}
-            <div className="lg:col-span-4 flex flex-col gap-6">
-              <Card className="h-auto">
-                <CardTitle className="text-sm uppercase tracking-wider text-slate-400 mb-6">Office Locations</CardTitle>
-                <div className="flex flex-col gap-6">
-                  <div className="flex items-start gap-4">
-                    <div className="w-8 h-8 rounded-full bg-primary/5 flex items-center justify-center text-primary shrink-0 mt-0.5">
-                      <MapPin size={16} />
-                    </div>
+            {/* Right Column: NAP & Office Details */}
+            <div className="lg:col-span-5 space-y-8">
+              <Card className="p-8 border-hairline bg-subtle-gray/50 space-y-6">
+                <CardTitle className="text-xl font-bold text-primary">Head Office Contact Details</CardTitle>
+                
+                <div className="space-y-4 text-xs text-slate-700">
+                  <div className="flex items-start gap-3">
+                    <MapPin size={20} className="text-primary shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="text-sm font-bold text-primary">Kathmandu Office</h4>
-                      <p className="text-xs text-slate-500 leading-relaxed mt-1">
-                        New Baneshwor, Kathmandu, Nepal<br />
-                        Near Baneshwor Plaza
-                      </p>
+                      <span className="font-bold block text-slate-900">India Office Address</span>
+                      99/1/2, Girish Ghosh Rd, Belur Math, Ghusuri, Howrah, West Bengal 711202, India
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-4 border-t border-hairline pt-4">
-                    <div className="w-8 h-8 rounded-full bg-primary/5 flex items-center justify-center text-primary shrink-0 mt-0.5">
-                      <MapPin size={16} />
-                    </div>
+                  <div className="flex items-center gap-3">
+                    <Phone size={20} className="text-primary shrink-0" />
                     <div>
-                      <h4 className="text-sm font-bold text-primary">India Office</h4>
-                      <p className="text-xs text-slate-500 leading-relaxed mt-1">
-                        99/1/2, Girish Ghosh Rd<br />
-                        Belur Math, Ghusuri<br />
-                        Howrah, West Bengal 711202<br />
-                        India
-                      </p>
+                      <span className="font-bold block text-slate-900">Direct Phone / WhatsApp</span>
+                      <a href="tel:+918910882334" className="hover:text-primary transition-colors">+91 89108 82334</a>
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-4 border-t border-hairline pt-4">
-                    <div className="w-8 h-8 rounded-full bg-primary/5 flex items-center justify-center text-primary shrink-0 mt-0.5">
-                      <Phone size={16} />
-                    </div>
+                  <div className="flex items-center gap-3">
+                    <Envelope size={20} className="text-primary shrink-0" />
                     <div>
-                      <h4 className="text-sm font-bold text-primary">Phone Inquiries</h4>
-                      <p className="text-xs font-mono-data text-slate-500 mt-1">+91 89108 82334</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4">
-                    <div className="w-8 h-8 rounded-full bg-primary/5 flex items-center justify-center text-primary shrink-0 mt-0.5">
-                      <Envelope size={16} />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-primary">Email Support</h4>
-                      <p className="text-xs font-mono-data text-slate-500 mt-1">business@annex-consultancy.com</p>
+                      <span className="font-bold block text-slate-900">Official Email</span>
+                      <a href="mailto:business@annex-consultancy.com" className="hover:text-primary transition-colors">business@annex-consultancy.com</a>
                     </div>
                   </div>
                 </div>
               </Card>
 
-              <Card className="h-auto">
-                <CardTitle className="text-sm uppercase tracking-wider text-slate-400 mb-4">Admissions Timeline</CardTitle>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  We schedule consultations Monday through Friday from 9:00 AM to 5:00 PM. Weekend session requests can be coordinated dynamically for remote students.
-                </p>
+              <Card className="p-8 border-hairline bg-white space-y-4">
+                <CardTitle className="text-lg font-bold text-primary">Working Hours</CardTitle>
+                <div className="space-y-2 text-xs text-slate-600 font-medium">
+                  <div className="flex justify-between border-b border-hairline pb-2">
+                    <span>Monday - Saturday</span>
+                    <span className="font-bold text-primary">9:30 AM - 6:30 PM IST</span>
+                  </div>
+                  <div className="flex justify-between pt-1">
+                    <span>Sunday</span>
+                    <span className="text-slate-400">Closed (Online Assistance)</span>
+                  </div>
+                </div>
               </Card>
             </div>
-          </div>
 
+          </div>
         </div>
       </main>
 

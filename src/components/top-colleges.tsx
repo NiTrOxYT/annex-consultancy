@@ -39,7 +39,7 @@ interface University {
 }
 
 interface TopCollegesSectionProps {
-  country: string; // e.g. 'uk', 'australia', 'europe', 'dubai', 'italy', 'india', 'abroad', 'all'
+  country?: string; // e.g. 'uk', 'australia', 'europe', 'dubai', 'italy', 'india', 'abroad', 'all'
   featuredOnly?: boolean;
   limit?: number;
   showControls?: boolean;
@@ -456,7 +456,7 @@ export function TopCollegesSection({ country, featuredOnly = false, limit, showC
 
   // Filtering by Country (Case Insensitive mapping)
   const filteredByCountry = React.useMemo(() => {
-    const searchCountry = country.toLowerCase();
+    const searchCountry = (country || "all").toLowerCase();
     
     return dbUnis.filter(uni => {
       const uCountry = uni.country.toLowerCase();

@@ -3,7 +3,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "motion/react";
-import { ArrowUpRight, Globe, Sparkle, Checks, IdentificationCard, ShieldCheck, GraduationCap, ArrowRight } from "@phosphor-icons/react";
+import { 
+  ArrowUpRight, Globe, Sparkle, Checks, IdentificationCard, ShieldCheck, 
+  GraduationCap, ArrowRight, BookOpen, CurrencyInr, Airplane, FileText, 
+  ChatTeardropText, Question, CheckCircle, MapPin, CaretDown, Star, Phone
+} from "@phosphor-icons/react";
+import { useState } from "react";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
@@ -12,6 +17,7 @@ import { AnimatedCounter } from "@/components/animated-counter";
 import { SectionReveal } from "@/components/section-reveal";
 import { TopCollegesSection } from "@/components/top-colleges";
 import { HomeCmsBanner } from "@/components/home-cms-banner";
+import { FAQSchema } from "@/components/seo/structured-data";
 
 // Seed images
 const HERO_IMAGE = "/images/hero.webp";
@@ -22,118 +28,152 @@ const DEST_DXB = "/images/dubai.webp";
 const DEST_IT = "/images/italy.webp";
 
 const destinations = [
-  { name: "United Kingdom", image: DEST_UK, slug: "uk", universities: "80+ Universities" },
-  { name: "Australia", image: DEST_AU, slug: "australia", universities: "40+ Universities" },
-  { name: "Europe", image: DEST_EU, slug: "europe", universities: "120+ Universities" },
-  { name: "Dubai", image: DEST_DXB, slug: "dubai", universities: "15+ Branches" },
-  { name: "Italy", image: DEST_IT, slug: "italy", universities: "30+ State Universities" },
+  { name: "United Kingdom", image: DEST_UK, slug: "uk", universities: "80+ Universities", intake: "Sept / Jan", pswr: "2 - 3 Years" },
+  { name: "Australia", image: DEST_AU, slug: "australia", universities: "40+ Universities", intake: "Feb / July", pswr: "2 - 4 Years" },
+  { name: "Canada", image: DEST_EU, slug: "canada", universities: "60+ Colleges/Varsities", intake: "Sept / Jan / May", pswr: "Up to 3 Years" },
+  { name: "United States", image: HERO_IMAGE, slug: "usa", universities: "100+ Universities", intake: "Fall / Spring", pswr: "1 - 3 Years (STEM)" },
+  { name: "Germany", image: DEST_EU, slug: "germany", universities: "35+ Universities", intake: "Oct / April", pswr: "1.5 Years" },
+  { name: "Europe & Italy", image: DEST_IT, slug: "italy", universities: "25+ Public Varsities", intake: "Sept / Oct", pswr: "1 - 2 Years" },
+  { name: "Dubai (UAE)", image: DEST_DXB, slug: "dubai", universities: "20+ Branch Campuses", intake: "Rolling Intakes", pswr: "Available" },
 ];
 
-const testimonials = [
+const HOMEPAGE_FAQS = [
   {
-    quote: "Annex made my UK visa process completely seamless. Their counselors were extremely transparent and supported me at every step.",
-    student: "Roshan Shrestha",
-    meta: "MSc Finance, University of Westminster",
+    question: "Why should I hire a professional study abroad consultancy like Annex Consultancy?",
+    answer: "Navigating international university admissions, financial documentation, statement of purpose (SOP) drafting, and student visa regulations requires specialized domain expertise. Annex Consultancy provides end-to-end guidance from profile evaluation to post-arrival support, maintaining a 98.4% visa approval rate across UK, Australia, Canada, USA, Germany, and Europe."
   },
   {
-    quote: "The test prep classes for PTE at Annex are exceptional. I scored a 79 overall, which helped me secure my scholarship in Australia.",
-    student: "Pooja Karki",
-    meta: "Bachelors in IT, Deakin University",
+    question: "What services are included in Annex Consultancy's overseas education counseling?",
+    answer: "Our comprehensive overseas counseling includes: 1) One-on-one career counseling & profile evaluation, 2) University shortlisting based on budget and academic standing, 3) SOP, LOR, and Resume editing by experienced copywriters, 4) Application tracking and offer letter confirmation, 5) Scholarship & education loan guidance, 6) Student visa interview preparation & file submission, and 7) Pre-departure orientation and accommodation assistance."
   },
   {
-    quote: "Highly recommended for state university placements in Italy. They helped me secure my tuition waivers and study grants.",
-    student: "Aashish Bhandari",
-    meta: "MSc Computer Science, University of Milan",
+    question: "Can I study abroad on a 100% scholarship or grant?",
+    answer: "Yes. Many study abroad destinations offer full tuition waivers and regional government grants. For example, Italian public universities offer DSU scholarships covering 100% tuition plus annual stipends up to €7,000. German public universities offer zero tuition fee education. Annex Consultancy identifies and applies for eligible merit-based and need-based scholarships for every client."
   },
+  {
+    question: "What are the minimum IELTS/PTE score requirements for Master's programs abroad?",
+    answer: "Generally, UK, Australian, Canadian, and US universities require an overall IELTS score of 6.5 (with no band under 6.0) or a PTE score of 58–64 for Postgraduate programs. Undergraduate programs usually accept IELTS 6.0 or PTE 52. Several UK and European universities also offer IELTS waivers based on Class 12th English marks (70%+)."
+  },
+  {
+    question: "How long does the student visa application process take?",
+    answer: "Student visa processing timelines vary by country: UK Student Visas take 3–4 weeks (Priority options available); Australian Student Visas take 4–8 weeks; Canadian Study Permits take 6–12 weeks; German Student Visas take 6–10 weeks; and Schengen/Italy visas take 3–6 weeks. We recommend starting your application 6 to 8 months before your target intake."
+  },
+  {
+    question: "What are the post-study work permit (PSWR) rights in popular study abroad destinations?",
+    answer: "Post-Study Work Rights allow international graduates to gain valuable global work experience: UK offers 2 years (3 years for PhD); Australia offers 2 to 4 years depending on degree level; Canada offers PGWP up to 3 years; USA offers 1 year OPT (extended to 3 years for STEM graduates); Germany offers 18 months; and Ireland offers 2 years for Master's graduates."
+  },
+  {
+    question: "Does Annex Consultancy assist with education loans and financial proof documentation?",
+    answer: "Yes. We work closely with leading nationalized banks, private financial institutions, and NBFCs to assist students in securing collateral and non-collateral education loans. We also guide you on exact embassy financial requirements, including CAS, GIC (Canada), Blocked Account (Germany), and liquid asset proofing."
+  },
+  {
+    question: "What is the difference between undergraduate and postgraduate admission requirements?",
+    answer: "Undergraduate admissions require Class 10/12 transcripts, SAT/ACT (for select US colleges), IELTS/PTE, and personal essays. Postgraduate admissions require a 3 or 4-year Bachelor's degree (GPA 2.8+ or 60%+), GRE/GMAT (for specific business or engineering schools), Statement of Purpose (SOP), 2-3 Letters of Recommendation (LORs), and updated CV."
+  },
+  {
+    question: "When should I start preparing for my study abroad application?",
+    answer: "The ideal timeline is 8 to 12 months prior to your target intake (Fall/September or Spring/January). This allows sufficient time for standardized language exams (IELTS/PTE), university research, SOP editing, application submissions, scholarship deadlines, and visa processing."
+  },
+  {
+    question: "Does Annex Consultancy provide post-arrival assistance in the destination country?",
+    answer: "Absolutes. Our relationship does not end with visa approval. We assist students with airport pickup arrangements, temporary student housing & accommodation guidance, SIM card activation, student bank account setup, and part-time job search tips in cities across the UK, Australia, Canada, Europe, and Dubai."
+  }
 ];
 
 export default function Home() {
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1, delayChildren: 0.1 },
-    },
-  };
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } },
+  const toggleFaq = (index: number) => {
+    setOpenFaq(openFaq === index ? null : index);
   };
 
   return (
     <>
+      <FAQSchema faqs={HOMEPAGE_FAQS} />
       <Navigation />
 
       <main className="flex-grow pt-24 md:pt-28">
         <HomeCmsBanner />
 
-        {/* Asymmetric Hero Section */}
+        {/* SECTION 1: HERO SECTION */}
         <section className="relative pb-20 md:pb-28 overflow-hidden bg-white">
           <div className="max-w-7xl mx-auto px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
 
-              {/* Left Column: Heading, Subhead, CTA */}
+              {/* Left Column: H1 Heading, Subhead, CTA */}
               <div className="lg:col-span-7 flex flex-col items-start text-left">
                 <motion.div
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                  transition={{ duration: 0.6 }}
                   className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-subtle-gray border border-hairline/80 text-[10px] uppercase tracking-[0.2em] font-semibold text-primary mb-6"
                 >
                   <Sparkle size={12} className="text-gold" weight="fill" />
-                  Your Global Education Journey
+                  India's Trusted Overseas Education Consultancy
                 </motion.div>
 
                 <motion.h1
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
-                  className="font-display font-bold text-4xl md:text-6xl text-primary tracking-tighter leading-[1.05] max-w-2xl mb-6"
+                  transition={{ duration: 0.8, delay: 0.05 }}
+                  className="font-display font-bold text-3xl sm:text-4xl md:text-6xl text-primary tracking-tighter leading-[1.05] max-w-2xl mb-6"
                 >
-                  Global education.<br />Uncompromised guidance.
+                  Global Education &<br />Study Abroad Consultancy.
                 </motion.h1>
 
                 <motion.p
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-                  className="text-base md:text-lg text-slate-500 leading-relaxed max-w-[48ch] mb-8"
+                  transition={{ duration: 0.8, delay: 0.1 }}
+                  className="text-base md:text-lg text-slate-600 leading-relaxed max-w-[54ch] mb-8"
                 >
-                  Secure placements at world-class universities in the UK, Australia, Europe, and beyond. Fully managed by certified professionals.
+                  Empowering ambitious students to secure admissions, 100% scholarships, and high-visa-success placements in top universities across the UK, Australia, Canada, USA, Germany, Europe, and Dubai.
                 </motion.p>
 
                 <motion.div
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-                  className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto"
+                  transition={{ duration: 0.8, delay: 0.15 }}
+                  className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto mb-8"
                 >
                   <Link href="/contact" className="w-full sm:w-auto">
                     <Button variant="primary" size="lg" className="w-full sm:w-auto">
-                      Book Consultation
+                      Book Free Counseling Session
                     </Button>
                   </Link>
                   <Link href="/study-abroad" className="w-full sm:w-auto">
                     <Button variant="secondary" size="lg" className="w-full sm:w-auto">
-                      Explore Destinations
+                      Explore Country Guides
                     </Button>
                   </Link>
                 </motion.div>
+
+                {/* Micro Trust Badge */}
+                <div className="flex flex-wrap items-center gap-6 text-xs text-slate-500 pt-4 border-t border-hairline/60 w-full max-w-xl">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <Checks size={16} className="text-emerald-600" /> 98.4% Visa Success
+                  </span>
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <Checks size={16} className="text-emerald-600" /> 150+ Varsity Partners
+                  </span>
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <Checks size={16} className="text-emerald-600" /> ₹5 Cr+ Scholarships Secured
+                  </span>
+                </div>
               </div>
 
-              {/* Right Column: Framed Image (Double Bezel) */}
+              {/* Right Column: Hero Image */}
               <div className="lg:col-span-5 relative w-full flex justify-center">
                 <motion.div
                   initial={{ opacity: 0, scale: 0.98, y: 20 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+                  transition={{ duration: 0.8, delay: 0.1 }}
                   className="relative w-full aspect-[4/3] bg-subtle-gray border border-hairline/80 p-2 rounded-[2rem]"
                 >
                   <div className="relative w-full h-full overflow-hidden rounded-[calc(2rem-0.5rem)] border border-hairline/40">
                     <Image
                       src={HERO_IMAGE}
-                      alt="Student studying abroad"
+                      alt="Annex Overseas Education Student Success"
                       fill
                       priority
                       sizes="(max-width: 1024px) 100vw, 40vw"
@@ -148,444 +188,353 @@ export default function Home() {
           </div>
         </section>
 
-        {/* University Partners & Trust metrics */}
-        <SectionReveal>
-          <section className="py-12 border-t border-b border-hairline bg-subtle-gray/20">
-            <div className="max-w-7xl mx-auto px-6 lg:px-8">
-              {/* Logo Row */}
-              <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-8">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  Placements at top global universities
-                </span>
-                <div className="flex flex-wrap items-center gap-x-12 gap-y-6 opacity-60 grayscale">
-                  <span className="font-display font-bold text-lg tracking-tight text-primary">University of Oxford</span>
-                  <span className="font-display font-bold text-lg tracking-tight text-primary">Melbourne</span>
-                  <span className="font-display font-bold text-lg tracking-tight text-primary">Sapienza Rome</span>
-                  <span className="font-display font-bold text-lg tracking-tight text-primary">LSE</span>
-                </div>
+        {/* SECTION 2: STATS & COUNTER BAR */}
+        <section className="border-y border-hairline/80 bg-subtle-gray py-12">
+          <div className="max-w-7xl mx-auto px-6 lg:px-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+              <div>
+                <AnimatedCounter value={1000} suffix="+" />
+                <p className="text-xs uppercase tracking-wider text-slate-500 font-semibold mt-1">Students Enrolled</p>
               </div>
-
-              {/* Monospace Statistics Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-8 border-t border-hairline/60 pt-8 text-left">
-                <div>
-                  <p className="font-mono-data text-3xl font-bold text-primary">
-                    <AnimatedCounter value={99} suffix="%" />
-                  </p>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Visa Success Rate</p>
-                </div>
-                <div>
-                  <p className="font-mono-data text-3xl font-bold text-primary">
-                    <AnimatedCounter value={5000} suffix="+" />
-                  </p>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Happy Alumni</p>
-                </div>
-                <div>
-                  <p className="font-mono-data text-3xl font-bold text-primary">
-                    <AnimatedCounter value={8} suffix="+" />
-                  </p>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">Countries Served</p>
-                </div>
-                <div>
-                  <p className="font-mono-data text-3xl font-bold text-primary">
-                    <AnimatedCounter value={150} suffix="+" />
-                  </p>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-1">University Partners</p>
-                </div>
+              <div>
+                <AnimatedCounter value={150} suffix="+" />
+                <p className="text-xs uppercase tracking-wider text-slate-500 font-semibold mt-1">Global University Partners</p>
+              </div>
+              <div>
+                <AnimatedCounter value={98} suffix="%" />
+                <p className="text-xs uppercase tracking-wider text-slate-500 font-semibold mt-1">Visa Approval Rate</p>
+              </div>
+              <div>
+                <AnimatedCounter value={15} suffix=" Cr+ Scholarships" />
+                <p className="text-xs uppercase tracking-wider text-slate-500 font-semibold mt-1">Total Disbursed</p>
               </div>
             </div>
-          </section>
-        </SectionReveal>
+          </div>
+        </section>
 
-        {/* Study Abroad Eligibility Calculator Banner */}
-        <SectionReveal>
-          <section className="py-24 bg-white border-b border-hairline overflow-hidden">
-            <div className="max-w-7xl mx-auto px-6 lg:px-8">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-                
-                {/* Left Column: The Value Pitch */}
-                <div className="lg:col-span-5 flex flex-col items-start text-left">
-                  <h2 className="font-display font-bold text-3xl md:text-5xl text-primary tracking-tight leading-[1.1] mb-6">
-                    Know your admission chances. Instantly.
-                  </h2>
-                  <p className="text-base text-slate-500 leading-relaxed max-w-[45ch] mb-8">
-                    Assess your profile against global standards to get matched universities, admission chance categories, and scholarship estimates.
-                  </p>
-                  
-                  {/* Checklist */}
-                  <ul className="flex flex-col gap-4 mb-8 w-full">
-                    <li className="flex items-start gap-3">
-                      <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
-                        <Checks size={12} weight="bold" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-primary leading-tight">Academic Match Score</h4>
-                        <p className="text-xs text-slate-500 mt-0.5">Instant feedback calibrated against your GPA and academic qualifications.</p>
-                      </div>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
-                        <Checks size={12} weight="bold" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-primary leading-tight">Admission Chances Categorization</h4>
-                        <p className="text-xs text-slate-500 mt-0.5">Clear classification of target universities into Safe, Target, and Ambitious matches.</p>
-                      </div>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
-                        <Checks size={12} weight="bold" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-primary leading-tight">Scholarship Projections</h4>
-                        <p className="text-xs text-slate-500 mt-0.5">Accurate projections for tuition fee waivers and academic grants.</p>
-                      </div>
-                    </li>
-                  </ul>
-                  
-                  <Link href="/study-abroad-eligibility" className="w-full sm:w-auto">
-                    <Button variant="primary" size="lg" className="w-full sm:w-auto">
-                      Check Your Eligibility
-                    </Button>
-                  </Link>
-                </div>
-                
-                {/* Right Column: Premium Mockup Card */}
-                <div className="lg:col-span-7 relative w-full flex justify-center">
-                  <motion.div
-                    whileHover={{ y: -6 }}
-                    transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                    className="relative w-full max-w-xl bg-subtle-gray border border-hairline/80 p-2 rounded-[2rem] shadow-[0_24px_48px_-15px_rgba(15,23,42,0.08)]"
-                  >
-                    <div className="relative w-full bg-slate-900 border border-hairline/40 rounded-[calc(2rem-0.5rem)] text-white p-6 md:p-8 h-full shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] overflow-hidden">
-                      {/* Background Ambient Glow */}
-                      <div className="absolute top-0 right-0 w-64 h-64 bg-[radial-gradient(circle_at_center,rgba(212,175,55,0.08),transparent)] pointer-events-none" />
-                      
-                      {/* Mockup Header */}
-                      <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-6">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-gold animate-pulse" />
-                          <span className="font-mono-data text-[10px] text-slate-400 tracking-wider uppercase font-semibold">
-                            ANNEX CORE ENGINE v2.4
-                          </span>
-                        </div>
-                        <span className="text-[9px] font-mono-data px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold uppercase tracking-wider">
-                          ACTIVE ASSESSMENT
-                        </span>
-                      </div>
-                      
-                      {/* Mockup Body Content */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center mb-8">
-                        {/* Circular Score Gauge */}
-                        <div className="flex flex-col items-center justify-center p-4 bg-white/5 border border-white/5 rounded-2xl">
-                          <div className="relative w-32 h-32 flex items-center justify-center">
-                            {/* SVG Gauge */}
-                            <svg className="absolute inset-0 w-full h-full transform -rotate-90">
-                              <circle
-                                cx="64"
-                                cy="64"
-                                r="48"
-                                className="stroke-white/5"
-                                strokeWidth="8"
-                                fill="transparent"
-                              />
-                              <circle
-                                cx="64"
-                                cy="64"
-                                r="48"
-                                className="stroke-gold"
-                                strokeWidth="8"
-                                fill="transparent"
-                                strokeDasharray={2 * Math.PI * 48}
-                                strokeDashoffset={2 * Math.PI * 48 * (1 - 0.88)}
-                                strokeLinecap="round"
-                              />
-                            </svg>
-                            <div className="text-center z-10">
-                              <span className="font-display font-extrabold text-3xl text-white tracking-tight leading-none block">
-                                88%
-                              </span>
-                              <span className="font-mono-data text-[8px] text-slate-400 tracking-widest uppercase font-bold mt-1 block">
-                                MATCH SCORE
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Chance & Scholarship Projections */}
-                        <div className="flex flex-col gap-3 text-left">
-                          <div className="p-3 bg-white/5 border border-white/5 rounded-xl flex flex-col gap-1">
-                            <span className="text-[10px] font-mono-data text-slate-400 font-bold uppercase tracking-wider">
-                              Chance Classification
-                            </span>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                                Safe
-                              </span>
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gold/20 text-gold border border-gold/30">
-                                Target
-                              </span>
-                            </div>
-                            <span className="text-[11px] text-slate-300 mt-1">
-                              Matched with 6 premium universities
-                            </span>
-                          </div>
-                          
-                          <div className="p-3 bg-white/5 border border-white/5 rounded-xl flex flex-col gap-1">
-                            <span className="text-[10px] font-mono-data text-slate-400 font-bold uppercase tracking-wider">
-                              Est. Scholarship Waiver
-                            </span>
-                            <span className="text-lg font-bold font-display text-gold tracking-tight">
-                              £6,500 - £12,000
-                            </span>
-                            <span className="text-[10px] text-slate-400">
-                              Based on GPA and course alignment
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Verified Checks Footer inside mockup */}
-                      <div className="border-t border-white/5 pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
-                        <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-                          <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-400">
-                            <span className="text-emerald-500">✓</span> Academic Calibration
-                          </span>
-                          <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-400">
-                            <span className="text-emerald-500">✓</span> Test Score Alignment
-                          </span>
-                          <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-400">
-                            <span className="text-emerald-500">✓</span> Budget Matrix Matched
-                          </span>
-                        </div>
-                        <Link href="/study-abroad-eligibility" className="group flex items-center gap-1 text-xs font-mono-data font-bold text-gold hover:text-white transition-colors uppercase tracking-wider">
-                          Calculate <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
-                        </Link>
-                      </div>
-                      
-                    </div>
-                  </motion.div>
-                </div>
-                
-              </div>
-            </div>
-          </section>
-        </SectionReveal>
-
-        {/* Study Destinations Section */}
-        <SectionReveal>
-          <section className="py-24 bg-white">
-            <div className="max-w-7xl mx-auto px-6 lg:px-8">
-              <div className="flex flex-col md:flex-row md:items-end justify-between mb-16">
-                <div className="text-left">
-                  <h2 className="font-display font-bold text-3xl md:text-4xl text-primary tracking-tight mb-4">
-                    Find your destination.
-                  </h2>
-                  <p className="text-sm text-slate-500 max-w-[50ch]">
-                    Choose from prestigious educational hubs across Europe, the United Kingdom, and the Pacific.
-                  </p>
-                </div>
-                <Link href="/study-abroad" className="group flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary hover:text-gold transition-colors mt-4 md:mt-0">
-                  All Destinations <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-                </Link>
-              </div>
-
-              {/* Destination grids (offset layout) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-                {destinations.map((dest, i) => (
-                  <Link key={dest.name} href={`/study-abroad/${dest.slug}`} className="group">
-                    <div className="relative w-full aspect-[3/4] bg-subtle-gray border border-hairline/80 p-1.5 rounded-2xl transition-transform duration-300 group-hover:-translate-y-1">
-                      <div className="relative w-full h-full overflow-hidden rounded-[calc(1rem-0.125rem)] border border-hairline/40">
-                        <Image
-                          src={dest.image}
-                          alt={dest.name}
-                          fill
-                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 20vw"
-                          className="object-cover group-hover:scale-105 transition-transform duration-700 ease-out brightness-95"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-primary/70 via-primary/20 to-transparent" />
-                        <div className="absolute bottom-4 left-4 right-4 text-left">
-                          <p className="text-xs font-mono-data text-gold font-semibold uppercase tracking-wider mb-0.5">
-                            {dest.universities}
-                          </p>
-                          <h4 className="font-display font-bold text-lg text-white tracking-tight">
-                            {dest.name}
-                          </h4>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </section>
-        </SectionReveal>
-
-        {/* Why Annex (Bento Grid) */}
-        <SectionReveal>
-          <section className="py-24 border-t border-hairline bg-subtle-gray/20">
-            <div className="max-w-7xl mx-auto px-6 lg:px-8 text-left">
-              <h2 className="font-display font-bold text-3xl md:text-4xl text-primary tracking-tight mb-16 text-center">
-                The Annex advantage.
+        {/* SECTION 3: END-TO-END OVERSEAS SERVICES (NLP & ENTITIES RICH) */}
+        <SectionReveal className="py-20 bg-white">
+          <div className="max-w-7xl mx-auto px-6 lg:px-8">
+            <div className="text-center max-w-3xl mx-auto mb-16">
+              <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-primary bg-subtle-gray px-3 py-1 rounded-full border border-hairline">
+                Comprehensive Overseas Counseling
+              </span>
+              <h2 className="font-display font-bold text-3xl md:text-5xl text-primary tracking-tight mt-4">
+                End-to-End Overseas Education & University Admission Services
               </h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Bento Card 1: 2-column wide */}
-                <div className="md:col-span-2">
-                  <Card hoverable={true} className="flex flex-col justify-between h-full min-h-[300px]">
-                    <div className="mb-6">
-                      <div className="w-10 h-10 rounded-full bg-primary/5 border border-hairline flex items-center justify-center text-primary mb-6">
-                        <IdentificationCard size={20} weight="bold" />
-                      </div>
-                      <CardTitle className="text-xl mb-2">Certified Counselors</CardTitle>
-                      <CardDescription className="max-w-md">
-                        Our experts hold QEAC certification and professional credentials, ensuring your profile is assessed with high international accuracy.
-                      </CardDescription>
-                    </div>
-                    <div className="border-t border-hairline/60 pt-4 flex justify-between items-center text-xs font-mono-data text-slate-400">
-                      <span>SECTOR STATUS: CERTIFIED</span>
-                      <span>99% ALIGNMENT</span>
-                    </div>
-                  </Card>
-                </div>
-
-                {/* Bento Card 2: 1-column */}
-                <div>
-                  <Card hoverable={true} className="flex flex-col justify-between h-full min-h-[300px] bg-slate-50 border-slate-100">
-                    <div className="mb-6">
-                      <div className="w-10 h-10 rounded-full bg-primary/5 border border-hairline flex items-center justify-center text-primary mb-6">
-                        <Checks size={20} weight="bold" />
-                      </div>
-                      <CardTitle className="text-xl mb-2">Managed Flow</CardTitle>
-                      <CardDescription>
-                        From test preparation to landing services, we manage application documentation, interviews, and visa steps.
-                      </CardDescription>
-                    </div>
-                    <div className="border-t border-hairline/60 pt-4 flex justify-between items-center text-xs font-mono-data text-slate-400">
-                      <span>100% COMPLETE</span>
-                    </div>
-                  </Card>
-                </div>
-
-                {/* Bento Card 3: 1-column with Gold Accent */}
-                <div>
-                  <Card hoverable={true} className="flex flex-col justify-between h-full min-h-[300px]">
-                    <div className="mb-6">
-                      <div className="w-10 h-10 rounded-full bg-primary/5 border border-hairline flex items-center justify-center text-primary mb-6">
-                        <Globe size={20} weight="bold" />
-                      </div>
-                      <CardTitle className="text-xl mb-2">Global Scholarships</CardTitle>
-                      <CardDescription>
-                        We identify fee waivers and scholarship grants that align with your financial targets.
-                      </CardDescription>
-                    </div>
-                    <div className="border-t border-hairline/60 pt-4 flex justify-between items-center text-xs font-mono-data text-gold font-bold">
-                      <span>GOLD STATUS INTAKE</span>
-                    </div>
-                  </Card>
-                </div>
-
-                {/* Bento Card 4: 2-column wide */}
-                <div className="md:col-span-2">
-                  <Card hoverable={true} className="flex flex-col justify-between h-full min-h-[300px]">
-                    <div className="mb-6">
-                      <div className="w-10 h-10 rounded-full bg-primary/5 border border-hairline flex items-center justify-center text-primary mb-6">
-                        <ShieldCheck size={20} weight="bold" />
-                      </div>
-                      <CardTitle className="text-xl mb-2">99% Visa Record</CardTitle>
-                      <CardDescription className="max-w-md">
-                        Through detailed mock interviews and thorough document auditing, we maintain one of the highest visa approval rates in the region.
-                      </CardDescription>
-                    </div>
-                    <div className="border-t border-hairline/60 pt-4 flex justify-between items-center text-xs font-mono-data text-slate-400">
-                      <span>SYSTEM SECURITY: HIGH</span>
-                      <span>VERIFICATION RATIO</span>
-                    </div>
-                  </Card>
-                </div>
-              </div>
-            </div>
-          </section>
-        </SectionReveal>
-
-        {/* Services Section */}
-        <SectionReveal>
-          <section className="py-24 bg-white border-b border-hairline">
-            <div className="max-w-7xl mx-auto px-6 lg:px-8">
-              <h2 className="font-display font-bold text-3xl md:text-4xl text-primary tracking-tight mb-16 text-center">
-                Our comprehensive services.
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
-                <div>
-                  <h3 className="font-display font-bold text-lg text-primary mb-2">1. Profile Assessment</h3>
-                  <p className="text-sm text-slate-500 leading-relaxed">
-                    We analyze your academic metrics, financial profile, and future prospects to align you with the right programs.
-                  </p>
-                </div>
-                <div>
-                  <h3 className="font-display font-bold text-lg text-primary mb-2">2. Application Management</h3>
-                  <p className="text-sm text-slate-500 leading-relaxed">
-                    We review, structure, and submit your documentation, drafts, letters of recommendation, and intake statements.
-                  </p>
-                </div>
-                <div>
-                  <h3 className="font-display font-bold text-lg text-primary mb-2">3. Visa Consultation</h3>
-                  <p className="text-sm text-slate-500 leading-relaxed">
-                    We arrange comprehensive mock interview drills and audit financial declarations before submission.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-        </SectionReveal>
-
-        {/* Featured Universities Section */}
-        <SectionReveal>
-          <TopCollegesSection country="all" featuredOnly={true} limit={6} showControls={false} />
-        </SectionReveal>
-
-        {/* Student Success Stories (Carousel / Quote Wall) */}
-        <SectionReveal>
-          <section className="py-24 bg-white">
-            <div className="max-w-7xl mx-auto px-6 lg:px-8 text-center">
-              <h2 className="font-display font-bold text-3xl md:text-4xl text-primary tracking-tight mb-16">
-                Placed by Annex.
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
-                {testimonials.map((test, i) => (
-                  <div key={test.student} className="border-l-2 border-gold/40 pl-6 py-2">
-                    <p className="text-base text-slate-700 italic leading-relaxed mb-4">
-                      &ldquo;{test.quote}&rdquo;
-                    </p>
-                    <div>
-                      <h5 className="font-display font-bold text-sm text-primary">{test.student}</h5>
-                      <p className="text-xs text-slate-400 font-semibold">{test.meta}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        </SectionReveal>
-
-        {/* Consultation Call to Action */}
-        <SectionReveal>
-          <section className="py-24 bg-primary text-white text-center relative overflow-hidden">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(212,175,55,0.1),transparent)] pointer-events-none" />
-            <div className="max-w-4xl mx-auto px-6 relative z-10 flex flex-col items-center">
-              <h2 className="font-display font-bold text-3xl md:text-5xl text-white tracking-tight leading-none mb-6">
-                Plan your global education.
-              </h2>
-              <p className="text-sm md:text-base text-slate-300 leading-relaxed max-w-[45ch] mb-8">
-                Speak with QEAC certified counselors and discover your admission scholarship options.
+              <p className="text-slate-600 text-sm md:text-base mt-4">
+                From choosing the right degree program to receiving your student visa and stepping onto campus, Annex Consultancy guides you through every step of international higher education.
               </p>
-              <Link href="/contact">
-                <Button variant="gold" size="lg">
-                  Book Consultation
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {/* Service 1 */}
+              <Card className="p-8 hover:shadow-lg transition-all duration-300 border-hairline">
+                <div className="w-12 h-12 rounded-2xl bg-primary/5 flex items-center justify-center mb-6 text-primary">
+                  <Globe size={24} weight="bold" />
+                </div>
+                <h3 className="font-display font-bold text-xl text-primary mb-3">
+                  1. Profile Evaluation & Career Counseling
+                </h3>
+                <p className="text-slate-600 text-sm leading-relaxed mb-4">
+                  We analyze your academic history, GPA, work experience, and financial budget to match your profile with top-tier universities in Canada, UK, USA, Australia, and Europe.
+                </p>
+                <ul className="space-y-2 text-xs text-slate-500">
+                  <li className="flex items-center gap-2"><Checks size={14} className="text-emerald-600" /> One-on-one expert counseling</li>
+                  <li className="flex items-center gap-2"><Checks size={14} className="text-emerald-600" /> Course & career pathway mapping</li>
+                </ul>
+              </Card>
+
+              {/* Service 2 */}
+              <Card className="p-8 hover:shadow-lg transition-all duration-300 border-hairline">
+                <div className="w-12 h-12 rounded-2xl bg-primary/5 flex items-center justify-center mb-6 text-primary">
+                  <BookOpen size={24} weight="bold" />
+                </div>
+                <h3 className="font-display font-bold text-xl text-primary mb-3">
+                  2. University & Course Shortlisting
+                </h3>
+                <p className="text-slate-600 text-sm leading-relaxed mb-4">
+                  Select from over 150 accredited global universities offering Bachelor’s, Master’s, MBA, and STEM degrees with high post-study work permit opportunities.
+                </p>
+                <ul className="space-y-2 text-xs text-slate-500">
+                  <li className="flex items-center gap-2"><Checks size={14} className="text-emerald-600" /> Direct varsity partner applications</li>
+                  <li className="flex items-center gap-2"><Checks size={14} className="text-emerald-600" /> Fast-track offer letter processing</li>
+                </ul>
+              </Card>
+
+              {/* Service 3 */}
+              <Card className="p-8 hover:shadow-lg transition-all duration-300 border-hairline">
+                <div className="w-12 h-12 rounded-2xl bg-primary/5 flex items-center justify-center mb-6 text-primary">
+                  <FileText size={24} weight="bold" />
+                </div>
+                <h3 className="font-display font-bold text-xl text-primary mb-3">
+                  3. SOP, LOR & Application Drafting
+                </h3>
+                <p className="text-slate-600 text-sm leading-relaxed mb-4">
+                  Our professional editorial team reviews and refines your Statement of Purpose (SOP), Letters of Recommendation (LORs), and Academic CV to satisfy strict admission committees.
+                </p>
+                <ul className="space-y-2 text-xs text-slate-500">
+                  <li className="flex items-center gap-2"><Checks size={14} className="text-emerald-600" /> Plagiarism-free customized SOPs</li>
+                  <li className="flex items-center gap-2"><Checks size={14} className="text-emerald-600" /> Optimized for university rubrics</li>
+                </ul>
+              </Card>
+
+              {/* Service 4 */}
+              <Card className="p-8 hover:shadow-lg transition-all duration-300 border-hairline">
+                <div className="w-12 h-12 rounded-2xl bg-primary/5 flex items-center justify-center mb-6 text-primary">
+                  <ShieldCheck size={24} weight="bold" />
+                </div>
+                <h3 className="font-display font-bold text-xl text-primary mb-3">
+                  4. Student Visa Assistance & Filings
+                </h3>
+                <p className="text-slate-600 text-sm leading-relaxed mb-4">
+                  Navigate complex visa protocols including UK CAS, Canadian SPP/SDS, Australian GTE/GST, German Blocked Account, and US F-1 visa interview prep with 98.4% success.
+                </p>
+                <ul className="space-y-2 text-xs text-slate-500">
+                  <li className="flex items-center gap-2"><Checks size={14} className="text-emerald-600" /> Mock visa interview practice</li>
+                  <li className="flex items-center gap-2"><Checks size={14} className="text-emerald-600" /> Financial proof verification</li>
+                </ul>
+              </Card>
+
+              {/* Service 5 */}
+              <Card className="p-8 hover:shadow-lg transition-all duration-300 border-hairline">
+                <div className="w-12 h-12 rounded-2xl bg-primary/5 flex items-center justify-center mb-6 text-primary">
+                  <CurrencyInr size={24} weight="bold" />
+                </div>
+                <h3 className="font-display font-bold text-xl text-primary mb-3">
+                  5. Scholarships & Education Loans
+                </h3>
+                <p className="text-slate-600 text-sm leading-relaxed mb-4">
+                  Maximize your funding through merit-based scholarships, government bursaries (like Italian DSU grants), and low-interest collateral/non-collateral education loans.
+                </p>
+                <ul className="space-y-2 text-xs text-slate-500">
+                  <li className="flex items-center gap-2"><Checks size={14} className="text-emerald-600" /> Up to 100% tuition fee waivers</li>
+                  <li className="flex items-center gap-2"><Checks size={14} className="text-emerald-600" /> Bank tie-ups for fast loan disbursal</li>
+                </ul>
+              </Card>
+
+              {/* Service 6 */}
+              <Card className="p-8 hover:shadow-lg transition-all duration-300 border-hairline">
+                <div className="w-12 h-12 rounded-2xl bg-primary/5 flex items-center justify-center mb-6 text-primary">
+                  <Airplane size={24} weight="bold" />
+                </div>
+                <h3 className="font-display font-bold text-xl text-primary mb-3">
+                  6. Pre-Departure & Post-Arrival Care
+                </h3>
+                <p className="text-slate-600 text-sm leading-relaxed mb-4">
+                  We prepare you for life abroad with flight bookings, temporary student housing options, airport pickups, bank account setup, and guidance on local part-time job rules.
+                </p>
+                <ul className="space-y-2 text-xs text-slate-500">
+                  <li className="flex items-center gap-2"><Checks size={14} className="text-emerald-600" /> Accommodation assistance</li>
+                  <li className="flex items-center gap-2"><Checks size={14} className="text-emerald-600" /> Student community network access</li>
+                </ul>
+              </Card>
+            </div>
+          </div>
+        </SectionReveal>
+
+        {/* SECTION 4: STUDY ABROAD DESTINATIONS GRID */}
+        <SectionReveal className="py-20 bg-subtle-gray border-y border-hairline/80">
+          <div className="max-w-7xl mx-auto px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row items-start md:items-end justify-between mb-12 gap-6">
+              <div>
+                <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-primary bg-white px-3 py-1 rounded-full border border-hairline">
+                  Top Destinations
+                </span>
+                <h2 className="font-display font-bold text-3xl md:text-5xl text-primary tracking-tight mt-3">
+                  Explore Top Overseas Study Destinations
+                </h2>
+              </div>
+              <Link href="/study-abroad">
+                <Button variant="outline" size="sm" className="gap-2">
+                  View All Countries <ArrowRight size={14} />
                 </Button>
               </Link>
             </div>
-          </section>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {destinations.map((dest) => (
+                <Link key={dest.slug} href={`/study-abroad/${dest.slug}`} className="group">
+                  <Card className="overflow-hidden border-hairline hover:shadow-xl transition-all duration-300 bg-white">
+                    <div className="relative h-48 w-full overflow-hidden">
+                      <Image
+                        src={dest.image}
+                        alt={`Study in ${dest.name} - Annex Consultancy`}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-primary/20 to-transparent" />
+                      <div className="absolute bottom-4 left-4 right-4 text-white">
+                        <span className="text-[10px] uppercase tracking-wider font-semibold bg-white/20 backdrop-blur-md px-2.5 py-0.5 rounded-full">
+                          {dest.universities}
+                        </span>
+                        <h3 className="font-display font-bold text-2xl mt-1 text-white">{dest.name}</h3>
+                      </div>
+                    </div>
+                    <div className="p-5 space-y-2 text-xs text-slate-600">
+                      <div className="flex justify-between border-b border-hairline/60 pb-2">
+                        <span className="text-slate-400 font-medium">Major Intakes:</span>
+                        <span className="font-bold text-slate-800">{dest.intake}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-medium">Post-Study Work Right:</span>
+                        <span className="font-bold text-emerald-700">{dest.pswr}</span>
+                      </div>
+                    </div>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </div>
         </SectionReveal>
+
+        {/* SECTION 5: TOP COLLEGES & VARSITY PARTNERS */}
+        <TopCollegesSection country="all" />
+
+        {/* SECTION 6: INFORMATION GAIN COMPARISON MATRIX */}
+        <SectionReveal className="py-20 bg-white">
+          <div className="max-w-7xl mx-auto px-6 lg:px-8">
+            <div className="text-center max-w-3xl mx-auto mb-14">
+              <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-primary bg-subtle-gray px-3 py-1 rounded-full border border-hairline">
+                Transparency & Value
+              </span>
+              <h2 className="font-display font-bold text-3xl md:text-4xl text-primary tracking-tight mt-3">
+                Why Choose Annex Consultancy vs. Generic Educational Agencies
+              </h2>
+              <p className="text-slate-600 text-sm mt-3">
+                We believe in ethical counseling, transparent documentation, and individualized university placement strategies.
+              </p>
+            </div>
+
+            <div className="overflow-x-auto border border-hairline rounded-2xl shadow-sm bg-white">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-primary text-white text-xs uppercase tracking-wider font-semibold">
+                    <th className="p-4 border-b border-hairline/20">Feature / Service Standard</th>
+                    <th className="p-4 border-b border-hairline/20">Annex Consultancy</th>
+                    <th className="p-4 border-b border-hairline/20 text-slate-300">Generic Local Agents</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-hairline/60">
+                  <tr className="hover:bg-subtle-gray/50">
+                    <td className="p-4 font-bold text-slate-800">University Selection</td>
+                    <td className="p-4 text-emerald-700 font-bold flex items-center gap-1.5">
+                      <CheckCircle size={16} className="text-emerald-600" /> Customized based on student GPA, budget & PR goals
+                    </td>
+                    <td className="p-4 text-slate-500">Pushes fixed commission-heavy colleges</td>
+                  </tr>
+                  <tr className="hover:bg-subtle-gray/50">
+                    <td className="p-4 font-bold text-slate-800">SOP & Essay Guidance</td>
+                    <td className="p-4 text-emerald-700 font-bold flex items-center gap-1.5">
+                      <CheckCircle size={16} className="text-emerald-600" /> Bespoke 100% original drafting by senior editors
+                    </td>
+                    <td className="p-4 text-slate-500">Copy-pasted generic templates</td>
+                  </tr>
+                  <tr className="hover:bg-subtle-gray/50">
+                    <td className="p-4 font-bold text-slate-800">Scholarship Application Support</td>
+                    <td className="p-4 text-emerald-700 font-bold flex items-center gap-1.5">
+                      <CheckCircle size={16} className="text-emerald-600" /> Dedicated filing for Italian DSU, merit waivers & bursaries
+                    </td>
+                    <td className="p-4 text-slate-500">No scholarship guidance provided</td>
+                  </tr>
+                  <tr className="hover:bg-subtle-gray/50">
+                    <td className="p-4 font-bold text-slate-800">Visa Success Track Record</td>
+                    <td className="p-4 text-emerald-700 font-bold flex items-center gap-1.5">
+                      <CheckCircle size={16} className="text-emerald-600" /> 98.4% success with mock embassy interviews
+                    </td>
+                    <td className="p-4 text-slate-500">High rejection rates due to weak file prep</td>
+                  </tr>
+                  <tr className="hover:bg-subtle-gray/50">
+                    <td className="p-4 font-bold text-slate-800">Post-Arrival Student Support</td>
+                    <td className="p-4 text-emerald-700 font-bold flex items-center gap-1.5">
+                      <CheckCircle size={16} className="text-emerald-600" /> Housing, bank account, SIM card & job guidance
+                    </td>
+                    <td className="p-4 text-slate-500">Service stops after visa stamp</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </SectionReveal>
+
+        {/* SECTION 7: FREQUENTLY ASKED QUESTIONS (FAQ) & SCHEMA */}
+        <SectionReveal className="py-20 bg-subtle-gray border-t border-hairline/80">
+          <div className="max-w-4xl mx-auto px-6 lg:px-8">
+            <div className="text-center mb-14">
+              <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-primary bg-white px-3 py-1 rounded-full border border-hairline">
+                Got Questions?
+              </span>
+              <h2 className="font-display font-bold text-3xl md:text-5xl text-primary tracking-tight mt-3">
+                Frequently Asked Questions About Studying Abroad
+              </h2>
+              <p className="text-slate-600 text-sm mt-3">
+                Clear, expert answers to help you plan your international academic journey with confidence.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {HOMEPAGE_FAQS.map((faq, index) => {
+                const isOpen = openFaq === index;
+                return (
+                  <div
+                    key={faq.question}
+                    className="border border-hairline rounded-2xl overflow-hidden bg-white shadow-2xs transition-all duration-200"
+                  >
+                    <button
+                      onClick={() => toggleFaq(index)}
+                      className="w-full p-5 text-left flex items-center justify-between gap-4 font-display font-bold text-base md:text-lg text-primary hover:text-slate-900 cursor-pointer"
+                      aria-expanded={isOpen}
+                    >
+                      <span>{faq.question}</span>
+                      <CaretDown
+                        size={18}
+                        className={`text-slate-400 shrink-0 transition-transform duration-300 ${
+                          isOpen ? "rotate-180 text-primary" : ""
+                        }`}
+                      />
+                    </button>
+                    {isOpen && (
+                      <div className="px-5 pb-5 text-xs md:text-sm text-slate-600 leading-relaxed border-t border-hairline/40 pt-3 animate-fade-in">
+                        {faq.answer}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </SectionReveal>
+
+        {/* SECTION 8: FINAL CALL-TO-ACTION */}
+        <section className="py-20 bg-primary text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-accent-blue/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="max-w-5xl mx-auto px-6 lg:px-8 text-center relative z-10">
+            <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/80 bg-white/10 px-3.5 py-1 rounded-full border border-white/20">
+              Start Your Journey Today
+            </span>
+            <h2 className="font-display font-bold text-3xl md:text-5xl text-white tracking-tight mt-4 mb-6">
+              Ready to Secure Your Admission & Student Visa?
+            </h2>
+            <p className="text-slate-300 text-sm md:text-base max-w-2xl mx-auto mb-8 leading-relaxed">
+              Book a complimentary 1-on-1 counseling session with our certified overseas education advisors. Get your profile evaluated in 24 hours.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link href="/contact" className="w-full sm:w-auto">
+                <Button variant="primary" size="lg" className="w-full sm:w-auto bg-white text-primary hover:bg-slate-100 font-bold">
+                  Book Free Counseling Session
+                </Button>
+              </Link>
+              <a 
+                href="https://wa.me/918910882334" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition-colors"
+              >
+                <Phone size={18} weight="fill" /> Chat on WhatsApp
+              </a>
+            </div>
+          </div>
+        </section>
       </main>
 
       <Footer />
