@@ -474,11 +474,12 @@ export default function StudentDashboard() {
 
       // 10. Fetch CMS Promotional Banners
       try {
-        const { data: bData } = await supabase
+        const { data: bData, error: bErr } = await supabase
           .from("cms_banners")
           .select("*")
           .eq("is_active", true)
           .order("created_at", { ascending: false });
+        console.log("[CMS Debug] Banners API Response:", { count: bData?.length, data: bData, error: bErr });
         if (bData && bData.length > 0) {
           setBanners(bData);
         } else {
@@ -491,6 +492,7 @@ export default function StudentDashboard() {
           }
         }
       } catch (e) {
+        console.warn("[CMS Debug] Banners fetch error:", e);
         const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
         if (local) {
           const parsed = JSON.parse(local);
@@ -1231,13 +1233,27 @@ export default function StudentDashboard() {
 
             {/* Dynamic Promotional Banner (CMS Driven) */}
             {(() => {
+              console.log("[CMS Debug] Banner Render Evaluation:", {
+                bannersLength: banners.length,
+                bannerDismissed,
+                studentDestination: studentData?.destination
+              });
+
               const activeBanner = banners.find(b => 
                 b.is_active !== false && 
                 (!b.display_location || b.display_location === "student_dashboard" || b.display_location === "global" || b.display_location === "homepage" || b.display_location === "All") &&
                 (!b.target_destination || b.target_destination === "All" || b.target_destination === (studentData?.destination || "India"))
               ) || (banners.length > 0 ? banners[0] : null);
 
-              if (!activeBanner || bannerDismissed) return null;
+              console.log("[CMS Debug] Selected Active Banner:", activeBanner);
+
+              if (!activeBanner || bannerDismissed) {
+                console.log("[CMS Debug] Banner Returned Early (null):", {
+                  hasActiveBanner: !!activeBanner,
+                  bannerDismissed
+                });
+                return null;
+              }
 
               const rawDesktop = (activeBanner.desktop_image_url || activeBanner.image_url || "").trim();
               const rawMobile = (activeBanner.mobile_image_url || "").trim();
