@@ -34,9 +34,10 @@ export function HomeCmsBanner() {
           .from("cms_banners")
           .select("*")
           .eq("is_active", true)
+          .in("display_location", ["homepage", "global"])
           .order("created_at", { ascending: false });
 
-        console.log("[CMS Query Debug - Home Banner] Result:", {
+        console.log("[CMS Debug - Home Banner] Result:", {
           count: data?.length || 0,
           rows: data,
           error
@@ -45,42 +46,11 @@ export function HomeCmsBanner() {
         if (!error && data && data.length > 0) {
           setBanners(data);
         } else {
-          const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
-          if (local && JSON.parse(local).length > 0) {
-            const parsed = JSON.parse(local);
-            setBanners(Array.isArray(parsed) ? parsed.filter((b: any) => b.is_active !== false) : []);
-          } else {
-            // Default referral banner fallback if database is empty/unpopulated
-            setBanners([{
-              id: "default-referral-banner",
-              desktop_image_url: "/images/hero.webp",
-              mobile_image_url: "/images/hero.webp",
-              target_destination: "All",
-              display_location: "global",
-              link_url: "/referral",
-              is_active: true,
-              title: "ANNEX Referral Program"
-            }]);
-          }
+          setBanners([]);
         }
       } catch (err) {
-        console.warn("[CMS Query Debug - Home Banner] Fetch Error:", err);
-        const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
-        if (local && JSON.parse(local).length > 0) {
-          const parsed = JSON.parse(local);
-          setBanners(Array.isArray(parsed) ? parsed.filter((b: any) => b.is_active !== false) : []);
-        } else {
-          setBanners([{
-            id: "default-referral-banner",
-            desktop_image_url: "/images/hero.webp",
-            mobile_image_url: "/images/hero.webp",
-            target_destination: "All",
-            display_location: "global",
-            link_url: "/referral",
-            is_active: true,
-            title: "ANNEX Referral Program"
-          }]);
-        }
+        console.warn("[CMS Debug - Home Banner] Fetch Error:", err);
+        setBanners([]);
       } finally {
         setLoading(false);
       }
@@ -94,11 +64,13 @@ export function HomeCmsBanner() {
     return null;
   }
 
-  // Find active banner for homepage or global or fallback (null location)
+  // Find active banner strictly for homepage or global
   const activeBanner = banners.find(b => 
     b.is_active !== false && 
-    (!b.display_location || b.display_location === "homepage" || b.display_location === "global" || b.display_location === "All")
-  ) || banners[0];
+    (b.display_location === "homepage" || b.display_location === "global")
+  );
+
+  console.log("[CMS Debug - Home Banner] Selected Banner:", activeBanner);
 
   if (!activeBanner || activeBanner.is_active === false) return null;
 

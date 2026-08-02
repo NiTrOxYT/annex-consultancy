@@ -472,68 +472,20 @@ export default function StudentDashboard() {
         console.error("Error loading notification preferences:", prefErr.message);
       }
 
-      // 10. Fetch CMS Promotional Banners
+      // 10. Fetch CMS Promotional Banners (Strictly for Student Dashboard)
       try {
-        const isMobileDevice = typeof window !== "undefined" ? window.innerWidth < 768 : false;
-        console.log("[CMS Query Debug - Student Dashboard] Executing Query:", {
-          table: "cms_banners",
-          filter: "is_active = true",
-          isMobile: isMobileDevice,
-          viewportWidth: typeof window !== "undefined" ? window.innerWidth : null,
-          studentDestination: studentData?.destination || "India"
-        });
-
         const { data: bData, error: bErr } = await supabase
           .from("cms_banners")
           .select("*")
           .eq("is_active", true)
+          .in("display_location", ["student_dashboard", "global"])
           .order("created_at", { ascending: false });
 
-        console.log("[CMS Query Debug - Student Dashboard] Result:", {
-          count: bData?.length || 0,
-          rows: bData,
-          error: bErr
-        });
-
-        if (bData && bData.length > 0) {
-          setBanners(bData);
-        } else {
-          const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
-          if (local && JSON.parse(local).length > 0) {
-            const parsed = JSON.parse(local);
-            setBanners(Array.isArray(parsed) ? parsed.filter((b: any) => b.is_active !== false) : []);
-          } else {
-            // Default referral banner fallback if database is empty/unpopulated
-            setBanners([{
-              id: "default-referral-banner",
-              desktop_image_url: "/images/hero.webp",
-              mobile_image_url: "/images/hero.webp",
-              target_destination: "All",
-              display_location: "global",
-              link_url: "/referral",
-              is_active: true,
-              title: "ANNEX Referral Program"
-            }]);
-          }
-        }
+        console.log("[CMS Debug - Student Dashboard] Fetch Result:", { count: bData?.length || 0, data: bData, error: bErr });
+        setBanners(bData || []);
       } catch (e) {
-        console.warn("[CMS Query Debug - Student Dashboard] Fetch Error:", e);
-        const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
-        if (local && JSON.parse(local).length > 0) {
-          const parsed = JSON.parse(local);
-          setBanners(Array.isArray(parsed) ? parsed.filter((b: any) => b.is_active !== false) : []);
-        } else {
-          setBanners([{
-            id: "default-referral-banner",
-            desktop_image_url: "/images/hero.webp",
-            mobile_image_url: "/images/hero.webp",
-            target_destination: "All",
-            display_location: "global",
-            link_url: "/referral",
-            is_active: true,
-            title: "ANNEX Referral Program"
-          }]);
-        }
+        console.warn("[CMS Debug - Student Dashboard] Fetch Error:", e);
+        setBanners([]);
       }
 
       // 11. Fetch Notification email history logs
@@ -1267,25 +1219,20 @@ export default function StudentDashboard() {
 
             {/* Dynamic Promotional Banner (CMS Driven) */}
             {(() => {
-              console.log("[CMS Debug] Banner Render Evaluation:", {
-                bannersLength: banners.length,
-                bannerDismissed,
-                studentDestination: studentData?.destination
-              });
-
               const activeBanner = banners.find(b => 
                 b.is_active !== false && 
-                (!b.display_location || b.display_location === "student_dashboard" || b.display_location === "global" || b.display_location === "homepage" || b.display_location === "All") &&
+                (b.display_location === "student_dashboard" || b.display_location === "global") &&
                 (!b.target_destination || b.target_destination === "All" || b.target_destination === (studentData?.destination || "India"))
-              ) || (banners.length > 0 ? banners[0] : null);
+              );
 
-              console.log("[CMS Debug] Selected Active Banner:", activeBanner);
+              console.log("[CMS Debug - Student Dashboard] Render Check:", {
+                currentPage: "student_dashboard",
+                requestedLocation: "student_dashboard",
+                selectedBannerLocation: activeBanner?.display_location,
+                selectedBanner: activeBanner
+              });
 
               if (!activeBanner || bannerDismissed) {
-                console.log("[CMS Debug] Banner Returned Early (null):", {
-                  hasActiveBanner: !!activeBanner,
-                  bannerDismissed
-                });
                 return null;
               }
 
