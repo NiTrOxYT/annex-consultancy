@@ -664,6 +664,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
   const [bannerForm, setBannerForm] = React.useState({
     target_destination: "India",
     display_location: "homepage",
+    target_device: "desktop",
     desktop_image_url: "",
     mobile_image_url: "",
     link_url: "",
@@ -753,14 +754,23 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
 
   const handleSaveBanner = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bannerForm.desktop_image_url && !bannerForm.mobile_image_url) {
-      alert("Please upload at least one banner image (PC or Mobile).");
+    const imgUrl = bannerForm.target_device === "desktop"
+      ? (bannerForm.desktop_image_url || bannerForm.mobile_image_url)
+      : (bannerForm.mobile_image_url || bannerForm.desktop_image_url);
+
+    if (!imgUrl) {
+      alert("Please upload a banner image.");
       return;
     }
     const payload = {
-      ...bannerForm,
-      desktop_image_url: bannerForm.desktop_image_url || bannerForm.mobile_image_url,
-      mobile_image_url: bannerForm.mobile_image_url || bannerForm.desktop_image_url
+      target_destination: bannerForm.target_destination,
+      display_location: bannerForm.display_location,
+      target_device: bannerForm.target_device,
+      desktop_image_url: bannerForm.target_device === "desktop" ? imgUrl : (bannerForm.desktop_image_url || ""),
+      mobile_image_url: bannerForm.target_device === "mobile" ? imgUrl : (bannerForm.mobile_image_url || ""),
+      image_url: imgUrl,
+      link_url: bannerForm.link_url,
+      is_active: bannerForm.is_active
     };
     
     // Update local state and localStorage instantly
@@ -9571,6 +9581,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                     setBannerForm({
                       target_destination: "India",
                       display_location: "homepage",
+                      target_device: "desktop",
                       desktop_image_url: "",
                       mobile_image_url: "",
                       link_url: "",
@@ -9600,7 +9611,10 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                   <Card key={banner.id} className="overflow-hidden border border-hairline hover:shadow-md transition-shadow bg-white p-4">
                     <div className="flex items-center justify-between mb-3 border-b border-hairline pb-3">
                       <div className="space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2.5 py-0.5 rounded-full font-mono-data">
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-900 text-white px-2.5 py-0.5 rounded-full font-mono-data">
+                          {banner.target_device === "mobile" ? "📱 Mobile" : "🖥️ Desktop"}
+                        </span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2.5 py-0.5 rounded-full font-mono-data ml-1.5">
                           {banner.target_destination === "All" ? "🌐" : banner.target_destination === "India" ? "🇮🇳" : banner.target_destination === "UK" ? "🇬🇧" : banner.target_destination === "Australia" ? "🇦🇺" : banner.target_destination === "Europe" ? "🇪🇺" : banner.target_destination === "Dubai" ? "🇦🇪" : banner.target_destination === "Italy" ? "🇮🇹" : "🌍"} {banner.target_destination || "India"}
                         </span>
                         <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200/60 px-2.5 py-0.5 rounded-full font-mono-data ml-1.5">
@@ -9624,8 +9638,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                             setBannerForm({
                               target_destination: banner.target_destination || "India",
                               display_location: banner.display_location || "homepage",
+                              target_device: banner.target_device || (banner.mobile_image_url && !banner.desktop_image_url ? "mobile" : "desktop"),
                               desktop_image_url: banner.desktop_image_url || banner.image_url || "",
-                              mobile_image_url: banner.mobile_image_url || banner.desktop_image_url || banner.image_url || "",
+                              mobile_image_url: banner.mobile_image_url || banner.image_url || "",
                               link_url: banner.link_url || "",
                               is_active: banner.is_active !== false
                             });
@@ -13009,12 +13024,41 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
             <div className="flex items-center gap-2 mb-6 border-b border-hairline pb-4">
               <ImageSquare size={22} className="text-primary" />
               <div>
-                <CardTitle className="text-lg">{editingBanner ? "Edit Location Banner" : "Add Location Banner"}</CardTitle>
-                <CardDescription className="text-xs">Select target location and upload PC & Mobile banners.</CardDescription>
+                <CardTitle className="text-lg">{editingBanner ? "Edit CMS Banner" : "Add CMS Banner"}</CardTitle>
+                <CardDescription className="text-xs">Select target device, display location, and upload banner artwork.</CardDescription>
               </div>
             </div>
 
             <form onSubmit={handleSaveBanner} className="flex flex-col gap-4 text-xs">
+              
+              {/* Target Device Selection */}
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-primary uppercase tracking-wider">Target Device *</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setBannerForm({ ...bannerForm, target_device: "desktop" })}
+                    className={`py-2.5 px-4 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                      bannerForm.target_device === "desktop"
+                        ? "bg-primary text-white border-primary shadow-sm"
+                        : "bg-slate-50 text-slate-600 border-hairline hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>🖥️ Desktop / PC (1200×300)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBannerForm({ ...bannerForm, target_device: "mobile" })}
+                    className={`py-2.5 px-4 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                      bannerForm.target_device === "mobile"
+                        ? "bg-primary text-white border-primary shadow-sm"
+                        : "bg-slate-50 text-slate-600 border-hairline hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>📱 Mobile (600×300)</span>
+                  </button>
+                </div>
+              </div>
               
               {/* Display Location Select */}
               <div className="flex flex-col gap-1.5">
@@ -13054,32 +13098,60 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                 </select>
               </div>
 
-              {/* Upload 1: Desktop / PC Banner */}
-              <div className="border border-hairline p-4 rounded-xl space-y-2 bg-slate-50/50">
-                <div className="flex items-center justify-between">
-                  <label className="font-bold text-primary uppercase tracking-wider text-xs">🖥️ PC / Desktop Banner (1200 × 300)</label>
-                  {bannerForm.desktop_image_url && <span className="text-[10px] text-emerald-600 font-bold">Uploaded ✓</span>}
-                </div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    value={bannerForm.desktop_image_url}
-                    onChange={(e) => setBannerForm({ ...bannerForm, desktop_image_url: e.target.value })}
-                    placeholder="Upload file or paste image URL..."
-                    className="flex-grow px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none bg-white"
-                  />
-                  <label className="px-4 py-2 bg-primary text-white hover:bg-primary/95 font-bold rounded-xl text-xs transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 shadow-sm">
-                    {uploadingDesktopImg ? <SpinnerGap size={14} className="animate-spin" /> : <UploadSimple size={14} />}
-                    <span>{uploadingDesktopImg ? "Uploading..." : "Upload PC Banner"}</span>
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadImageFile(e, "desktop")} disabled={uploadingDesktopImg} />
-                  </label>
-                </div>
-                {bannerForm.desktop_image_url && (
-                  <div className="h-24 w-full rounded-xl overflow-hidden border border-hairline relative bg-slate-900 mt-2">
-                    <img src={bannerForm.desktop_image_url} alt="Desktop Preview" className="w-full h-full object-cover" />
+              {/* Upload Field: Desktop vs Mobile based on target_device */}
+              {bannerForm.target_device === "desktop" ? (
+                <div className="border border-hairline p-4 rounded-xl space-y-2 bg-slate-50/50">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-primary uppercase tracking-wider text-xs">🖥️ Desktop Banner Image (1200 × 300)</label>
+                    {bannerForm.desktop_image_url && <span className="text-[10px] text-emerald-600 font-bold">Uploaded ✓</span>}
                   </div>
-                )}
-              </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      value={bannerForm.desktop_image_url}
+                      onChange={(e) => setBannerForm({ ...bannerForm, desktop_image_url: e.target.value })}
+                      placeholder="Upload file or paste image URL..."
+                      className="flex-grow px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none bg-white"
+                    />
+                    <label className="px-4 py-2 bg-primary text-white hover:bg-primary/95 font-bold rounded-xl text-xs transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 shadow-sm">
+                      {uploadingDesktopImg ? <SpinnerGap size={14} className="animate-spin" /> : <UploadSimple size={14} />}
+                      <span>{uploadingDesktopImg ? "Uploading..." : "Upload Desktop Banner"}</span>
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadImageFile(e, "desktop")} disabled={uploadingDesktopImg} />
+                    </label>
+                  </div>
+                  {bannerForm.desktop_image_url && (
+                    <div className="h-24 w-full rounded-xl overflow-hidden border border-hairline relative bg-slate-900 mt-2">
+                      <img src={bannerForm.desktop_image_url} alt="Desktop Preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="border border-hairline p-4 rounded-xl space-y-2 bg-slate-50/50">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-primary uppercase tracking-wider text-xs">📱 Mobile Banner Image (600 × 300)</label>
+                    {bannerForm.mobile_image_url && <span className="text-[10px] text-emerald-600 font-bold">Uploaded ✓</span>}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      value={bannerForm.mobile_image_url}
+                      onChange={(e) => setBannerForm({ ...bannerForm, mobile_image_url: e.target.value })}
+                      placeholder="Upload file or paste image URL..."
+                      className="flex-grow px-3.5 py-2 border border-hairline rounded-xl text-xs outline-none bg-white"
+                    />
+                    <label className="px-4 py-2 bg-primary text-white hover:bg-primary/95 font-bold rounded-xl text-xs transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 shadow-sm">
+                      {uploadingMobileImg ? <SpinnerGap size={14} className="animate-spin" /> : <UploadSimple size={14} />}
+                      <span>{uploadingMobileImg ? "Uploading..." : "Upload Mobile Banner"}</span>
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadImageFile(e, "mobile")} disabled={uploadingMobileImg} />
+                    </label>
+                  </div>
+                  {bannerForm.mobile_image_url && (
+                    <div className="h-24 w-full rounded-xl overflow-hidden border border-hairline relative bg-slate-900 mt-2">
+                      <img src={bannerForm.mobile_image_url} alt="Mobile Preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Upload 2: Mobile Banner */}
               <div className="border border-hairline p-4 rounded-xl space-y-2 bg-slate-50/50">

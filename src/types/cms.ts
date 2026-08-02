@@ -10,12 +10,16 @@ export type DisplayLocation =
   | "success_stories"
   | "global";
 
+export type TargetDevice = "desktop" | "mobile";
+
 export interface CmsBanner {
   id: string;
-  desktop_image_url: string;
+  desktop_image_url?: string;
   mobile_image_url?: string;
+  image_url?: string;
   target_destination?: string;
   display_location: DisplayLocation;
+  target_device: TargetDevice;
   title?: string;
   link_url?: string;
   is_active: boolean;

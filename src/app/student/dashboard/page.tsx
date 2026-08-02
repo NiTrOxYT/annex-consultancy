@@ -1222,25 +1222,28 @@ export default function StudentDashboard() {
 
             {/* Dynamic Promotional Banner (CMS Driven) */}
             {(() => {
-              const activeBanner = banners.find(b => 
+              const desktopBanner = banners.find(b => 
                 b.is_active !== false && 
                 (!b.display_location || b.display_location === "student_dashboard" || b.display_location === "global" || b.display_location === "All") &&
-                (!b.target_destination || b.target_destination === "All" || b.target_destination === (studentData?.destination || "India"))
+                (!b.target_destination || b.target_destination === "All" || b.target_destination === (studentData?.destination || "India")) &&
+                (b.target_device === "desktop" || !b.target_device || (b.desktop_image_url && !b.mobile_image_url))
               ) || (banners.length > 0 ? banners[0] : null);
 
-              console.log("[CMS Debug - Student Dashboard] Render Check:", {
-                currentPage: "student_dashboard",
-                requestedLocation: "student_dashboard",
-                selectedBannerLocation: activeBanner?.display_location,
-                selectedBanner: activeBanner
-              });
+              const mobileBanner = banners.find(b => 
+                b.is_active !== false && 
+                (!b.display_location || b.display_location === "student_dashboard" || b.display_location === "global" || b.display_location === "All") &&
+                (!b.target_destination || b.target_destination === "All" || b.target_destination === (studentData?.destination || "India")) &&
+                (b.target_device === "mobile" || b.mobile_image_url)
+              ) || desktopBanner;
+
+              const activeBanner = mobileBanner || desktopBanner;
 
               if (!activeBanner || bannerDismissed) {
                 return null;
               }
 
-              const rawDesktop = (activeBanner.desktop_image_url || activeBanner.image_url || "").trim();
-              const rawMobile = (activeBanner.mobile_image_url || "").trim();
+              const rawDesktop = (desktopBanner?.desktop_image_url || desktopBanner?.image_url || activeBanner?.desktop_image_url || "").trim();
+              const rawMobile = (mobileBanner?.mobile_image_url || mobileBanner?.image_url || rawDesktop).trim();
               const fallbackUrl = "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop";
               const desktopImg = rawDesktop || rawMobile || fallbackUrl;
               const mobileImg = rawMobile || rawDesktop || fallbackUrl;

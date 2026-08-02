@@ -50,22 +50,28 @@ export function HomeCmsBanner() {
     return null;
   }
 
-  // Find active banner for homepage or global or unmigrated (no location property)
-  const activeBanner = banners.find(b => 
+  // Find active banner for homepage / global
+  const desktopBanner = banners.find(b => 
     b.is_active !== false && 
-    (!b.display_location || b.display_location === "homepage" || b.display_location === "global" || b.display_location === "All")
+    (!b.display_location || b.display_location === "homepage" || b.display_location === "global" || b.display_location === "All") &&
+    (b.target_device === "desktop" || !b.target_device || (b.desktop_image_url && !b.mobile_image_url))
   ) || (banners.length > 0 ? banners[0] : null);
 
-  console.log("[CMS Debug - Home Banner] Selected Banner:", activeBanner);
+  const mobileBanner = banners.find(b => 
+    b.is_active !== false && 
+    (!b.display_location || b.display_location === "homepage" || b.display_location === "global" || b.display_location === "All") &&
+    (b.target_device === "mobile" || b.mobile_image_url)
+  ) || desktopBanner;
 
-  if (!activeBanner || activeBanner.is_active === false) return null;
+  if (!desktopBanner && !mobileBanner) return null;
 
-  const rawDesktop = (activeBanner.desktop_image_url || activeBanner.image_url || "").trim();
-  const rawMobile = (activeBanner.mobile_image_url || "").trim();
+  const rawDesktop = (desktopBanner?.desktop_image_url || desktopBanner?.image_url || "").trim();
+  const rawMobile = (mobileBanner?.mobile_image_url || mobileBanner?.image_url || rawDesktop).trim();
 
-  // Always resolve both to a real URL — fall back to each other
   const desktopImg = rawDesktop || rawMobile;
   const mobileImg = rawMobile || rawDesktop;
+
+  const activeBanner = mobileBanner || desktopBanner;
 
   if (!desktopImg && !mobileImg) return null;
 
