@@ -89,38 +89,38 @@ export function HomeCmsBanner() {
     }
   };
 
+  console.log("[Banner Debug - Home Banner]", {
+    banner: activeBanner,
+    desktopImg,
+    mobileImg,
+    rawDesktop,
+    rawMobile,
+  });
+
+  console.log("Rendering mobile image:", mobileImg);
+
   return (
     <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 md:pt-28 pb-0 animate-fade-in">
       <div className="relative rounded-2xl md:rounded-3xl overflow-hidden shadow-md border border-hairline/80 group bg-slate-100 min-h-[140px]">
         <div
           onClick={handleBannerClick}
-          className="block relative w-full min-h-[140px] cursor-pointer bg-slate-100"
+          className="block relative w-full cursor-pointer bg-slate-100"
         >
-          {/* DESKTOP banner — shown on md+ */}
-          <img
-            src={desktopImg}
-            alt="Promotional Banner"
-            className="hidden md:block w-full h-full min-h-[180px] max-h-[400px] object-cover rounded-2xl md:rounded-3xl"
-            onError={(e) => {
-              e.currentTarget.onerror = null;
-              if (mobileImg && e.currentTarget.src !== mobileImg) {
-                e.currentTarget.src = mobileImg;
-              }
-            }}
-          />
-
-          {/* MOBILE banner — shown below md */}
-          <img
-            src={mobileImg}
-            alt="Promotional Banner"
-            className="block md:hidden w-full h-full min-h-[140px] max-h-[300px] object-cover rounded-2xl"
-            onError={(e) => {
-              e.currentTarget.onerror = null;
-              if (desktopImg && e.currentTarget.src !== desktopImg) {
-                e.currentTarget.src = desktopImg;
-              }
-            }}
-          />
+          <picture className="block w-full">
+            {desktopImg && <source media="(min-width: 768px)" srcSet={desktopImg} />}
+            <img
+              src={mobileImg || desktopImg}
+              alt="Promotional Banner"
+              className="w-full h-auto rounded-2xl md:rounded-3xl block object-cover max-h-[400px]"
+              onError={(e) => {
+                console.log("Image failed:", e.currentTarget.src, { desktopImg, mobileImg });
+                e.currentTarget.onerror = null;
+                if (desktopImg && e.currentTarget.src !== desktopImg) {
+                  e.currentTarget.src = desktopImg;
+                }
+              }}
+            />
+          </picture>
         </div>
 
         {/* Dismiss Button */}
