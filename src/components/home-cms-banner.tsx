@@ -90,7 +90,7 @@ export function HomeCmsBanner() {
   };
 
   return (
-    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-2 animate-fade-in">
+    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 md:pt-28 pb-0 animate-fade-in">
       <div className="relative rounded-2xl md:rounded-3xl overflow-hidden shadow-md border border-hairline/80 group bg-slate-100 min-h-[140px]">
         <div
           onClick={handleBannerClick}
