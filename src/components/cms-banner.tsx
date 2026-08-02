@@ -87,18 +87,18 @@ export function CmsBanner({ location, className = "" }: CmsBannerProps) {
 
   return (
     <div className={`w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${className}`}>
-      <div className="relative rounded-2xl md:rounded-3xl overflow-hidden shadow-md border border-hairline/80 group bg-slate-900">
+      <div className="relative rounded-2xl md:rounded-3xl overflow-hidden shadow-md border border-hairline/80 group bg-slate-950 min-h-[140px] md:min-h-[180px] w-full">
         
         {/* Banner Clickable Wrapper */}
         <div 
           onClick={handleClick}
-          className="block relative w-full cursor-pointer overflow-hidden"
+          className="block relative w-full cursor-pointer overflow-hidden min-h-[140px] md:min-h-[180px]"
         >
           {/* DESKTOP BANNER IMAGE (Shown on screen sizes >= 768px) */}
           <img
             src={finalDesktop}
             alt={banner.title || "Promotional Banner"}
-            className="hidden md:block w-full h-auto min-h-[160px] max-h-[360px] object-cover rounded-2xl md:rounded-3xl transition-transform duration-500 group-hover:scale-[1.01]"
+            className="hidden md:block w-full h-full min-h-[180px] max-h-[360px] object-cover aspect-[4/1] rounded-2xl md:rounded-3xl transition-transform duration-500 group-hover:scale-[1.01]"
             onError={(e) => {
               e.currentTarget.onerror = null;
               e.currentTarget.src = fallbackSrc;
@@ -109,7 +109,7 @@ export function CmsBanner({ location, className = "" }: CmsBannerProps) {
           <img
             src={finalMobile}
             alt={banner.title || "Promotional Banner"}
-            className="block md:hidden w-full h-auto min-h-[130px] max-h-[260px] object-cover rounded-2xl transition-transform duration-500 group-hover:scale-[1.01]"
+            className="block md:hidden w-full h-full min-h-[140px] max-h-[260px] object-cover aspect-[2.2/1] rounded-2xl transition-transform duration-500 group-hover:scale-[1.01]"
             onError={(e) => {
               e.currentTarget.onerror = null;
               e.currentTarget.src = fallbackSrc;
