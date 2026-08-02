@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const statusFilter = searchParams.get("status");
     const searchQuery = searchParams.get("search");
 
-    // 1. Fetch Public Referrals table
+    // ─── 1. Public Web Referrals ───────────────────────────────────────
     let publicList: any[] = [];
     try {
       const { data, error } = await db
@@ -41,21 +41,23 @@ export async function GET(request: Request) {
       console.warn("Public referrals fetch note:", e.message);
     }
 
-    // 2. Fetch Student Portal Referrals table
+    // ─── 2. Student Portal Referrals ──────────────────────────────────
     let portalList: any[] = [];
     try {
       const { data, error } = await db
         .from("referrals")
-        .select("*, students(name, email), referral_rewards(*)")
+        .select("*, students(name, email, referral_code), referral_rewards(*)")
         .order("created_at", { ascending: false });
 
       if (!error && data) {
         portalList = data.map((r: any) => ({
           ...r,
-          source: r.source || (r.referrer_name ? "public_website" : "student_portal"),
-          referrer_name: r.referrer_name || r.students?.name || "Student Referral",
-          referrer_email: r.referrer_email || r.students?.email || "",
-          referrer_phone: r.referrer_phone || "",
+          // ALWAYS tag student portal rows as student_portal
+          source: "student_portal",
+          referrer_name: r.students?.name || "Student",
+          referrer_email: r.students?.email || "",
+          referrer_phone: "",
+          referral_code: r.referral_code || r.students?.referral_code || "",
           student_name: r.referred_name,
           student_phone: r.referred_phone,
           student_email: r.referred_email,
@@ -66,16 +68,15 @@ export async function GET(request: Request) {
       console.warn("Portal referrals fetch note:", e.message);
     }
 
-    // Merge lists by ID
-    const combinedMap = new Map();
-    publicList.forEach((r: any) => combinedMap.set(r.id, r));
-    portalList.forEach((r: any) => combinedMap.set(r.id, r));
-    let combined = Array.from(combinedMap.values());
+    // ─── Combine (public first, then student) ─────────────────────────
+    // Keep IDs unique — no merging required since they come from separate tables
+    const combined = [...publicList, ...portalList];
 
     // Apply Search Filter
+    let filtered = combined;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      combined = combined.filter((r: any) =>
+      filtered = filtered.filter((r: any) =>
         (r.referrer_name || "").toLowerCase().includes(q) ||
         (r.referrer_phone || "").toLowerCase().includes(q) ||
         (r.student_name || r.referred_name || "").toLowerCase().includes(q) ||
@@ -86,25 +87,32 @@ export async function GET(request: Request) {
 
     // Apply Status Filter
     if (statusFilter && statusFilter !== "All") {
-      combined = combined.filter((r: any) => r.status.toLowerCase() === statusFilter.toLowerCase());
+      filtered = filtered.filter((r: any) => r.status.toLowerCase() === statusFilter.toLowerCase());
     }
 
     // Sort descending by creation date
-    combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    // Analytics Metrics
-    const totalReferrals = combined.length;
-    const pendingCount = combined.filter((r: any) => r.status === "Pending" || r.status === "lead" || r.status === "pending_contact").length;
-    const contactedCount = combined.filter((r: any) => r.status === "Contacted" || r.status === "contacted").length;
-    const convertedCount = combined.filter((r: any) => r.status === "Converted" || r.status === "enrolled" || r.status === "rewarded").length;
-    const rewardsPaidCount = combined.filter((r: any) => r.status === "Reward Paid" || r.status === "rewarded" || r.status === "reward_paid").length;
+    // Analytics
+    const totalReferrals = filtered.length;
+    const pendingCount = filtered.filter((r: any) =>
+      ["pending", "lead", "pending_contact"].includes((r.status || "").toLowerCase())
+    ).length;
+    const contactedCount = filtered.filter((r: any) =>
+      ["contacted"].includes((r.status || "").toLowerCase())
+    ).length;
+    const convertedCount = filtered.filter((r: any) =>
+      ["converted", "enrolled", "rewarded", "reward paid"].includes((r.status || "").toLowerCase())
+    ).length;
+    const rewardsPaidCount = filtered.filter((r: any) =>
+      ["reward paid", "rewarded", "reward_paid"].includes((r.status || "").toLowerCase())
+    ).length;
     const rewardsPaidTotal = rewardsPaidCount * 10000;
-
     const conversionRate = totalReferrals > 0 ? Math.round((convertedCount / totalReferrals) * 100) : 0;
 
     return NextResponse.json({
       success: true,
-      referrals: combined,
+      referrals: filtered,
       analytics: {
         totalReferrals,
         pendingCount,
@@ -114,7 +122,7 @@ export async function GET(request: Request) {
         rewardsPaid: rewardsPaidTotal,
         totalRewardsPaid: rewardsPaidTotal,
         conversionRate,
-        activeReferrers: new Set(combined.map((r: any) => r.referrer_name || r.referrer_phone)).size
+        activeReferrers: new Set(filtered.map((r: any) => r.referrer_name || r.referrer_phone)).size
       }
     });
   } catch (err: any) {
@@ -131,7 +139,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { action, referralId, status, notes, assigned_counselor, reward_status } = body;
+    const { action, referralId, source, status, notes, assigned_counselor, reward_status } = body;
 
     if (!referralId) {
       return NextResponse.json({ error: "Missing referralId" }, { status: 400 });
@@ -139,24 +147,21 @@ export async function POST(request: Request) {
 
     const updatePayload: any = { updated_at: new Date().toISOString() };
     if (status) updatePayload.status = status;
-    if (notes) updatePayload.notes = notes;
+    if (notes !== undefined) updatePayload.notes = notes;
     if (assigned_counselor) updatePayload.assigned_counselor = assigned_counselor;
     if (reward_status) updatePayload.reward_status = reward_status;
     if (status === "Contacted") updatePayload.contacted = true;
     if (action === "delete") updatePayload.deleted = true;
 
-    // Update public_referrals
-    try {
-      await db.from("public_referrals").update(updatePayload).eq("id", referralId);
-    } catch (e: any) {
-      console.warn("Update public_referrals fallback:", e.message);
-    }
-
-    // Update referrals
-    try {
+    // Route to correct table based on source field
+    if (source === "student_portal") {
       await db.from("referrals").update(updatePayload).eq("id", referralId);
-    } catch (e: any) {
-      console.warn("Update referrals fallback:", e.message);
+    } else if (source === "public_website") {
+      await db.from("public_referrals").update(updatePayload).eq("id", referralId);
+    } else {
+      // Fallback: try both
+      await db.from("public_referrals").update(updatePayload).eq("id", referralId);
+      await db.from("referrals").update(updatePayload).eq("id", referralId);
     }
 
     return NextResponse.json({ success: true, message: "Referral updated successfully" });

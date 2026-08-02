@@ -2261,7 +2261,7 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
     const rows = referrals.map(r => [
       r.id,
       new Date(r.created_at).toLocaleDateString(),
-      r.source === "public_website" || r.referrer_name ? "Public Website" : "Student Portal",
+      r.source === "student_portal" ? "Student Portal" : "Public Website",
       r.referrer_name || r.students?.name || "Website Guest",
       r.referrer_phone || r.students?.email || "",
       r.referrer_email || r.students?.email || "",
@@ -8100,8 +8100,9 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                                 <p className="font-semibold text-slate-800">{ref.referrer_name || ref.students?.name || "Website Guest"}</p>
                                 <p className="text-[10px] text-slate-500">{ref.referrer_phone || ref.referrer_email || ref.students?.email || "No contact"}</p>
                                 {ref.referrer_city && <p className="text-[10px] text-purple-700 font-medium">📍 {ref.referrer_city}</p>}
-                                <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full mt-1 ${ref.source === "public_website" || ref.referrer_name ? "bg-purple-50 text-purple-700 border border-purple-200/60" : "bg-slate-100 text-slate-600"}`}>
-                                  {ref.source === "public_website" || ref.referrer_name ? "🌐 Public Web" : "🎓 Student Portal"}
+                                {ref.referral_code && <p className="text-[10px] font-mono text-purple-600">🔑 {ref.referral_code}</p>}
+                                <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full mt-1 ${ref.source === "student_portal" ? "bg-amber-50 text-amber-700 border border-amber-200/60" : "bg-blue-50 text-blue-700 border border-blue-200/60"}`}>
+                                  {ref.source === "student_portal" ? "🎓 Student Referral" : "🌐 Public Web"}
                                 </span>
                               </td>
                               <td className="px-6 py-4.5">
@@ -8185,8 +8186,8 @@ export default function AdminDashboard({ initialTab }: AdminDashboardProps = {})
                       {/* Drawer Header */}
                       <div className="flex items-center justify-between border-b border-hairline pb-4">
                         <div>
-                          <span className="text-[10px] font-mono uppercase tracking-wider text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
-                            {selectedReferralDrawer.source === "public_website" || selectedReferralDrawer.referrer_name ? "🌐 Public Referral" : "🎓 Portal Referral"}
+                          <span className={`text-[10px] font-mono uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${selectedReferralDrawer.source === "student_portal" ? "text-amber-700 bg-amber-50 border-amber-200" : "text-blue-700 bg-blue-50 border-blue-200"}`}>
+                            {selectedReferralDrawer.source === "student_portal" ? "🎓 Student Referral" : "🌐 Public Web Referral"}
                           </span>
                           <h3 className="font-display font-bold text-xl text-primary mt-2">Referral Entry Details</h3>
                           <p className="text-[10px] text-slate-400">ID: {selectedReferralDrawer.id}</p>

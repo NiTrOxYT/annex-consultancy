@@ -2,11 +2,12 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Gift, CurrencyInr, Users, CheckCircle, ArrowRight, CaretDown, 
   Sparkle, ShieldCheck, GraduationCap, Bank, Lightning, Headset, 
-  PaperPlaneRight, Globe, Paperclip, SpinnerGap, PhoneCall, EnvelopeSimple, User, MapPin
+  PaperPlaneRight, Globe, Paperclip, SpinnerGap, PhoneCall, EnvelopeSimple, User, MapPin, Star
 } from "@phosphor-icons/react";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
@@ -348,6 +349,13 @@ function ReferralBenefits() {
 // 5. REFERRAL FORM SECTION
 // ==========================================
 function ReferralForm() {
+  const searchParams = useSearchParams();
+  // Read referral code from URL: /referral?ref=ANNEX-XXXX
+  const referralCodeFromUrl = React.useMemo(() => {
+    const ref = searchParams.get("ref");
+    return ref ? ref.trim().toUpperCase() : null;
+  }, [searchParams]);
+
   const [form, setForm] = React.useState({
     referrer_name: "",
     referrer_email: "",
@@ -360,6 +368,7 @@ function ReferralForm() {
   });
   const [submitting, setSubmitting] = React.useState(false);
   const [submitted, setSubmitted] = React.useState(false);
+  const [submitSource, setSubmitSource] = React.useState<"student_portal" | "public_website" | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -369,14 +378,21 @@ function ReferralForm() {
     }
     setSubmitting(true);
     try {
+      const payload = {
+        ...form,
+        // Only send referral_code if present — API will validate against students table
+        ...(referralCodeFromUrl ? { referral_code: referralCodeFromUrl } : {})
+      };
       const res = await fetch("/api/referral/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form)
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to submit referral");
       
+      setSubmitSource(data.source || (referralCodeFromUrl ? "student_portal" : "public_website"));
+
       if (typeof window !== "undefined") {
         const item = data.referral || {
           id: `ref-${Date.now()}`,
@@ -388,7 +404,8 @@ function ReferralForm() {
           referred_phone: form.student_phone,
           preferred_country: form.preferred_country,
           notes: form.message,
-          status: "pending_contact",
+          status: data.source === "student_portal" ? "lead" : "Pending",
+          source: data.source,
           created_at: new Date().toISOString()
         };
         const local = localStorage.getItem("annex_submitted_referrals");
@@ -420,6 +437,25 @@ function ReferralForm() {
           </p>
         </div>
 
+        {/* Student referral code banner */}
+        {referralCodeFromUrl && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-purple-50 to-amber-50 border border-purple-200/60 flex items-center gap-3"
+          >
+            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+              <Star size={20} weight="fill" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-purple-800">Student Referral Link Detected</p>
+              <p className="text-xs text-purple-600 mt-0.5">
+                You were referred by a student with code <span className="font-mono font-bold">{referralCodeFromUrl}</span>. This submission will be linked to their student account.
+              </p>
+            </div>
+          </motion.div>
+        )}
+
         <Card className="p-8 sm:p-10 shadow-xl border border-hairline bg-white rounded-3xl">
           {submitted ? (
             <div className="text-center py-12 space-y-4">
@@ -427,12 +463,28 @@ function ReferralForm() {
                 <CheckCircle size={36} weight="fill" />
               </div>
               <h3 className="font-display font-bold text-2xl text-primary">Referral Submitted Successfully!</h3>
-              <p className="text-slate-500 text-sm max-w-md mx-auto">
-                Thank you for referring your friend. Our senior counselors will contact them shortly. You can track your reward status with our team.
-              </p>
+              {submitSource === "student_portal" ? (
+                <p className="text-slate-500 text-sm max-w-md mx-auto">
+                  Your referral has been linked to the student's account. Our counselors will contact your friend shortly, and the referrer will be notified when the reward becomes eligible.
+                </p>
+              ) : (
+                <p className="text-slate-500 text-sm max-w-md mx-auto">
+                  Thank you for referring your friend. Our senior counselors will contact them shortly. You can track your reward status with our team.
+                </p>
+              )}
+              {submitSource && (
+                <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full ${
+                  submitSource === "student_portal"
+                    ? "bg-purple-50 text-purple-700 border border-purple-200"
+                    : "bg-blue-50 text-blue-700 border border-blue-200"
+                }`}>
+                  {submitSource === "student_portal" ? "🎓 Student Referral" : "🌐 Public Referral"}
+                </span>
+              )}
               <Button
                 onClick={() => {
                   setSubmitted(false);
+                  setSubmitSource(null);
                   setForm({
                     referrer_name: "",
                     referrer_email: "",
