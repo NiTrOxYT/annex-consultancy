@@ -1276,7 +1276,7 @@ export default function StudentDashboard() {
                     <img
                       src={desktopImg}
                       alt={`Banner ${activeBanner.target_destination || "India"}`}
-                      className="hidden md:block w-full h-full min-h-[180px] max-h-[300px] object-cover rounded-2xl md:rounded-3xl"
+                      className="hidden md:block w-full h-auto min-h-[180px] max-h-[300px] object-cover rounded-2xl md:rounded-3xl"
                       onError={(e) => {
                         console.log("Image failed (Desktop):", e.currentTarget.src, { desktopImg, mobileImg });
                         e.currentTarget.onerror = null;
@@ -1291,7 +1291,7 @@ export default function StudentDashboard() {
                     <img
                       src={mobileImg}
                       alt={`Banner ${activeBanner.target_destination || "India"}`}
-                      className="block md:hidden w-full h-full min-h-[140px] max-h-[300px] object-cover rounded-2xl"
+                      className="block md:hidden w-full h-auto min-h-[140px] max-h-[300px] object-cover rounded-2xl"
                       onError={(e) => {
                         console.log("Image failed (Mobile):", e.currentTarget.src, { desktopImg, mobileImg });
                         e.currentTarget.onerror = null;
