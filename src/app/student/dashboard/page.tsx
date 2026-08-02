@@ -472,31 +472,23 @@ export default function StudentDashboard() {
         console.error("Error loading notification preferences:", prefErr.message);
       }
 
-      // 10. Fetch CMS Promotional Banners (With Backward Compatibility Fallback)
+      // 10. Fetch CMS Promotional Banners
       try {
-        let { data: bData, error: bErr } = await supabase
+        const { data: bData } = await supabase
           .from("cms_banners")
           .select("*")
           .eq("is_active", true)
-          .in("display_location", ["student_dashboard", "global"])
           .order("created_at", { ascending: false });
 
-        if (bErr || !bData || bData.length === 0) {
-          const fallbackRes = await supabase
-            .from("cms_banners")
-            .select("*")
-            .eq("is_active", true)
-            .order("created_at", { ascending: false });
-          if (fallbackRes.data && fallbackRes.data.length > 0) {
-            bData = fallbackRes.data;
-          }
+        if (bData && bData.length > 0) {
+          setBanners(bData);
+        } else {
+          const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
+          setBanners(local ? JSON.parse(local) : []);
         }
-
-        console.log("[CMS Debug - Student Dashboard] Fetch Result:", { count: bData?.length || 0, data: bData, error: bErr });
-        setBanners(bData || []);
       } catch (e) {
-        console.warn("[CMS Debug - Student Dashboard] Fetch Error:", e);
-        setBanners([]);
+        const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
+        setBanners(local ? JSON.parse(local) : []);
       }
 
       // 11. Fetch Notification email history logs

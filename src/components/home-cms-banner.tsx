@@ -22,39 +22,21 @@ export function HomeCmsBanner() {
 
     const loadBanners = async () => {
       try {
-        let { data, error } = await supabase
+        const { data, error } = await supabase
           .from("cms_banners")
           .select("*")
           .eq("is_active", true)
-          .in("display_location", ["homepage", "global"])
           .order("created_at", { ascending: false });
-
-        // Backward compatibility fallback if display_location column does not exist in DB yet
-        if (error || !data || data.length === 0) {
-          const fallbackRes = await supabase
-            .from("cms_banners")
-            .select("*")
-            .eq("is_active", true)
-            .order("created_at", { ascending: false });
-          if (fallbackRes.data && fallbackRes.data.length > 0) {
-            data = fallbackRes.data;
-          }
-        }
-
-        console.log("[CMS Debug - Home Banner] Result:", {
-          count: data?.length || 0,
-          rows: data,
-          error
-        });
 
         if (data && data.length > 0) {
           setBanners(data);
         } else {
-          setBanners([]);
+          const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
+          setBanners(local ? JSON.parse(local) : []);
         }
       } catch (err) {
-        console.warn("[CMS Debug - Home Banner] Fetch Error:", err);
-        setBanners([]);
+        const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
+        setBanners(local ? JSON.parse(local) : []);
       } finally {
         setLoading(false);
       }
