@@ -111,8 +111,8 @@ export default function PrivacyPolicy() {
                     <p className="text-xs text-slate-500 leading-relaxed pl-6">
                       Kathmandu Head Office<br />
                       New Baneshwor, Kathmandu, Nepal<br />
-                      <span className="font-mono-data">TEL: +977-1-4780516</span><br />
-                      <span className="font-mono-data">MAIL: info@annexconsultant.com</span>
+                      <span className="font-mono-data">TEL: +91 89108 82334</span><br />
+                      <span className="font-mono-data">MAIL: business@annex-consultancy.com</span>
                     </p>
                   </div>
 
@@ -126,8 +126,8 @@ export default function PrivacyPolicy() {
                       99/1/2, Girish Ghosh Rd<br />
                       Belur Math, Ghusuri<br />
                       Howrah, West Bengal 711202, India<br />
-                      <span className="font-mono-data">TEL: +91-33-XXXXXXXX</span><br />
-                      <span className="font-mono-data">MAIL: india@annexconsultant.com</span>
+                      <span className="font-mono-data">TEL: +91 89108 82334</span><br />
+                      <span className="font-mono-data">MAIL: business@annex-consultancy.com</span>
                     </p>
                   </div>
 
@@ -140,7 +140,7 @@ export default function PrivacyPolicy() {
                     <p className="text-xs text-slate-500 leading-relaxed pl-6">
                       For data privacy requests or file cleanup:
                       <span className="block font-semibold text-primary font-mono-data mt-1">
-                        privacy@annexconsultant.com
+                        business@annex-consultancy.com
                       </span>
                     </p>
                   </div>

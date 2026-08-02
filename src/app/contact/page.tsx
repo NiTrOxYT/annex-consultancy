@@ -315,7 +315,7 @@ export default function Contact() {
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-primary">Phone Inquiries</h4>
-                      <p className="text-xs font-mono-data text-slate-500 mt-1">+977-1-4780516</p>
+                      <p className="text-xs font-mono-data text-slate-500 mt-1">+91 89108 82334</p>
                     </div>
                   </div>
 
@@ -325,7 +325,7 @@ export default function Contact() {
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-primary">Email Support</h4>
-                      <p className="text-xs font-mono-data text-slate-500 mt-1">info@annexconsultant.com</p>
+                      <p className="text-xs font-mono-data text-slate-500 mt-1">business@annex-consultancy.com</p>
                     </div>
                   </div>
                 </div>

@@ -73,7 +73,7 @@ export function Footer() {
               </a>
 
               <a
-                href="https://wa.me/977123456789"
+                href="https://wa.me/918910882334"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-9 h-9 rounded-full border border-hairline flex items-center justify-center text-slate-500 hover:text-primary hover:border-primary transition-all"
@@ -133,8 +133,8 @@ export function Footer() {
               <p className="text-xs font-semibold text-slate-600 leading-relaxed">
                 Kathmandu Head Office<br />
                 New Baneshwor, Kathmandu, Nepal<br />
-                Phone: +977-1-4780516<br />
-                Email: info@annexconsultant.com
+                Phone: +91 89108 82334<br />
+                Email: business@annex-consultancy.com
               </p>
             </div>
             <div>
@@ -145,7 +145,9 @@ export function Footer() {
                 99/1/2, Girish Ghosh Rd<br />
                 Belur Math, Ghusuri<br />
                 Howrah, West Bengal 711202<br />
-                India
+                India<br />
+                Phone: +91 89108 82334<br />
+                Email: business@annex-consultancy.com
               </p>
             </div>
           </div>

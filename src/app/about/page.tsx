@@ -29,14 +29,14 @@ const offices = [
   {
     branch: "Head Office (Kathmandu)",
     address: "New Baneshwor, Kathmandu, Nepal",
-    phone: "+977-1-4780516",
-    email: "kathmandu@annexconsultant.com",
+    phone: "+91 89108 82334",
+    email: "business@annex-consultancy.com",
   },
   {
     branch: "India Office",
     address: "99/1/2, Girish Ghosh Rd, Belur Math, Ghusuri, Howrah, West Bengal 711202, India",
-    phone: "+91-33-XXXXXXXX",
-    email: "india@annexconsultant.com",
+    phone: "+91 89108 82334",
+    email: "business@annex-consultancy.com",
   },
   {
     branch: "Liaison Office (Sydney)",

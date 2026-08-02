@@ -113,7 +113,7 @@ export default function TermsOfService() {
                   <div className="flex items-center gap-3 border-t border-hairline pt-4">
                     <Envelope size={16} className="text-primary shrink-0" />
                     <div className="text-xs font-mono-data text-slate-600">
-                      <span className="block font-semibold text-primary">support@annexconsultant.com</span>
+                      <span className="block font-semibold text-primary">business@annex-consultancy.com</span>
                     </div>
                   </div>
 
