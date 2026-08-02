@@ -26,7 +26,6 @@ export function HomeCmsBanner() {
           .from("cms_banners")
           .select("*")
           .eq("is_active", true)
-          .in("display_location", ["homepage", "global"])
           .order("created_at", { ascending: false });
 
         if (!error && data && data.length > 0) {
@@ -61,7 +60,12 @@ export function HomeCmsBanner() {
     return null;
   }
 
-  const activeBanner = banners[0];
+  // Find active banner for homepage or global or fallback (null location)
+  const activeBanner = banners.find(b => 
+    b.is_active !== false && 
+    (!b.display_location || b.display_location === "homepage" || b.display_location === "global" || b.display_location === "All")
+  ) || banners[0];
+
   if (!activeBanner || activeBanner.is_active === false) return null;
 
   const rawDesktop = (activeBanner.desktop_image_url || activeBanner.image_url || "").trim();
@@ -95,25 +99,16 @@ export function HomeCmsBanner() {
 
   return (
     <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-2 animate-fade-in">
-      <div className="relative rounded-2xl md:rounded-3xl overflow-hidden shadow-md border border-hairline/80 group bg-white">
+      <div className="relative rounded-2xl md:rounded-3xl overflow-hidden shadow-md border border-hairline/80 group bg-slate-100 min-h-[140px]">
         <div
           onClick={handleBannerClick}
-          className="block relative w-full cursor-pointer"
+          className="block relative w-full min-h-[140px] cursor-pointer bg-slate-100"
         >
-          {/*
-           * Use TWO separate <img> elements controlled purely by Tailwind responsive
-           * visibility classes — avoids <picture> srcSet hydration quirks and
-           * guarantees both images are always in the DOM on the correct breakpoint.
-           *
-           * hidden md:block  → visible on md+ (desktop)
-           * block md:hidden  → visible on <md (mobile)
-           */}
-
           {/* DESKTOP banner — shown on md+ */}
           <img
             src={desktopImg}
             alt="Promotional Banner"
-            className="hidden md:block w-full h-auto max-h-[400px] object-cover rounded-2xl md:rounded-3xl"
+            className="hidden md:block w-full h-full min-h-[180px] max-h-[400px] object-cover rounded-2xl md:rounded-3xl"
             onError={(e) => {
               e.currentTarget.onerror = null;
               if (mobileImg && e.currentTarget.src !== mobileImg) {
@@ -126,7 +121,7 @@ export function HomeCmsBanner() {
           <img
             src={mobileImg}
             alt="Promotional Banner"
-            className="block md:hidden w-full h-auto object-cover rounded-2xl"
+            className="block md:hidden w-full h-full min-h-[140px] max-h-[300px] object-cover rounded-2xl"
             onError={(e) => {
               e.currentTarget.onerror = null;
               if (desktopImg && e.currentTarget.src !== desktopImg) {
