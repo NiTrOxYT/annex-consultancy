@@ -110,3 +110,102 @@ export function CityLocalBusinessSchema({
     />
   );
 }
+
+/**
+ * HowTo Schema for Step-by-Step Guides & Visa Workflows
+ */
+export function HowToSchema({
+  name,
+  description,
+  steps,
+}: {
+  name: string;
+  description: string;
+  steps: { name: string; text: string; url?: string }[];
+}) {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": name,
+    "description": description,
+    "step": steps.map((step, idx) => ({
+      "@type": "HowToStep",
+      "position": idx + 1,
+      "name": step.name,
+      "text": step.text,
+      "url": step.url || undefined,
+    })),
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  );
+}
+
+/**
+ * DefinedTerm Schema for Glossary Term Detail Pages
+ */
+export function DefinedTermSchema({
+  term,
+  definition,
+  url,
+  inDefinedTermSet = "https://annex-consultancy.com/glossary",
+}: {
+  term: string;
+  definition: string;
+  url: string;
+  inDefinedTermSet?: string;
+}) {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "DefinedTerm",
+    "name": term,
+    "description": definition,
+    "url": url,
+    "inDefinedTermSet": inDefinedTermSet,
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  );
+}
+
+/**
+ * DefinedTermSet Schema for Glossary Directory Hub Page
+ */
+export function DefinedTermSetSchema({
+  name = "Study Abroad Terminology & Entity Knowledge Base",
+  description = "A-Z Glossary of international education, visa, scholarship, and admission terms.",
+  terms,
+}: {
+  name?: string;
+  description?: string;
+  terms: { name: string; description: string; url: string }[];
+}) {
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "DefinedTermSet",
+    "name": name,
+    "description": description,
+    "@id": "https://annex-consultancy.com/glossary#termset",
+    "hasDefinedTerm": terms.map((t) => ({
+      "@type": "DefinedTerm",
+      "name": t.name,
+      "description": t.description,
+      "url": t.url,
+    })),
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  );
+}

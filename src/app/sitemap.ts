@@ -16,6 +16,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: "/compare", priority: 0.9, changeFrequency: "daily" },
     { path: "/tools", priority: 0.9, changeFrequency: "daily" },
     { path: "/guides", priority: 0.9, changeFrequency: "daily" },
+    { path: "/glossary", priority: 0.9, changeFrequency: "daily" },
+    { path: "/research", priority: 0.9, changeFrequency: "daily" },
+    { path: "/scholarships", priority: 0.9, changeFrequency: "daily" },
+    { path: "/cities", priority: 0.9, changeFrequency: "daily" },
+    { path: "/media", priority: 0.8, changeFrequency: "weekly" },
     { path: "/about", priority: 0.8, changeFrequency: "weekly" },
     { path: "/contact", priority: 0.8, changeFrequency: "weekly" },
     { path: "/success-stories", priority: 0.8, changeFrequency: "weekly" },
@@ -77,6 +82,42 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: now,
     changeFrequency: "weekly",
     priority: 0.9,
+  }));
+
+  // Glossary Slugs
+  const glossarySlugs = ["cas", "gic", "pgwp", "dsu"];
+  const glossaryEntries: MetadataRoute.Sitemap = glossarySlugs.map((slug) => ({
+    url: `${baseUrl}/glossary/${slug}`,
+    lastModified: now,
+    changeFrequency: "weekly",
+    priority: 0.8,
+  }));
+
+  // Research Slugs
+  const researchSlugs = ["global-tuition-benchmarks-2026", "visa-processing-timeline-analysis"];
+  const researchEntries: MetadataRoute.Sitemap = researchSlugs.map((slug) => ({
+    url: `${baseUrl}/research/${slug}`,
+    lastModified: now,
+    changeFrequency: "weekly",
+    priority: 0.9,
+  }));
+
+  // Scholarship Slugs
+  const scholarshipSlugs = ["italian-dsu-scholarship", "uk-chevening-scholarship"];
+  const scholarshipEntries: MetadataRoute.Sitemap = scholarshipSlugs.map((slug) => ({
+    url: `${baseUrl}/scholarships/${slug}`,
+    lastModified: now,
+    changeFrequency: "weekly",
+    priority: 0.9,
+  }));
+
+  // City Slugs
+  const cityDetailSlugs = ["london", "toronto"];
+  const cityDetailEntries: MetadataRoute.Sitemap = cityDetailSlugs.map((slug) => ({
+    url: `${baseUrl}/cities/${slug}`,
+    lastModified: now,
+    changeFrequency: "weekly",
+    priority: 0.8,
   }));
 
   // University Detail Slugs
@@ -178,6 +219,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...comparisonEntries,
     ...toolEntries,
     ...guideEntries,
+    ...glossaryEntries,
+    ...researchEntries,
+    ...scholarshipEntries,
+    ...cityDetailEntries,
     ...uniEntries,
     ...courseHubEntries,
     ...cityEntries,

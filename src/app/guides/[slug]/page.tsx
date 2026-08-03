@@ -7,6 +7,8 @@ import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
+import { QuickSummary } from "@/components/seo/quick-summary";
+import { HowToSchema } from "@/components/seo/extended-schemas";
 import { FAQSchema } from "@/components/seo/structured-data";
 
 interface GuideDetail {
@@ -14,7 +16,10 @@ interface GuideDetail {
   title: string;
   category: string;
   lastUpdated: string;
+  readingTime: number;
   overview: string;
+  takeaways: string[];
+  entities: { name: string; url?: string }[];
   sections: { heading: string; body: string }[];
   faqs: { question: string; answer: string }[];
 }
@@ -25,7 +30,21 @@ const guidesDataMap: Record<string, GuideDetail> = {
     title: "The Ultimate Master Guide to Studying Abroad",
     category: "Overseas Education Pillar",
     lastUpdated: "August 2026",
+    readingTime: 8,
     overview: "Studying abroad is one of the most transformative decisions of your academic and professional life. This comprehensive guide breaks down university selection, document preparation, tuition budgeting, visa filings, and landing arrangements.",
+    takeaways: [
+      "Begin profile auditing 8-12 months before your target intake",
+      "Shortlist universities based on academic GPA, budget, and post-study work permit rights",
+      "Draft bespoke, plagiarism-free Statements of Purpose (SOP)",
+      "Secure early offer letters to lock in university merit scholarships",
+      "Prepare mandatory financial proofing (UK CAS, Canada GIC, German Blocked Account)"
+    ],
+    entities: [
+      { name: "IELTS / PTE", url: "/test-preparation" },
+      { name: "SOP Guidance", url: "/guides/sop-writing-guide" },
+      { name: "GIC Deposit", url: "/glossary/gic" },
+      { name: "CAS Letter", url: "/glossary/cas" }
+    ],
     sections: [
       {
         heading: "1. Profile Assessment & Target Shortlisting",
@@ -49,7 +68,21 @@ const guidesDataMap: Record<string, GuideDetail> = {
     title: "Global Student Visa Approval Playbook",
     category: "Visa & Immigration",
     lastUpdated: "August 2026",
+    readingTime: 6,
     overview: "Navigating international student visas requires complete accuracy. Learn the exact financial proofing, health checks, and embassy interview techniques for UK, Australia, Canada, USA, Germany, and Europe.",
+    takeaways: [
+      "UK Student Visas require a valid 14-digit CAS electronic reference",
+      "Canadian SDS Study Permits require IELTS 6.5+ and CAD $20,635 GIC deposit",
+      "Australian Genuine Student (GS) criteria require 3 months bank history",
+      "German Student Visas require an official €11,208 Sperrkonto Blocked Account",
+      "Mock embassy interview prep significantly increases first-time visa approval"
+    ],
+    entities: [
+      { name: "CAS Reference", url: "/glossary/cas" },
+      { name: "GIC Requirement", url: "/glossary/gic" },
+      { name: "German Blocked Account", url: "/glossary/blocked-account" },
+      { name: "Canada PGWP", url: "/glossary/pgwp" }
+    ],
     sections: [
       {
         heading: "1. UK Student Visa (CAS & Priority Options)",
@@ -94,8 +127,18 @@ export default async function GuideDetailPage({ params }: { params: Promise<{ sl
   const guide = guidesDataMap[slugKey];
   if (!guide) notFound();
 
+  const howToSteps = guide.sections.map((sec) => ({
+    name: sec.heading,
+    text: sec.body,
+  }));
+
   return (
     <>
+      <HowToSchema
+        name={guide.title}
+        description={guide.overview}
+        steps={howToSteps}
+      />
       <FAQSchema faqs={guide.faqs} />
       <Navigation />
 
@@ -110,12 +153,9 @@ export default async function GuideDetailPage({ params }: { params: Promise<{ sl
         {/* HERO */}
         <section className="py-12 bg-white">
           <div className="max-w-7xl mx-auto px-6 lg:px-8 space-y-4">
-            <div className="flex items-center gap-3">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-subtle-gray border border-hairline text-xs font-bold uppercase tracking-wider text-primary">
-                <BookOpen size={14} className="text-primary" /> {guide.category}
-              </span>
-              <span className="text-xs text-slate-400 font-semibold">Last Reviewed: {guide.lastUpdated}</span>
-            </div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-subtle-gray border border-hairline text-xs font-bold uppercase tracking-wider text-primary">
+              <BookOpen size={14} className="text-primary" /> {guide.category}
+            </span>
 
             <h1 className="font-display font-bold text-4xl md:text-6xl text-primary tracking-tight">
               {guide.title}
@@ -124,6 +164,18 @@ export default async function GuideDetailPage({ params }: { params: Promise<{ sl
             <p className="text-base md:text-lg text-slate-600 max-w-3xl leading-relaxed">
               {guide.overview}
             </p>
+          </div>
+        </section>
+
+        {/* EXECUTIVE SUMMARY / QUICK SUMMARY */}
+        <section className="bg-white">
+          <div className="max-w-4xl mx-auto px-6 lg:px-8">
+            <QuickSummary
+              readingTimeMinutes={guide.readingTime}
+              lastUpdated={guide.lastUpdated}
+              keyTakeaways={guide.takeaways}
+              entities={guide.entities}
+            />
           </div>
         </section>
 
