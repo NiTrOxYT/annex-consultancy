@@ -16,7 +16,7 @@ const DEFAULT_BANNER = {
   title: "Annex Educational Consultancy",
   display_location: "homepage",
   target_device: "all",
-  desktop_image_url: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1600&auto=format&fit=crop",
+  desktop_image_url: "https://res.cloudinary.com/dcmbneyre/image/upload/v1785847797/991A2472-CD73-4576-A7EE-BE69B21249DA_dgnf9u.png",
   mobile_image_url: "https://res.cloudinary.com/dcmbneyre/image/upload/v1785691570/70A612D1-8AD5-4EC7-93D7-5BC1DBB5820C_bf8kj5.png",
   link_url: "/contact",
   is_active: true
@@ -107,9 +107,9 @@ export function CmsBanner({ location, className = "", onSelectTab }: CmsBannerPr
   return (
     <div className={`w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${className}`}>
       <div className="relative rounded-2xl md:rounded-3xl overflow-hidden shadow-md border border-hairline/80 group bg-slate-950 min-h-[140px] md:min-h-[180px] w-full">
-        
+
         {/* Banner Clickable Wrapper */}
-        <div 
+        <div
           onClick={handleClick}
           className="block relative w-full cursor-pointer overflow-hidden min-h-[140px] md:min-h-[180px]"
         >
