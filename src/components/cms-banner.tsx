@@ -18,7 +18,7 @@ const DEFAULT_BANNER = {
   target_device: "all",
   desktop_image_url: "https://res.cloudinary.com/dcmbneyre/image/upload/v1785847797/991A2472-CD73-4576-A7EE-BE69B21249DA_dgnf9u.png",
   mobile_image_url: "https://res.cloudinary.com/dcmbneyre/image/upload/v1785691570/70A612D1-8AD5-4EC7-93D7-5BC1DBB5820C_bf8kj5.png",
-  link_url: "/contact",
+  link_url: "/referral",
   is_active: true
 };
 
@@ -38,6 +38,7 @@ export function CmsBanner({ location, className = "", onSelectTab }: CmsBannerPr
           .order("created_at", { ascending: false });
 
         let list = data || [];
+
         if (!list || list.length === 0) {
           const local = typeof window !== "undefined" ? localStorage.getItem("annex_cms_banners") : null;
           list = local ? JSON.parse(local) : [];
@@ -86,15 +87,35 @@ export function CmsBanner({ location, className = "", onSelectTab }: CmsBannerPr
   const finalMobile = rawMobile || rawDesktop || fallbackSrc;
 
   const handleClick = () => {
-    const link = (active?.link_url || "").trim();
-    if (link.startsWith("http")) {
-      window.open(link, "_blank");
-    } else if (onSelectTab) {
+    if (onSelectTab) {
       onSelectTab("referrals");
-    } else if (link && link !== "/" && link !== "referrals" && link !== "/referrals") {
-      router.push(link);
-    } else {
+      return;
+    }
+
+    const rawLink = (active?.link_url || "").trim();
+
+    if (!rawLink || rawLink === "/contact" || rawLink === "/" || rawLink === "/referral" || rawLink === "referral") {
       router.push("/referral");
+      return;
+    }
+
+    if (rawLink.includes("annex-consultancy.com/referral") || rawLink.includes("annex-consultancy.com/refer")) {
+      router.push("/referral");
+      return;
+    }
+
+    if (location === "homepage") {
+      router.push(rawLink.startsWith("http") && !rawLink.includes("annex-consultancy.com") ? rawLink : "/referral");
+      if (rawLink.startsWith("http") && !rawLink.includes("annex-consultancy.com")) {
+        window.open(rawLink, "_blank");
+      }
+      return;
+    }
+
+    if (rawLink.startsWith("http")) {
+      window.open(rawLink, "_blank");
+    } else {
+      router.push(rawLink);
     }
   };
 
