@@ -1,13 +1,14 @@
 import React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Sparkle, ShieldCheck, Target, Heart, CheckCircle, GraduationCap, Globe, Users, Building, Phone } from "@phosphor-icons/react/dist/ssr";
+import { Sparkle, ShieldCheck, Target, Heart, CheckCircle, GraduationCap, Globe, Users, Building, Phone, LinkedinLogo } from "@phosphor-icons/react/dist/ssr";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { SectionReveal } from "@/components/section-reveal";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase";
 
 export const metadata: Metadata = {
   title: "About Annex Consultancy | Certified Overseas Education & Study Abroad Experts",
@@ -22,23 +23,16 @@ export const metadata: Metadata = {
   },
 };
 
-const teamMembers = [
-  {
-    name: "Subas Chandra Thapa",
-    role: "Managing Director / Principal Counselor",
-    meta: "QEAC Certified No. M108",
-  },
-  {
-    name: "Sonia Regmi",
-    role: "Head of Admissions & University Relations",
-    meta: "Senior Overseas Education Advisor",
-  },
-  {
-    name: "Dr. Prabhat Adhikari",
-    role: "Advisory Board Member",
-    meta: "Academic Relations Specialist",
-  },
-];
+interface CareerExpert {
+  id: string;
+  name: string;
+  designation: string;
+  expertise: string;
+  photo_url?: string;
+  linkedin_url?: string;
+  display_order: number;
+  is_active: boolean;
+}
 
 const offices = [
   {
@@ -61,7 +55,23 @@ const offices = [
   },
 ];
 
-export default function About() {
+export default async function About() {
+  let teamMembers: CareerExpert[] = [];
+
+  try {
+    const { data } = await supabase
+      .from("career_experts")
+      .select("*")
+      .eq("is_active", true)
+      .order("display_order", { ascending: true });
+
+    if (data && data.length > 0) {
+      teamMembers = data;
+    }
+  } catch (err) {
+    console.error("Error fetching career_experts for About page:", err);
+  }
+
   return (
     <>
       <Navigation />
@@ -165,7 +175,7 @@ export default function About() {
             </div>
           </SectionReveal>
 
-          {/* CERTIFIED TEAM */}
+          {/* DYNAMIC CERTIFIED TEAM FROM CAREER_EXPERTS TABLE */}
           <SectionReveal className="mb-20">
             <div className="text-center max-w-2xl mx-auto mb-12">
               <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-primary bg-subtle-gray px-3 py-1 rounded-full border border-hairline">
@@ -176,20 +186,52 @@ export default function About() {
               </h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {teamMembers.map((member, i) => (
-                <Card key={i} className="p-8 border-hairline bg-white text-center space-y-3">
-                  <div className="w-16 h-16 rounded-full bg-primary/10 text-primary font-display font-bold text-xl flex items-center justify-center mx-auto">
-                    {member.name.charAt(0)}
-                  </div>
-                  <h3 className="font-display font-bold text-lg text-primary">{member.name}</h3>
-                  <p className="text-xs font-semibold text-slate-700">{member.role}</p>
-                  <span className="inline-block text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full">
-                    {member.meta}
-                  </span>
-                </Card>
-              ))}
-            </div>
+            {teamMembers.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                {teamMembers.map((member) => (
+                  <Card key={member.id} className="p-8 border-hairline bg-white text-center space-y-3 hover:shadow-md transition-shadow flex flex-col justify-between items-center">
+                    <div className="space-y-3 w-full">
+                      {member.photo_url ? (
+                        <img
+                          src={member.photo_url}
+                          alt={member.name}
+                          className="w-20 h-20 rounded-full object-cover border-2 border-primary/20 mx-auto shadow-sm"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 rounded-full bg-primary/10 text-primary font-display font-bold text-2xl flex items-center justify-center mx-auto border-2 border-primary/20">
+                          {member.name.charAt(0)}
+                        </div>
+                      )}
+                      <div>
+                        <h3 className="font-display font-bold text-lg text-primary">{member.name}</h3>
+                        <p className="text-xs font-semibold text-slate-700 mt-1">{member.designation}</p>
+                      </div>
+                      {member.expertise && (
+                        <span className="inline-block text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full">
+                          {member.expertise}
+                        </span>
+                      )}
+                    </div>
+                    {member.linkedin_url && (
+                      <div className="pt-2">
+                        <a
+                          href={member.linkedin_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-slate-900 transition-colors"
+                        >
+                          <LinkedinLogo size={16} weight="fill" /> LinkedIn Profile
+                        </a>
+                      </div>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center p-8 bg-subtle-gray rounded-2xl border border-hairline max-w-md mx-auto">
+                <p className="text-xs font-semibold text-slate-600">Counselor directory currently updating.</p>
+              </div>
+            )}
           </SectionReveal>
 
           {/* OFFICE LOCATIONS */}
